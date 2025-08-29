@@ -31,7 +31,8 @@ const apiService = {
     return response.json();
   },
   getOrders: async (userId) => {
-    const response = await fetch(`${API_URL}/orders?userId=${userId}`);
+    const url = userId ? `${API_URL}/orders?userId=${userId}` : `${API_URL}/orders`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error('Erro ao buscar pedidos.');
     return response.json();
   },
@@ -61,18 +62,7 @@ const apiService = {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
     if (!response.ok) throw new Error('Erro ao buscar relatório de vendas por representante.');
     return response.json();
-  },
-  checkStatus: async () => {
-  const response = await fetch(`${API_URL}/status`);
-  if (!response.ok) throw new Error('Erro ao verificar status do servidor.');
-  return response.json();
-},
-
-getDashboardStats: async () => {
-  const response = await fetch(`${API_URL}/reports/dashboard-stats`);
-  if (!response.ok) throw new Error('Erro ao buscar estatísticas do dashboard.');
-  return response.json();
-}
+  }
 };
 
 export default apiService;
