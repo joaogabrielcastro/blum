@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import apiService from '../apiService';
+import formatCurrency from "../utils/format";
+
 
 const ReportsPage = ({ userRole, userId, reps = {} }) => { // Garantir valor padrão para reps
   const [allOrders, setAllOrders] = useState([]);
