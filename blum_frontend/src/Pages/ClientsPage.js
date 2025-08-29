@@ -1,52 +1,80 @@
 import { useState, useEffect } from 'react';
-import apiService from './services/apiService';
+import apiService from '../apiService';
+import ClientsForm from '../components/ClientsForm';
 
 const ClientsPage = () => {
   const [clients, setClients] = useState([]);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        const data = await apiService.getClients();
-        setClients(data);
-      } catch (error) {
-        console.error('Falha ao buscar clientes:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchClients();
   }, []);
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Carregando clientes...</div>;
+  const fetchClients = async () => {
+    try {
+      setLoading(true);
+      const clientsData = await apiService.getClients();
+      setClients(clientsData);
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error);
+      alert("Falha ao carregar clientes.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClientAdded = () => {
+    setShowForm(false);
+    fetchClients();
+  };
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Gestão de Clientes</h1>
-      <p className="text-gray-600 mb-8">Lista e detalhes dos clientes cadastrados.</p>
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
-        {clients.length > 0 ? (
-          <ul className="divide-y divide-gray-200">
-            {clients.map(client => (
-              <li key={client.id} className="py-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">{client.companyName}</h2>
-                    <p className="text-sm text-gray-500">Contato: {client.contactPerson}</p>
-                  </div>
-                  <div className="mt-2 sm:mt-0 text-right">
-                    <p className="text-sm text-gray-700">{client.phone}</p>
-                    <p className="text-sm text-gray-500">Região: {client.region}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center text-gray-500">Nenhum cliente encontrado.</div>
-        )}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">Clientes</h1>
+        <button
+          onClick={() => setShowForm(true)}
+          className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
+        >
+          + Adicionar Cliente
+        </button>
       </div>
+
+      {showForm ? (
+        <ClientsForm onClientAdded={handleClientAdded} onCancel={() => setShowForm(false)} />
+      ) : (
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center">Carregando clientes...</div>
+          ) : clients.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">Nenhum cliente encontrado.</div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Região</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CNPJ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {clients.map((client) => (
+                  <tr key={client.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">{client.companyName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{client.contactPerson}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{client.phone}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{client.region}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{client.cnpj}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 };

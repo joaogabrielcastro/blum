@@ -7,9 +7,12 @@ const Login = ({ onLogin }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (username === 'admin' && password === '123') {
-      onLogin();
+      onLogin('admin');
+    } else if (username === 'representante' && password === '123') {
+      onLogin('salesperson');
     } else {
-      alert('Credenciais incorretas. Tente: admin / 123');
+      console.error('Credenciais incorretas.');
+      alert('Credenciais incorretas. Tente: admin / 123 ou representante / 123');
     }
   };
 
