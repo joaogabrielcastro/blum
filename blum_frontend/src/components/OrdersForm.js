@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react';
-import apiService from '../apiService';
+import { useState, useEffect } from "react";
+import apiService from "../apiService";
 
 const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
-  const [selectedClient, setSelectedClient] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('');
+  const [selectedClient, setSelectedClient] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [orderItems, setOrderItems] = useState([]);
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [clientSearch, setClientSearch] = useState('');
-  const [productSearch, setProductSearch] = useState('');
-  const [description, setDescription] = useState('');
-  const [selectedBrand, setSelectedBrand] = useState('all');
+  const [clientSearch, setClientSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("all");
 
   useEffect(() => {
     const fetchClientsAndProducts = async () => {
@@ -33,19 +33,19 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
       alert("Selecione um produto e uma quantidade válida.");
       return;
     }
-    const product = products.find(p => p.id === selectedProduct);
+    const product = products.find((p) => p.id === selectedProduct);
     if (!product) return;
     const item = {
       productId: product.id,
       productName: product.name,
       brand: product.brand,
       quantity,
-      price: product.price,
+      price: Number(product.price) || 0,
     };
     setOrderItems([...orderItems, item]);
-    setSelectedProduct('');
+    setSelectedProduct("");
     setQuantity(1);
-    setProductSearch('');
+    setProductSearch("");
   };
 
   const handleRemoveItem = (index) => {
@@ -57,7 +57,9 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClient || orderItems.length === 0) {
-      alert("Por favor, selecione um cliente и adicione pelo menos um produto.");
+      alert(
+        "Por favor, selecione um cliente и adicione pelo menos um produto."
+      );
       return;
     }
     setLoading(true);
@@ -66,8 +68,10 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
         clientId: selectedClient,
         userId: userId,
         items: orderItems,
-        totalPrice: orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0),
-        status: 'Em aberto',
+        totalPrice: Number(
+          orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
+        ),
+        status: "Em aberto",
         description: description,
       };
       await apiService.createOrder(newOrder);
@@ -79,95 +83,126 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
       setLoading(false);
     }
   };
-  
-  const filteredClients = clients.filter(client =>
+
+  const filteredClients = clients.filter((client) =>
     client.companyName.toLowerCase().includes(clientSearch.toLowerCase())
   );
-  
-  const filteredProducts = products.filter(product =>
-    (selectedBrand === 'all' || product.brand === selectedBrand) &&
-    (product.name.toLowerCase().includes(productSearch.toLowerCase()))
+
+  const filteredProducts = products.filter(
+    (product) =>
+      (selectedBrand === "all" || product.brand === selectedBrand) &&
+      product.name.toLowerCase().includes(productSearch.toLowerCase())
   );
 
   const handleClientSelect = (e) => {
     const selectedName = e.target.value;
-    const foundClient = clients.find(c => c.companyName.toLowerCase() === selectedName.toLowerCase());
+    const foundClient = clients.find(
+      (c) => c.companyName.toLowerCase() === selectedName.toLowerCase()
+    );
     if (foundClient) {
-        setSelectedClient(foundClient.id);
-        setClientSearch(foundClient.companyName);
+      setSelectedClient(foundClient.id);
+      setClientSearch(foundClient.companyName);
     } else {
-        setSelectedClient('');
+      setSelectedClient("");
     }
   };
 
   const handleProductSelect = (e) => {
     const selectedName = e.target.value;
-    const foundProduct = products.find(p => p.name.toLowerCase() === selectedName.toLowerCase());
+    const foundProduct = products.find(
+      (p) => p.name.toLowerCase() === selectedName.toLowerCase()
+    );
     if (foundProduct) {
-        setSelectedProduct(foundProduct.id);
-        setProductSearch(foundProduct.name);
+      setSelectedProduct(foundProduct.id);
+      setProductSearch(foundProduct.name);
     } else {
-        setSelectedProduct('');
+      setSelectedProduct("");
     }
   };
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Criar Novo Pedido</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        Criar Novo Pedido
+      </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="client-search">Cliente</label>
+          <label
+            className="block text-gray-700 text-sm font-medium mb-2"
+            htmlFor="client-search"
+          >
+            Cliente
+          </label>
           <input
             type="text"
             id="client-search"
             placeholder="Buscar cliente..."
             value={clientSearch}
-            onChange={(e) => { setClientSearch(e.target.value) }}
+            onChange={(e) => {
+              setClientSearch(e.target.value);
+            }}
             onBlur={handleClientSelect}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             list="client-list"
           />
           <datalist id="client-list">
-            {filteredClients.map(client => (
+            {filteredClients.map((client) => (
               <option key={client.id} value={client.companyName} />
             ))}
           </datalist>
         </div>
 
         <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="description">Descrição do Pedido</label>
-            <textarea
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows="3"
-            />
-          </div>
+          <label
+            className="block text-gray-700 text-sm font-medium mb-2"
+            htmlFor="description"
+          >
+            Descrição do Pedido
+          </label>
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows="3"
+          />
+        </div>
 
         <div className="space-y-4 border p-4 rounded-lg">
           <h3 className="font-semibold text-lg">Itens do Pedido</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="md:col-span-2">
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="product-search">Produto</label>
+              <label
+                className="block text-gray-700 text-sm font-medium mb-2"
+                htmlFor="product-search"
+              >
+                Produto
+              </label>
               <input
                 type="text"
                 id="product-search"
                 placeholder="Buscar produto..."
                 value={productSearch}
-                onChange={(e) => { setProductSearch(e.target.value) }}
+                onChange={(e) => {
+                  setProductSearch(e.target.value);
+                }}
                 onBlur={handleProductSelect}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 list="product-list"
               />
               <datalist id="product-list">
-                {filteredProducts.map(product => (
+                {filteredProducts.map((product) => (
                   <option key={product.id} value={product.name} />
                 ))}
               </datalist>
             </div>
             <div>
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="quantity">Quantidade</label>
+              <label
+                className="block text-gray-700 text-sm font-medium mb-2"
+                htmlFor="quantity"
+              >
+                Quantidade
+              </label>
               <input
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 type="number"
@@ -201,8 +236,14 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
           {orderItems.length > 0 && (
             <ul className="divide-y divide-gray-200 mt-4">
               {orderItems.map((item, index) => (
-                <li key={index} className="flex justify-between items-center py-2">
-                  <span>{item.productName} ({item.quantity} x R${item.price.toFixed(2)})</span>
+                <li
+                  key={index}
+                  className="flex justify-between items-center py-2"
+                >
+                  <span>
+                    {item.productName} ({item.quantity} x R$
+                    {item.price.toFixed(2)})
+                  </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveItem(index)}
@@ -229,7 +270,7 @@ const OrdersForm = ({ onOrderAdded, onCancel, userId }) => {
             className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:bg-blue-300"
             disabled={loading}
           >
-            {loading ? 'Salvando...' : 'Salvar Pedido'}
+            {loading ? "Salvando..." : "Salvar Pedido"}
           </button>
         </div>
       </form>

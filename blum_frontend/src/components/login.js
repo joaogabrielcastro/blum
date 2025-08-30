@@ -1,31 +1,39 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 const Login = ({ onLogin }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === '123') {
-      onLogin('admin', 'admin');
-    } else if (username === 'siane' && password === '123') {
-      onLogin('salesperson', 'siane');
-    } else if (username === 'eduardo' && password === '123') {
-      onLogin('salesperson', 'eduardo');
+    if (username === "admin" && password === "123") {
+      onLogin("admin", "admin"); // role, username
+    } else if (username === "siane" && password === "123") {
+      onLogin("salesperson", "siane");
+    } else if (username === "eduardo" && password === "123") {
+      onLogin("salesperson", "eduardo");
     } else {
-      console.error('Credenciais incorretas.');
-      alert('Credenciais incorretas. Tente: admin / 123, siane / 123 ou eduardo / 123');
+      alert("Usuário ou senha inválidos");
     }
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-gray-200">
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">Blum</h2>
-        <p className="text-center text-gray-600 mb-8">Acesse seu painel de controle</p>
+        <h2 className="text-3xl font-bold text-center text-gray-800 mb-6">
+          Blum
+        </h2>
+        <p className="text-center text-gray-600 mb-8">
+          Acesse seu painel de controle
+        </p>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="username">Usuário</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="username"
+            >
+              Usuário
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
               type="text"
@@ -37,7 +45,12 @@ const Login = ({ onLogin }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="password">Senha</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="password"
+            >
+              Senha
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
               type="password"

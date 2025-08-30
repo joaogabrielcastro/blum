@@ -11,39 +11,37 @@ import apiService from "./apiService";
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
-  const [userId, setUserId] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [username, setUsername] = useState(null);
 
-  useEffect(() => {
-    setUserId("representante_1");
-  }, []);
-
-  const handleLogin = (role) => {
+  const handleLogin = (role, user) => {
     setIsLoggedIn(true);
     setUserRole(role);
+    setUsername(user);
     setCurrentPage("dashboard");
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setCurrentPage("login");
     setUserRole(null);
+    setUsername(null);
+    setCurrentPage("login");
   };
 
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={setCurrentPage} username={username} />;
+      case "orders":
+        return <OrdersPage userId={username} />; // usa o representante para filtrar pedidos
+      case "clients":
+        return <ClientsPage username={username} />;
       case "products":
         return <ProductsPage userRole={userRole} />;
-      case "clients":
-        return <ClientsPage />;
-      case "orders":
-        return <OrdersPage userId={userId} />;
       case "reports":
-        return <ReportsPage userRole={userRole} userId={userId} />;
+        return <ReportsPage userRole={userRole} userId={username} />;
       default:
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={setCurrentPage} username={username} />;
     }
   };
 
