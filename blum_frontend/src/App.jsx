@@ -9,54 +9,49 @@ import ReportsPage from "./Pages/ReportsPage";
 import apiService from "./apiService";
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentPage, setCurrentPage] = useState("dashboard");
-  const [userRole, setUserRole] = useState(null);
-  const [username, setUsername] = useState(null);
-  const [brands, setBrands] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPage, setCurrentPage] = useState("dashboard");
+  const [userRole, setUserRole] = useState(null);
+  const [username, setUsername] = useState(null);
+  const [brands, setBrands] = useState([]);
+  const userId = username;
 
-  const handleLogin = (role, user) => {
-    setIsLoggedIn(true);
-    setUserRole(role);
-    setUsername(user);
-    setCurrentPage("dashboard");
+  const reps = {
+    'admin_1': 'Admin',
+    'siane_1': 'Siane',
+    'eduardo_1': 'Eduardo'
   };
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserRole(null);
-    setUsername(null);
-    setCurrentPage("login");
-  };
+  const handleLogin = (role, user) => {
+    setIsLoggedIn(true);
+    setUserRole(role);
+    setUsername(user);
+    setCurrentPage("dashboard");
+  };
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case "dashboard":
-        return <Dashboard onNavigate={setCurrentPage} username={username} />;
-      case "orders":
-        return (
-          <OrdersPage
-            userRole={userRole}
-            brands={brands}
-            setBrands={setBrands}
-          />
-        );
-      case "clients":
-        return <ClientsPage username={username} />;
-      case "products":
-        return (
-          <ProductsPage
-            userRole={userRole}
-            brands={brands}
-            setBrands={setBrands}
-          />
-        );
-      case "reports":
-        return <ReportsPage userRole={userRole} userId={username} />;
-      default:
-        return <Dashboard onNavigate={setCurrentPage} username={username} />;
-    }
-  };
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserRole(null);
+    setUsername(null);
+    setCurrentPage("login");
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case "dashboard":
+        return <Dashboard onNavigate={setCurrentPage} username={username} />;
+      case "orders":
+        return <OrdersPage userId={userId} brands={brands} reps={reps} />;
+      case "clients":
+        return <ClientsPage username={username} />;
+      case "products":
+        return <ProductsPage userRole={userRole} brands={brands} setBrands={setBrands} />;
+      case "reports":
+        return <ReportsPage userRole={userRole} userId={userId} reps={reps} />;
+      default:
+        return <Dashboard onNavigate={setCurrentPage} username={username} />;
+    }
+  };
 
   return (
     <div className="font-sans text-gray-800 antialiased bg-gray-50">

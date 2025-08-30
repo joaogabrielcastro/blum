@@ -1,9 +1,15 @@
-import React from 'react';
-
-const ConfirmationModal = ({ show, onConfirm, onCancel, message }) => {
+const ConfirmationModal = ({ 
+  show, 
+  onConfirm, 
+  onCancel, 
+  message, 
+  confirmText = "Confirmar", 
+  confirmColor = "bg-red-600 hover:bg-red-700" 
+}) => {
   if (!show) return null;
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full mx-4 text-center">
         <h3 className="text-xl font-bold mb-4">Confirmação</h3>
         <p className="text-gray-600 mb-6">{message}</p>
@@ -16,9 +22,9 @@ const ConfirmationModal = ({ show, onConfirm, onCancel, message }) => {
           </button>
           <button
             onClick={onConfirm}
-            className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors duration-200"
+            className={`px-6 py-2 text-white font-bold rounded-lg transition-colors duration-200 ${confirmColor}`}
           >
-            Confirmar
+            {confirmText}
           </button>
         </div>
       </div>

@@ -22,17 +22,25 @@ exports.getAll = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { clientId, userId, items, totalPrice, description } = req.body;
+
     const result = await sql`
-      INSERT INTO orders ("clientId", "userId", items, "totalPrice", description)
-      VALUES (${clientId}, ${userId}, ${JSON.stringify(
-      items
-    )}, ${totalPrice}, ${description})
+      INSERT INTO orders ("clientId", "userId", items, "totalPrice", description, status, "createdAt")
+      VALUES (
+        ${clientId},
+        ${userId},
+        ${JSON.stringify(items)}::jsonb,
+        ${totalPrice},
+        ${description || ""},
+        'Em aberto',
+        NOW()
+      )
       RETURNING *;
     `;
+
     res.status(201).json(result[0]);
   } catch (error) {
     console.error("Erro ao criar pedido:", error);
-    res.status(500).json({ error: "Erro ao criar pedido." });
+    res.status(500).json({ error: error.message || "Erro ao criar pedido." });
   }
 };
 
@@ -57,10 +65,10 @@ exports.finalize = async (req, res) => {
     }
 
     await sql`
-          UPDATE orders
-          SET status = 'Entregue', "finishedAt" = NOW()
-          WHERE id = ${id};
-      `;
+          UPDATE orders
+          SET status = 'Entregue', "finishedAt" = NOW()
+          WHERE id = ${id};
+      `;
 
     const items = order.items;
     for (const item of items) {
@@ -71,6 +79,28 @@ exports.finalize = async (req, res) => {
   } catch (error) {
     console.error("Erro ao finalizar pedido:", error);
     res.status(500).json({ error: "Erro ao finalizar pedido." });
+  }
+};
+
+exports.update = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { clientId, items, totalPrice, description, discount } = req.body;
+
+    await sql`
+      UPDATE orders
+      SET "clientId" = ${clientId},
+          items = ${JSON.stringify(items)}::JSONB,
+          "totalPrice" = ${totalPrice},
+          description = ${description},
+          discount = ${discount}
+      WHERE id = ${id};
+    `;
+
+    res.status(200).json({ message: "Pedido atualizado com sucesso." });
+  } catch (error) {
+    console.error("Erro ao atualizar pedido:", error);
+    res.status(500).json({ error: "Erro ao atualizar pedido." });
   }
 };
 

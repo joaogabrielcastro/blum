@@ -44,9 +44,21 @@ const apiService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newOrderData),
     });
-    if (!response.ok) throw new Error("Erro ao criar pedido.");
-    return response.json();
+
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      data = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || "Erro ao criar pedido.");
+    }
+
+    return data;
   },
+
   deleteOrder: async (orderId) => {
     const response = await fetch(`${API_URL}/orders/${orderId}`, {
       method: "DELETE",
@@ -78,6 +90,18 @@ const apiService = {
       body: JSON.stringify(newBrandData),
     });
     if (!response.ok) throw new Error("Erro ao criar marca.");
+    return response.json();
+  },
+  getStatus: async () => {
+    const response = await fetch(`${API_URL}/status`);
+    if (!response.ok) {
+      throw new Error("Erro ao buscar o status da API.");
+    }
+    return response.json();
+  },
+  queryCNPJ: async (cnpj) => {
+    const response = await fetch(`${CNPJ_API_URL}/${cnpj}`);
+    if (!response.ok) throw new Error("Erro ao consultar CNPJ.");
     return response.json();
   },
 };

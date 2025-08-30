@@ -1,295 +1,285 @@
 import { useState, useEffect } from "react";
 import apiService from "../apiService";
-import OrdersForm from "./OrdersForm";
 
-const OrdersPage = ({ userId, reps, brands }) => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
-  const [orderToFinalize, setOrderToFinalize] = useState(null);
-  const [clients, setClients] = useState({});
+const OrdersForm = ({ onOrderAdded, onCancel, userId, brands }) => {
+  const [selectedClient, setSelectedClient] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [orderItems, setOrderItems] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("all");
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchClientsAndProducts = async () => {
       try {
-        setLoading(true);
-        const [ordersData, clientsData, productsData] = await Promise.all([
-          apiService.getOrders(userId),
-          apiService.getClients(),
-          apiService.getProducts(),
-        ]);
-
-        setOrders(ordersData);
-
-        const clientsMap = {};
-        clientsData.forEach((client) => {
-          clientsMap[client.id] = client.companyName;
-        });
-        setClients(clientsMap);
+        const clientsData = await apiService.getClients();
+        setClients(clientsData);
+        const productsData = await apiService.getProducts(selectedBrand);
+        setProducts(productsData);
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
-      } finally {
-        setLoading(false);
       }
     };
-    fetchData();
-  }, [userId]);
+    fetchClientsAndProducts();
+  }, [selectedBrand]);
 
-  const handleDelete = (orderId) => {
-    setOrderToDelete(orderId);
-    setShowModal(true);
-  };
-
-  const handleFinalize = (orderId) => {
-    setOrderToFinalize(orderId);
-    setShowModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!orderToDelete) return;
-    try {
-      await apiService.deleteOrder(orderToDelete);
-      console.log(`Pedido ${orderToDelete} excluído com sucesso.`);
-      setOrders(orders.filter((order) => order.id !== orderToDelete));
-    } catch (error) {
-      console.error("Erro ao excluir pedido:", error);
-      alert("Falha ao excluir o pedido. Tente novamente.");
-    } finally {
-      setShowModal(false);
-      setOrderToDelete(null);
+  const handleAddItem = () => {
+    if (!selectedProduct || quantity < 1) {
+      alert("Selecione um produto e uma quantidade válida.");
+      return;
     }
+    const product = products.find((p) => p.id === selectedProduct);
+    if (!product) return;
+    const item = {
+      productId: product.id,
+      productName: product.name,
+      brand: product.brand,
+      quantity,
+      price: Number(product.price) || 0,
+    };
+    setOrderItems([...orderItems, item]);
+    setSelectedProduct("");
+    setQuantity(1);
+    setProductSearch("");
   };
 
-  const confirmFinalize = async () => {
-    if (!orderToFinalize) return;
-    try {
-      await apiService.finalizeOrder(orderToFinalize);
-      console.log(`Pedido ${orderToFinalize} finalizado com sucesso.`);
-      setOrders(
-        orders.map((order) =>
-          order.id === orderToFinalize
-            ? {
-                ...order,
-                status: "Entregue",
-                finishedAt: new Date().toISOString(),
-              }
-            : order
-        )
+  const handleRemoveItem = (index) => {
+    const newItems = [...orderItems];
+    newItems.splice(index, 1);
+    setOrderItems(newItems);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedClient || orderItems.length === 0) {
+      alert(
+        "Por favor, selecione um cliente e adicione pelo menos um produto."
       );
+      return;
+    }
+    setLoading(true);
+    try {
+      const newOrder = {
+        clientId: selectedClient,
+        userId: userId,
+        items: orderItems,
+        totalPrice: Number(
+          orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0)
+        ),
+        status: "Em aberto",
+        description: description,
+      };
+
+      const response = await apiService.createOrder(newOrder);
+      console.log("Pedido criado com sucesso:", response);
+      onOrderAdded();
     } catch (error) {
-      console.error("Erro ao finalizar pedido:", error);
-      alert("Falha ao finalizar o pedido. Tente novamente.");
+      console.error("Erro ao adicionar pedido:", error.response || error);
+      alert("Falha ao adicionar pedido. Detalhes no console.");
     } finally {
-      setShowModal(false);
-      setOrderToFinalize(null);
+      setLoading(false);
     }
   };
 
-  const handleGeneratePdf = (order) => {
-    const doc = new jsPDF();
-    doc.text(`Pedido #${order.id}`, 10, 10);
-    doc.text(`Cliente: ${clients[order.clientId]}`, 10, 20);
-    doc.text(`Vendedor: ${reps[order.userId]}`, 10, 30);
-    doc.text(
-      `Data de Finalização: ${
-        order.finishedAt
-          ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
-          : "N/A"
-      }`,
-      10,
-      40
+  const filteredClients = clients.filter((client) =>
+    client.companyName.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
+  const filteredProducts = products.filter(
+    (product) =>
+      (selectedBrand === "all" || product.brand === selectedBrand) &&
+      product.name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const handleClientSelect = (e) => {
+    const selectedName = e.target.value;
+    const foundClient = clients.find(
+      (c) => c.companyName.toLowerCase() === selectedName.toLowerCase()
     );
-    doc.text(`Descrição: ${order.description || "N/A"}`, 10, 50);
-
-    const tableColumn = [
-      "Produto",
-      "Marca",
-      "Quantidade",
-      "Preço Unitário",
-      "Total",
-    ];
-    const tableRows = [];
-
-    order.items.forEach((item) => {
-      const itemData = [
-        item.productName,
-        item.brand,
-        item.quantity,
-        `R$ ${parseFloat(item.price).toFixed(2)}`,
-        `R$ ${(parseFloat(item.price) * item.quantity).toFixed(2)}`,
-      ];
-      tableRows.push(itemData);
-    });
-
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 60,
-      theme: "grid",
-      headStyles: { fillColor: [241, 243, 244], textColor: [0, 0, 0] },
-      styles: { fontSize: 10, cellPadding: 2, overflow: "linebreak" },
-    });
-
-    const finalY = doc.autoTable.previous.finalY;
-    const discountAmount =
-      parseFloat(order.totalPrice) * (parseFloat(order.discount) / 100) || 0;
-    doc.text(
-      `Desconto: R$ ${discountAmount.toFixed(2)} (${order.discount}%)`,
-      10,
-      finalY + 10
-    );
-    doc.text(
-      `Valor Total: R$ ${parseFloat(order.totalPrice).toFixed(2)}`,
-      10,
-      finalY + 20
-    );
-
-    const footerText = "Blum - Gestão de Pedidos Eletrônicos | www.blum.com";
-    const footerY = doc.internal.pageSize.height - 10;
-    doc.setFontSize(10);
-    doc.setTextColor(150);
-    doc.text(footerText, 10, footerY);
-
-    doc.save(`pedido_${order.id}.pdf`);
+    if (foundClient) {
+      setSelectedClient(foundClient.id);
+      setClientSearch(foundClient.companyName);
+    } else {
+      setSelectedClient("");
+    }
   };
 
-  if (loading)
-    return (
-      <div className="p-8 text-center text-gray-500">Carregando pedidos...</div>
+  const handleProductSelect = (e) => {
+    const selectedName = e.target.value;
+    const foundProduct = products.find(
+      (p) => p.name.toLowerCase() === selectedName.toLowerCase()
     );
-  if (showForm) {
-    return (
-      <div className="p-8">
-        <OrdersForm
-          userId={userId}
-          clients={clients}
-          onOrderAdded={() => setShowForm(false)}
-          onCancel={() => setShowForm(false)}
-          brands={brands}
-        />
-      </div>
-    );
-  }
+    if (foundProduct) {
+      setSelectedProduct(foundProduct.id);
+      setProductSearch(foundProduct.name);
+    } else {
+      setSelectedProduct("");
+    }
+  };
 
   return (
-    <div className="p-8">
-      <ConfirmationModal
-        show={showModal}
-        onConfirm={orderToDelete ? confirmDelete : confirmFinalize}
-        onCancel={() => {
-          setShowModal(false);
-          setOrderToDelete(null);
-          setOrderToFinalize(null);
-        }}
-        message={
-          orderToDelete
-            ? "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
-            : "Tem certeza que deseja finalizar este pedido? Esta ação não pode ser desfeita."
-        }
-      />
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Gerenciamento de Pedidos
-        </h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
-        >
-          + Criar Pedido
-        </button>
-      </div>
-      <p className="text-gray-600 mb-8">
-        Acompanhe o status e histórico de pedidos.
-      </p>
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
-        {orders.length > 0 ? (
-          <ul className="divide-y divide-gray-200">
-            {orders.map((order) => (
-              <li
-                key={order.id}
-                className="py-4 flex justify-between items-center"
+    <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-gray-200">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        Criar Novo Pedido
+      </h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label
+            className="block text-gray-700 text-sm font-medium mb-2"
+            htmlFor="client-search"
+          >
+            Cliente
+          </label>
+          <input
+            type="text"
+            id="client-search"
+            placeholder="Buscar cliente..."
+            value={clientSearch}
+            onChange={(e) => {
+              setClientSearch(e.target.value);
+            }}
+            onBlur={handleClientSelect}
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            list="client-list"
+          />
+          <datalist id="client-list">
+            {filteredClients.map((client) => (
+              <option key={client.id} value={client.companyName} />
+            ))}
+          </datalist>
+        </div>
+
+        <div>
+          <label
+            className="block text-gray-700 text-sm font-medium mb-2"
+            htmlFor="description"
+          >
+            Descrição do Pedido
+          </label>
+          <textarea
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows="3"
+          />
+        </div>
+
+        <div className="space-y-4 border p-4 rounded-lg">
+          <h3 className="font-semibold text-lg">Itens do Pedido</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="md:col-span-2">
+              <label
+                className="block text-gray-700 text-sm font-medium mb-2"
+                htmlFor="product-search"
               >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      Pedido #{order.id}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      Cliente: {clients[order.clientId] || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Vendedor: {reps[order.userId] || "N/A"}
-                    </p>
-                    {order.items && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Itens: {order.items.length}
-                      </p>
-                    )}
-                    <p className="text-sm text-gray-500 mt-1">
-                      Descrição: {order.description || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Finalizado em:{" "}
-                      {order.finishedAt
-                        ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div className="mt-2 sm:mt-0 text-right">
-                    <p className="text-sm text-gray-700">
-                      Total: R${" "}
-                      {parseFloat(order.totalPrice)?.toFixed(2) || "N/A"}
-                    </p>
-                    <span
-                      className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                        order.status === "Entregue"
-                          ? "bg-green-100 text-green-800"
-                          : order.status === "Em aberto"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {order.status || "N/A"}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex space-x-2 ml-4">
+                Produto
+              </label>
+              <input
+                type="text"
+                id="product-search"
+                placeholder="Buscar produto..."
+                value={productSearch}
+                onChange={(e) => {
+                  setProductSearch(e.target.value);
+                }}
+                onBlur={handleProductSelect}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                list="product-list"
+              />
+              <datalist id="product-list">
+                {filteredProducts.map((product) => (
+                  <option key={product.id} value={product.name} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label
+                className="block text-gray-700 text-sm font-medium mb-2"
+                htmlFor="quantity"
+              >
+                Quantidade
+              </label>
+              <input
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="number"
+                id="quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
+                min="1"
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="font-semibold text-gray-700">Marca:</span>
+            <select
+              value={selectedBrand}
+              onChange={(e) => setSelectedBrand(e.target.value)}
+              className="p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="all">Todas</option>
+              {(brands || []).map((brandName) => (
+                <option key={brandName} value={brandName}>
+                  {brandName}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAddItem}
+              className="bg-green-600 text-white font-bold p-3 rounded-lg hover:bg-green-700 transition duration-300 shadow-md"
+            >
+              Adicionar Item
+            </button>
+          </div>
+          {orderItems.length > 0 && (
+            <ul className="divide-y divide-gray-200 mt-4">
+              {orderItems.map((item, index) => (
+                <li
+                  key={index}
+                  className="flex justify-between items-center py-2"
+                >
+                  <span>
+                    {item.productName} ({item.quantity} x R$
+                    {item.price.toFixed(2)})
+                  </span>
                   <button
-                    onClick={() => handleDelete(order.id)}
+                    type="button"
+                    onClick={() => handleRemoveItem(index)}
                     className="text-red-500 hover:text-red-700"
                   >
-                    Excluir
+                    Remover
                   </button>
-                  {order.status === "Em aberto" && (
-                    <button
-                      onClick={() => handleFinalize(order.id)}
-                      className="text-green-500 hover:text-green-700 ml-2"
-                    >
-                      Finalizar
-                    </button>
-                  )}
-                  {order.status === "Entregue" && (
-                    <button
-                      onClick={() => handleGeneratePdf(order)}
-                      className="bg-gray-200 text-gray-800 font-bold px-3 py-1 rounded-lg text-sm hover:bg-gray-300"
-                    >
-                      Gerar PDF
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center text-gray-500">
-            Nenhum pedido encontrado.
-          </div>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end space-x-4 mt-6">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors duration-200"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:bg-blue-300"
+            disabled={loading}
+          >
+            {loading ? "Salvando..." : "Salvar Pedido"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
 
-export default OrdersPage;
+export default OrdersForm;
