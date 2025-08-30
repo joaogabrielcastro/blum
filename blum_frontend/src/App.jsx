@@ -13,6 +13,7 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [userRole, setUserRole] = useState(null);
   const [username, setUsername] = useState(null);
+  const [brands, setBrands] = useState([]);
 
   const handleLogin = (role, user) => {
     setIsLoggedIn(true);
@@ -33,11 +34,23 @@ const App = () => {
       case "dashboard":
         return <Dashboard onNavigate={setCurrentPage} username={username} />;
       case "orders":
-        return <OrdersPage userId={username} />; // usa o representante para filtrar pedidos
+        return (
+          <OrdersPage
+            userRole={userRole}
+            brands={brands}
+            setBrands={setBrands}
+          />
+        );
       case "clients":
         return <ClientsPage username={username} />;
       case "products":
-        return <ProductsPage userRole={userRole} />;
+        return (
+          <ProductsPage
+            userRole={userRole}
+            brands={brands}
+            setBrands={setBrands}
+          />
+        );
       case "reports":
         return <ReportsPage userRole={userRole} userId={username} />;
       default:

@@ -1,17 +1,22 @@
 import { useState } from 'react';
 import apiService from '../apiService';
 
-const ProductsForm = ({ onProductAdded, onCancel }) => {
+const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
   const [name, setName] = useState('');
   const [productCode, setProductCode] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [brand, setBrand] = useState('Blumenau');
+  // Seta a primeira marca da lista como padrão, se houver
+  const [brand, setBrand] = useState(brands[0] || 'Blumenau');
+  const [newBrand, setNewBrand] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name || !productCode || !brand || isNaN(parseFloat(price)) || parseFloat(price) <= 0 || isNaN(parseInt(stock, 10)) || parseInt(stock, 10) < 0) {
+
+    const productBrand = brand === 'other' ? newBrand : brand;
+
+    if (!name || !productCode || !productBrand || isNaN(parseFloat(price)) || parseFloat(price) <= 0 || isNaN(parseInt(stock, 10)) || parseInt(stock, 10) < 0) {
       alert('Por favor, preencha todos os campos corretamente.');
       return;
     }
@@ -23,9 +28,10 @@ const ProductsForm = ({ onProductAdded, onCancel }) => {
         productCode,
         price: parseFloat(price),
         stock: parseInt(stock, 10),
-        brand,
+        brand: productBrand,
       };
       await apiService.createProduct(newProduct);
+      alert('Produto salvo com sucesso!');
       onProductAdded();
     } catch (error) {
       console.error("Erro ao adicionar produto:", error);
@@ -94,11 +100,26 @@ const ProductsForm = ({ onProductAdded, onCancel }) => {
               onChange={(e) => setBrand(e.target.value)}
               required
             >
-              <option value="Blumenau">Blumenau</option>
-              <option value="Zagonel">Zagonel</option>
-              <option value="Padova">Padova</option>
+              {brands.map(brandName => (
+                <option key={brandName} value={brandName}>{brandName}</option>
+              ))}
+              <option value="other">Outra (digitar)</option>
             </select>
           </div>
+          {brand === 'other' && (
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="newBrand">Nova Marca</label>
+              <input
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="text"
+                id="newBrand"
+                value={newBrand}
+                onChange={(e) => setNewBrand(e.target.value)}
+                placeholder="Digite a nova marca"
+                required
+              />
+            </div>
+          )}
         </div>
         <div className="flex justify-end space-x-4 mt-6">
           <button
