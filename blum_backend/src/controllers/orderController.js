@@ -1,6 +1,6 @@
 const { neon } = require("@neondatabase/serverless");
 const sql = neon(process.env.DATABASE_URL);
-const productsController = require("../controllers/productController");
+const productsController = require("./productController");
 
 exports.getAll = async (req, res) => {
   try {
@@ -65,10 +65,10 @@ exports.finalize = async (req, res) => {
     }
 
     await sql`
-          UPDATE orders
-          SET status = 'Entregue', "finishedAt" = NOW()
-          WHERE id = ${id};
-      `;
+      UPDATE orders
+      SET status = 'Entregue', "finishedAt" = NOW()
+      WHERE id = ${id};
+    `;
 
     const items = order.items;
     for (const item of items) {

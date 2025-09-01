@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logo from "../public/BLU1M.jpg"; 
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState("");
