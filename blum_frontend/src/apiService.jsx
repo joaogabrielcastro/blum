@@ -30,14 +30,16 @@ const apiService = {
     if (!response.ok) throw new Error("Erro ao criar produto.");
     return response.json();
   },
-  getOrders: async (userId) => {
-    const url = userId
-      ? `${API_URL}/orders?userId=${userId}`
-      : `${API_URL}/orders`;
+
+  // FUNÇÃO ATUALIZADA: Agora recebe um objeto de parâmetros
+  getOrders: async (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const url = `${API_URL}/orders?${query}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error("Erro ao buscar pedidos.");
     return response.json();
   },
+
   createOrder: async (newOrderData) => {
     const response = await fetch(`${API_URL}/orders`, {
       method: "POST",
@@ -58,7 +60,6 @@ const apiService = {
 
     return data;
   },
-
   deleteOrder: async (orderId) => {
     const response = await fetch(`${API_URL}/orders/${orderId}`, {
       method: "DELETE",
@@ -72,6 +73,15 @@ const apiService = {
     if (!response.ok) throw new Error("Erro ao finalizar pedido.");
     return response.json();
   },
+
+  // NOVA FUNÇÃO: Busca estatísticas do cliente
+  getClientStats: async (clientId) => {
+    const response = await fetch(`${API_URL}/orders/stats/${clientId}`);
+    if (!response.ok)
+      throw new Error("Falha ao buscar estatísticas do cliente.");
+    return response.json();
+  },
+
   getSalesByRep: async () => {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
     if (!response.ok)

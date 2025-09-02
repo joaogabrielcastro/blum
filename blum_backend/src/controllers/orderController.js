@@ -4,11 +4,16 @@ const productsController = require("./productController");
 
 exports.getAll = async (req, res) => {
   try {
-    const { userId } = req.query;
+    // Agora desestruturamos userId E clientId
+    const { userId, clientId } = req.query;
     let orders;
     if (userId) {
       orders =
         await sql`SELECT * FROM orders WHERE "userId" = ${userId} ORDER BY "createdAt" DESC`;
+    } else if (clientId) {
+      // Nova condição para filtrar por cliente
+      orders =
+        await sql`SELECT * FROM orders WHERE "clientId" = ${clientId} ORDER BY "createdAt" DESC`;
     } else {
       orders = await sql`SELECT * FROM orders ORDER BY "createdAt" DESC`;
     }
@@ -24,18 +29,18 @@ exports.create = async (req, res) => {
     const { clientId, userId, items, totalPrice, description } = req.body;
 
     const result = await sql`
-      INSERT INTO orders ("clientId", "userId", items, "totalPrice", description, status, "createdAt")
-      VALUES (
-        ${clientId},
-        ${userId},
-        ${JSON.stringify(items)}::jsonb,
-        ${totalPrice},
-        ${description || ""},
-        'Em aberto',
-        NOW()
-      )
-      RETURNING *;
-    `;
+      INSERT INTO orders ("clientId", "userId", items, "totalPrice", description, status, "createdAt")
+      VALUES (
+        ${clientId},
+        ${userId},
+        ${JSON.stringify(items)}::jsonb,
+        ${totalPrice},
+        ${description || ""},
+        'Em aberto',
+        NOW()
+      )
+      RETURNING *;
+    `;
 
     res.status(201).json(result[0]);
   } catch (error) {
@@ -65,10 +70,10 @@ exports.finalize = async (req, res) => {
     }
 
     await sql`
-      UPDATE orders
-      SET status = 'Entregue', "finishedAt" = NOW()
-      WHERE id = ${id};
-    `;
+      UPDATE orders
+      SET status = 'Entregue', "finishedAt" = NOW()
+      WHERE id = ${id};
+    `;
 
     const items = order.items;
     for (const item of items) {
@@ -88,20 +93,49 @@ exports.update = async (req, res) => {
     const { clientId, items, totalPrice, description, discount } = req.body;
 
     await sql`
-      UPDATE orders
-      SET "clientId" = ${clientId},
-          items = ${JSON.stringify(items)}::JSONB,
-          "totalPrice" = ${totalPrice},
-          description = ${description},
-          discount = ${discount}
-      WHERE id = ${id};
-    `;
+      UPDATE orders
+      SET "clientId" = ${clientId},
+          items = ${JSON.stringify(items)}::JSONB,
+          "totalPrice" = ${totalPrice},
+          description = ${description},
+          discount = ${discount}
+      WHERE id = ${id};
+    `;
 
     res.status(200).json({ message: "Pedido atualizado com sucesso." });
   } catch (error) {
     console.error("Erro ao atualizar pedido:", error);
     res.status(500).json({ error: "Erro ao atualizar pedido." });
   }
+
+  exports.getClientStats = async (req, res) => {
+    try {
+      const { clientId } = req.params;
+
+      if (!clientId) {
+        return res
+          .status(400)
+          .json({ error: "O ID do cliente é obrigatório." });
+      }
+
+      const result = await sql`
+      SELECT
+        COUNT(id) AS "totalOrders",
+        COALESCE(SUM("totalPrice"), 0) AS "totalSpent"
+      FROM orders
+      WHERE "clientId" = ${clientId} AND status = 'Entregue';
+    `;
+
+      const stats = result[0] || { totalOrders: 0, totalSpent: 0 };
+
+      res.status(200).json(stats);
+    } catch (error) {
+      console.error("Erro ao buscar estatísticas do cliente:", error);
+      res
+        .status(500)
+        .json({ error: "Erro ao buscar estatísticas do cliente." });
+    }
+  };
 };
 
 module.exports = exports;

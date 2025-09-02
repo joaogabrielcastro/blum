@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import apiService from '../apiService';
-import ClientsForm from '../components/ClientsForm';
+import { useState, useEffect } from "react";
+import apiService from "../apiService";
+import ClientsForm from "../components/ClientsForm";
 
-const ClientsPage = () => {
+// O componente agora recebe a função de navegação como uma prop
+const ClientsPage = ({ onNavigateToClientHistory }) => {
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,32 +43,70 @@ const ClientsPage = () => {
       </div>
 
       {showForm ? (
-        <ClientsForm onClientAdded={handleClientAdded} onCancel={() => setShowForm(false)} />
+        <ClientsForm
+          onClientAdded={handleClientAdded}
+          onCancel={() => setShowForm(false)}
+        />
       ) : (
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="p-8 text-center">Carregando clientes...</div>
           ) : clients.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">Nenhum cliente encontrado.</div>
+            <div className="p-8 text-center text-gray-500">
+              Nenhum cliente encontrado.
+            </div>
           ) : (
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empresa</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Região</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CNPJ</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Empresa
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contato
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Telefone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Região
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CNPJ
+                  </th>
+                  {/* Nova coluna para as ações */}
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {clients.map((client) => (
                   <tr key={client.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">{client.companyName}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{client.contactPerson}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{client.phone}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{client.region}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{client.cnpj}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {client.companyName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {client.contactPerson}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {client.phone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {client.region}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {client.cnpj}
+                    </td>
+                    {/* Botão para ver o histórico de compras */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => onNavigateToClientHistory(client.id)}
+                        className="text-blue-600 hover:text-blue-900 font-medium"
+                      >
+                        Ver Histórico
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
