@@ -93,32 +93,31 @@ exports.update = async (req, res) => {
     const { clientId, items, totalPrice, description, discount } = req.body;
 
     await sql`
-      UPDATE orders
-      SET "clientId" = ${clientId},
-          items = ${JSON.stringify(items)}::JSONB,
-          "totalPrice" = ${totalPrice},
-          description = ${description},
-          discount = ${discount}
-      WHERE id = ${id};
-    `;
+      UPDATE orders
+      SET "clientId" = ${clientId},
+          items = ${JSON.stringify(items)}::JSONB,
+          "totalPrice" = ${totalPrice},
+          description = ${description},
+          discount = ${discount}
+      WHERE id = ${id};
+    `;
 
     res.status(200).json({ message: "Pedido atualizado com sucesso." });
   } catch (error) {
     console.error("Erro ao atualizar pedido:", error);
     res.status(500).json({ error: "Erro ao atualizar pedido." });
   }
+};
 
-  exports.getClientStats = async (req, res) => {
-    try {
-      const { clientId } = req.params;
+exports.getClientStats = async (req, res) => {
+  try {
+    const { clientId } = req.params;
 
-      if (!clientId) {
-        return res
-          .status(400)
-          .json({ error: "O ID do cliente é obrigatório." });
-      }
+    if (!clientId) {
+      return res.status(400).json({ error: "O ID do cliente é obrigatório." });
+    }
 
-      const result = await sql`
+    const result = await sql`
       SELECT
         COUNT(id) AS "totalOrders",
         COALESCE(SUM("totalPrice"), 0) AS "totalSpent"
@@ -126,16 +125,13 @@ exports.update = async (req, res) => {
       WHERE "clientId" = ${clientId} AND status = 'Entregue';
     `;
 
-      const stats = result[0] || { totalOrders: 0, totalSpent: 0 };
+    const stats = result[0] || { totalOrders: 0, totalSpent: 0 };
 
-      res.status(200).json(stats);
-    } catch (error) {
-      console.error("Erro ao buscar estatísticas do cliente:", error);
-      res
-        .status(500)
-        .json({ error: "Erro ao buscar estatísticas do cliente." });
-    }
-  };
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error("Erro ao buscar estatísticas do cliente:", error);
+    res.status(500).json({ error: "Erro ao buscar estatísticas do cliente." });
+  }
 };
 
 module.exports = exports;
