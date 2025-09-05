@@ -10,7 +10,6 @@ import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import apiService from "./apiService";
 
 const App = () => {
-  // 1. DECLARAÇÃO DOS ESTADOS
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [userRole, setUserRole] = useState(null);
@@ -18,15 +17,17 @@ const App = () => {
   const [brands, setBrands] = useState([]);
   const [clients, setClients] = useState({});
   const [selectedClientId, setSelectedClientId] = useState(null);
+  
+  // Adicionado: Estado para monitorar o status da conexão
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const userId = username;
   const reps = {
-    admin_1: "Admin",
-    siane_1: "Siane",
-    eduardo_1: "Eduardo",
+    "admin_1": "Admin",
+    "siane_1": "Siane",
+    "eduardo_1": "Eduardo",
   };
 
-  // 2. FUNÇÕES DE MANIPULAÇÃO
   const fetchClients = async () => {
     try {
       const clientsData = await apiService.getClients();
@@ -54,20 +55,33 @@ const App = () => {
     setCurrentPage("login");
   };
 
-  // A FUNÇÃO handleNavigateToClientHistory VEM AQUI
+  // Função para navegar para o histórico de um cliente
   const handleNavigateToClientHistory = (clientId) => {
     setCurrentPage("clientHistory");
     setSelectedClientId(clientId);
   };
+  
+  // Adicionado: useEffect para monitorar o status da conexão
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-  // 3. O useEffect USA AS FUNÇÕES DE MANIPULAÇÃO
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // useEffect para buscar os clientes ao logar
   useEffect(() => {
     if (isLoggedIn) {
       fetchClients();
     }
   }, [isLoggedIn]);
 
-  // 4. A FUNÇÃO DE RENDERIZAÇÃO VEM POR ÚLTIMO
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
@@ -108,7 +122,15 @@ const App = () => {
       {isLoggedIn ? (
         <div className="flex min-h-screen">
           <Sidebar onNavigate={setCurrentPage} onLogout={handleLogout} />
-          <div className="flex-1 overflow-auto">{renderPage()}</div>
+          <div className="flex-1 overflow-auto">
+            {/* Adicionado: Aviso de modo offline */}
+            {!isOnline && (
+              <div className="bg-yellow-500 text-white text-center font-bold py-2 shadow-md">
+                Você está no modo offline. Os dados podem não estar atualizados.
+              </div>
+            )}
+            {renderPage()}
+          </div>
         </div>
       ) : (
         <Login onLogin={handleLogin} />
