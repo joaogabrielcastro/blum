@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import apiService from "../apiService";
+import apiService from "../services/apiService";
 import ClientsForm from "../components/ClientsForm";
 
 // O componente agora recebe a função de navegação como uma prop

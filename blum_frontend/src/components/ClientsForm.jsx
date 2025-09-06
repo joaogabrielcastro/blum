@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import apiService from '../apiService';
+import { useState } from "react";
+import apiService from "../services/apiService";
 
 const ClientsForm = ({ onClientAdded, onCancel }) => {
-  const [companyName, setCompanyName] = useState('');
-  const [contactPerson, setContactPerson] = useState('');
-  const [phone, setPhone] = useState('');
-  const [region, setRegion] = useState('');
-  const [cnpj, setCnpj] = useState('');
+  const [companyName, setCompanyName] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [phone, setPhone] = useState("");
+  const [region, setRegion] = useState("");
+  const [cnpj, setCnpj] = useState("");
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
   const handleCnpjChange = async (e) => {
-    const newCnpj = e.target.value.replace(/\D/g, '');
+    const newCnpj = e.target.value.replace(/\D/g, "");
     setCnpj(newCnpj);
 
     if (newCnpj.length === 14) {
@@ -23,7 +23,7 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
           setPhone(data.telefone);
           setRegion(data.uf);
         } else {
-          alert('CNPJ não encontrado. Por favor, preencha manualmente.');
+          alert("CNPJ não encontrado. Por favor, preencha manualmente.");
         }
       } catch (error) {
         console.error("Erro ao buscar CNPJ:", error);
@@ -37,7 +37,7 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!companyName || !cnpj) {
-      alert('Por favor, preencha o nome da empresa e o CNPJ.');
+      alert("Por favor, preencha o nome da empresa e o CNPJ.");
       return;
     }
     setLoading(true);
@@ -50,7 +50,7 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
         cnpj,
       };
       await apiService.createClient(newClient);
-      alert('Cliente salvo com sucesso!');
+      alert("Cliente salvo com sucesso!");
       onClientAdded();
     } catch (error) {
       console.error("Erro ao adicionar cliente:", error);
@@ -62,11 +62,18 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Adicionar Novo Cliente</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        Adicionar Novo Cliente
+      </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="cnpj">CNPJ</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="cnpj"
+            >
+              CNPJ
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -78,7 +85,12 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="companyName">Nome da Empresa</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="companyName"
+            >
+              Nome da Empresa
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -89,7 +101,12 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="contactPerson">Pessoa de Contato</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="contactPerson"
+            >
+              Pessoa de Contato
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -99,7 +116,12 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="phone">Telefone</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="phone"
+            >
+              Telefone
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="tel"
@@ -109,7 +131,12 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
             />
           </div>
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="region">Região</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="region"
+            >
+              Região
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -132,7 +159,7 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
             className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:bg-blue-300"
             disabled={loading || isSearching}
           >
-            {loading ? 'Salvando...' : 'Salvar Cliente'}
+            {loading ? "Salvando..." : "Salvar Cliente"}
           </button>
         </div>
       </form>

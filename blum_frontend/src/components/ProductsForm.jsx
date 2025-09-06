@@ -1,23 +1,31 @@
-import { useState } from 'react';
-import apiService from '../apiService';
+import { useState } from "react";
+import apiService from "../services/apiService";
 
 const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
-  const [name, setName] = useState('');
-  const [productCode, setProductCode] = useState('');
-  const [price, setPrice] = useState('');
-  const [stock, setStock] = useState('');
+  const [name, setName] = useState("");
+  const [productCode, setProductCode] = useState("");
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
   // Seta a primeira marca da lista como padrão, se houver
-  const [brand, setBrand] = useState(brands[0] || 'Blumenau');
-  const [newBrand, setNewBrand] = useState('');
+  const [brand, setBrand] = useState(brands[0] || "Blumenau");
+  const [newBrand, setNewBrand] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const productBrand = brand === 'other' ? newBrand : brand;
+    const productBrand = brand === "other" ? newBrand : brand;
 
-    if (!name || !productCode || !productBrand || isNaN(parseFloat(price)) || parseFloat(price) <= 0 || isNaN(parseInt(stock, 10)) || parseInt(stock, 10) < 0) {
-      alert('Por favor, preencha todos os campos corretamente.');
+    if (
+      !name ||
+      !productCode ||
+      !productBrand ||
+      isNaN(parseFloat(price)) ||
+      parseFloat(price) <= 0 ||
+      isNaN(parseInt(stock, 10)) ||
+      parseInt(stock, 10) < 0
+    ) {
+      alert("Por favor, preencha todos os campos corretamente.");
       return;
     }
 
@@ -31,7 +39,7 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
         brand: productBrand,
       };
       await apiService.createProduct(newProduct);
-      alert('Produto salvo com sucesso!');
+      alert("Produto salvo com sucesso!");
       onProductAdded();
     } catch (error) {
       console.error("Erro ao adicionar produto:", error);
@@ -43,11 +51,18 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Adicionar Novo Produto</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">
+        Adicionar Novo Produto
+      </h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="name">Nome do Produto</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="name"
+            >
+              Nome do Produto
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -58,7 +73,12 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="price">Preço (R$)</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="price"
+            >
+              Preço (R$)
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="number"
@@ -70,7 +90,12 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="stock">Estoque</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="stock"
+            >
+              Estoque
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="number"
@@ -81,7 +106,12 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
             />
           </div>
           <div>
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="productCode">Código do Produto</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="productCode"
+            >
+              Código do Produto
+            </label>
             <input
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               type="text"
@@ -92,7 +122,12 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
             />
           </div>
           <div className="col-span-1 md:col-span-2">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="brand">Marca</label>
+            <label
+              className="block text-gray-700 text-sm font-medium mb-2"
+              htmlFor="brand"
+            >
+              Marca
+            </label>
             <select
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               id="brand"
@@ -100,15 +135,22 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
               onChange={(e) => setBrand(e.target.value)}
               required
             >
-              {brands.map(brandName => (
-                <option key={brandName} value={brandName}>{brandName}</option>
+              {brands.map((brandName) => (
+                <option key={brandName} value={brandName}>
+                  {brandName}
+                </option>
               ))}
               <option value="other">Outra (digitar)</option>
             </select>
           </div>
-          {brand === 'other' && (
+          {brand === "other" && (
             <div className="col-span-1 md:col-span-2">
-              <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="newBrand">Nova Marca</label>
+              <label
+                className="block text-gray-700 text-sm font-medium mb-2"
+                htmlFor="newBrand"
+              >
+                Nova Marca
+              </label>
               <input
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 type="text"
@@ -134,7 +176,7 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
             className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:bg-blue-300"
             disabled={loading}
           >
-            {loading ? 'Salvando...' : 'Salvar Produto'}
+            {loading ? "Salvando..." : "Salvar Produto"}
           </button>
         </div>
       </form>

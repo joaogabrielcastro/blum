@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import apiService from "../apiService";
+import apiService from "../services/apiService";
 import ConfirmationModal from "../components/ConfirmationModal";
 import Modal from "../components/ConfirmationModal";
 
@@ -17,7 +17,7 @@ const ClientHistoryPage = ({ clientId, reps, clients }) => {
       setLoading(true);
       const [ordersData, statsData] = await Promise.all([
         apiService.getOrders({ clientId }),
-        apiService.getClientStats(clientId)
+        apiService.getClientStats(clientId),
       ]);
 
       setOrders(ordersData);
@@ -51,9 +51,7 @@ const ClientHistoryPage = ({ clientId, reps, clients }) => {
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800">
-        Histórico de Compras
-      </h1>
+      <h1 className="text-3xl font-bold text-gray-800">Histórico de Compras</h1>
       <p className="text-xl text-gray-600 mb-6">
         Cliente: <span className="font-semibold">{clientName}</span>
       </p>
@@ -93,7 +91,8 @@ const ClientHistoryPage = ({ clientId, reps, clients }) => {
                       Pedido #{order.id}
                     </p>
                     <p className="text-sm text-gray-500">
-                      Data: {new Date(order.createdAt).toLocaleDateString("pt-BR")}
+                      Data:{" "}
+                      {new Date(order.createdAt).toLocaleDateString("pt-BR")}
                     </p>
                     <p className="text-sm text-gray-500">
                       Vendedor: {reps[order.userId] || "N/A"}

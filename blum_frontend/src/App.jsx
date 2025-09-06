@@ -7,7 +7,7 @@ import ClientsPage from "./Pages/ClientsPage";
 import OrdersPage from "./Pages/OrdersPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
-import apiService from "./apiService";
+import apiService from "./services/apiService";
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -17,15 +17,16 @@ const App = () => {
   const [brands, setBrands] = useState([]);
   const [clients, setClients] = useState({});
   const [selectedClientId, setSelectedClientId] = useState(null);
-  
+
   // Adicionado: Estado para monitorar o status da conexão
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // NOVO ESTADO AQUI
 
   const userId = username;
   const reps = {
-    "admin_1": "Admin",
-    "siane_1": "Siane",
-    "eduardo_1": "Eduardo",
+    admin_1: "Admin",
+    siane_1: "Siane",
+    eduardo_1: "Eduardo",
   };
 
   const fetchClients = async () => {
@@ -60,7 +61,7 @@ const App = () => {
     setCurrentPage("clientHistory");
     setSelectedClientId(clientId);
   };
-  
+
   // Adicionado: useEffect para monitorar o status da conexão
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -120,13 +121,47 @@ const App = () => {
   return (
     <div className="font-sans text-gray-800 antialiased bg-gray-50">
       {isLoggedIn ? (
-        <div className="flex min-h-screen">
-          <Sidebar onNavigate={setCurrentPage} onLogout={handleLogout} />
-          <div className="flex-1 overflow-auto">
-            {/* Adicionado: Aviso de modo offline */}
+        <div className="relative flex h-screen overflow-hidden bg-gray-100">
+          <Sidebar
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)} // Passa a função para fechar
+            onNavigate={setCurrentPage}
+            onLogout={handleLogout}
+          />
+
+          {/* Overlay para escurecer o fundo quando o menu estiver aberto no mobile */}
+          {isSidebarOpen && (
+            <div
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 z-30 bg-black bg-opacity-50 md:hidden"
+            ></div>
+          )}
+
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            {/* Botão Hambúrguer - Visível apenas em telas pequenas */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-4 text-gray-500 hover:text-gray-600 md:hidden"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16m-7 6h7"
+                />
+              </svg>
+            </button>
+
             {!isOnline && (
               <div className="bg-yellow-500 text-white text-center font-bold py-2 shadow-md">
-                Você está no modo offline. Os dados podem não estar atualizados.
+                Você está no modo offline.
               </div>
             )}
             {renderPage()}

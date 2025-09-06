@@ -6,6 +6,7 @@ const apiService = {
     if (!response.ok) throw new Error("Erro ao buscar clientes.");
     return response.json();
   },
+
   createClient: async (newClientData) => {
     const response = await fetch(`${API_URL}/clients`, {
       method: "POST",
@@ -15,12 +16,24 @@ const apiService = {
     if (!response.ok) throw new Error("Erro ao criar cliente.");
     return response.json();
   },
+
+  updateClient: async (clientId, clientData) => {
+    const response = await fetch(`${API_URL}/clients/${clientId}`, {
+      method: "PUT", // ou PATCH
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(clientData),
+    });
+    if (!response.ok) throw new Error("Falha ao atualizar cliente.");
+    return response.json();
+  },
+
   getProducts: async (brand = "all") => {
     const query = brand !== "all" ? `?brand=${brand}` : "";
     const response = await fetch(`${API_URL}/products${query}`);
     if (!response.ok) throw new Error("Erro ao buscar produtos.");
     return response.json();
   },
+
   createProduct: async (newProductData) => {
     const response = await fetch(`${API_URL}/products`, {
       method: "POST",
@@ -31,7 +44,6 @@ const apiService = {
     return response.json();
   },
 
-  // FUNÇÃO ATUALIZADA: Agora recebe um objeto de parâmetros
   getOrders: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const url = `${API_URL}/orders?${query}`;
@@ -50,22 +62,21 @@ const apiService = {
     let data;
     try {
       data = await response.json();
-    } catch (e) {
+    } catch {
       data = {};
     }
 
-    if (!response.ok) {
-      throw new Error(data.error || "Erro ao criar pedido.");
-    }
-
+    if (!response.ok) throw new Error(data.error || "Erro ao criar pedido.");
     return data;
   },
+
   deleteOrder: async (orderId) => {
     const response = await fetch(`${API_URL}/orders/${orderId}`, {
       method: "DELETE",
     });
     if (!response.ok) throw new Error("Erro ao excluir pedido.");
   },
+
   finalizeOrder: async (orderId) => {
     const response = await fetch(`${API_URL}/orders/${orderId}/finalize`, {
       method: "PUT",
@@ -74,7 +85,6 @@ const apiService = {
     return response.json();
   },
 
-  // NOVA FUNÇÃO: Busca estatísticas do cliente
   getClientStats: async (clientId) => {
     const response = await fetch(`${API_URL}/orders/stats/${clientId}`);
     if (!response.ok)
@@ -88,11 +98,13 @@ const apiService = {
       throw new Error("Erro ao buscar relatório de vendas por representante.");
     return response.json();
   },
+
   getBrands: async () => {
     const response = await fetch(`${API_URL}/brands`);
     if (!response.ok) throw new Error("Erro ao buscar marcas.");
     return response.json();
   },
+
   createBrand: async (newBrandData) => {
     const response = await fetch(`${API_URL}/brands`, {
       method: "POST",
@@ -102,16 +114,10 @@ const apiService = {
     if (!response.ok) throw new Error("Erro ao criar marca.");
     return response.json();
   },
+
   getStatus: async () => {
     const response = await fetch(`${API_URL}/status`);
-    if (!response.ok) {
-      throw new Error("Erro ao buscar o status da API.");
-    }
-    return response.json();
-  },
-  queryCNPJ: async (cnpj) => {
-    const response = await fetch(`${CNPJ_API_URL}/${cnpj}`);
-    if (!response.ok) throw new Error("Erro ao consultar CNPJ.");
+    if (!response.ok) throw new Error("Erro ao buscar o status da API.");
     return response.json();
   },
 };

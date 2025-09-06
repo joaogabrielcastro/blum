@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import ProductsForm from "../components/ProductsForm";
 import AddBrandForm from "../components/AddBrandForm";
-import apiService from "../apiService";
+import apiService from "../services/apiService";
 
 const ProductsPage = ({ userRole, brands, setBrands }) => {
   const [products, setProducts] = useState([]);

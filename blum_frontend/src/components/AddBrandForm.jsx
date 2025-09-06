@@ -1,5 +1,5 @@
 import { useState } from "react";
-import apiService from "../apiService";
+import apiService from "../services/apiService";
 
 const AddBrandForm = ({ onBrandAdded, onCancel }) => {
   const [brandName, setBrandName] = useState("");
@@ -64,7 +64,11 @@ const AddBrandForm = ({ onBrandAdded, onCancel }) => {
           <button
             type="submit"
             className={`px-6 py-3 font-bold rounded-lg shadow-md transition-colors duration-300 
-              ${loading ? "bg-blue-300 text-white cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+              ${
+                loading
+                  ? "bg-blue-300 text-white cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
             disabled={loading}
           >
             {loading ? "Salvando..." : "Salvar Marca"}
