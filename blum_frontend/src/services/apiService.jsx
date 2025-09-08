@@ -27,6 +27,19 @@ const apiService = {
     return response.json();
   },
 
+  updateOrder: async (orderId, orderData) => {
+    const response = await fetch(`${API_URL}/orders/${orderId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderData),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Erro ao atualizar pedido.");
+    }
+    return response.json();
+  },
+
   getProducts: async (brand = "all") => {
     const query = brand !== "all" ? `?brand=${brand}` : "";
     const response = await fetch(`${API_URL}/products${query}`);

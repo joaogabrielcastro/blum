@@ -5,44 +5,46 @@ const productsController = require("./productController");
 
 // Função getAll corrigida para usar nomes de colunas em minúsculas e query parametrizada.
 exports.getAll = async (req, res) => {
-  try {
-    const { userId, clientId, userRole } = req.query;
-    let query = 'SELECT * FROM orders';
+  try {
+    const { userId, clientId, userRole } = req.query;
+    let query = "SELECT * FROM orders";
     const params = [];
 
-    if (userRole === "admin") {
-      if (clientId) {
-        query += ' WHERE clientid = $1';
+    if (userRole === "admin") {
+      if (clientId) {
+        query += " WHERE clientid = $1";
         params.push(clientId);
       }
-    }
-    else if (userRole === "salesperson") {
-      if (!userId) {
-        return res.status(400).json({ error: "O ID do usuário é obrigatório para representantes." });
-      }
-      query += ' WHERE userid = $1';
+    } else if (userRole === "salesperson") {
+      if (!userId) {
+        return res
+          .status(400)
+          .json({
+            error: "O ID do usuário é obrigatório para representantes.",
+          });
+      }
+      query += " WHERE userid = $1";
       params.push(userId);
-    }
-    else if (clientId) {
-      query += ' WHERE clientid = $1';
+    } else if (clientId) {
+      query += " WHERE clientid = $1";
       params.push(clientId);
-    }
-    else {
-      return res.status(200).json([]);
-    }
+    } else {
+      return res.status(200).json([]);
+    }
 
-    query += ' ORDER BY createdat DESC';
+    query += " ORDER BY createdat DESC";
     const orders = await sql(query, params);
-    res.status(200).json(orders);
-  } catch (error) {
-    console.error("Erro ao buscar pedidos:", error);
-    res.status(500).json({ error: "Erro ao buscar pedidos." });
-  }
+    res.status(200).json(orders);
+  } catch (error) {
+    console.error("Erro ao buscar pedidos:", error);
+    res.status(500).json({ error: "Erro ao buscar pedidos." });
+  }
 };
 
 // Função create corrigida e segura.
 exports.create = async (req, res) => {
-  const { clientId, userId, items, totalPrice, description, discount } = req.body;
+  const { clientId, userId, items, totalPrice, description, discount } =
+    req.body;
 
   if (!clientId || !userId || items === undefined || totalPrice === undefined) {
     console.error("Erro: Dados incompletos recebidos.", req.body);
@@ -55,7 +57,14 @@ exports.create = async (req, res) => {
       `INSERT INTO orders (clientid, userid, items, totalprice, description, discount, status, createdat)
        VALUES ($1, $2, $3::jsonb, $4, $5, $6, 'Em aberto', NOW())
        RETURNING *`,
-      [clientId, userId, itemsJson, totalPrice, description || "", discount || 0]
+      [
+        clientId,
+        userId,
+        itemsJson,
+        totalPrice,
+        description || "",
+        discount || 0,
+      ]
     );
     res.status(201).json(result[0]);
   } catch (error) {
@@ -67,84 +76,106 @@ exports.create = async (req, res) => {
 
 // Função delete corrigida.
 exports.delete = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await sql('DELETE FROM orders WHERE id = $1', [id]);
-    res.status(204).end();
-  } catch (error) {
-    console.error("Erro ao excluir pedido:", error);
-    res.status(500).json({ error: "Erro ao excluir pedido." });
-  }
+  try {
+    const { id } = req.params;
+    await sql("DELETE FROM orders WHERE id = $1", [id]);
+    res.status(204).end();
+  } catch (error) {
+    console.error("Erro ao excluir pedido:", error);
+    res.status(500).json({ error: "Erro ao excluir pedido." });
+  }
 };
 
 // Função finalize corrigida.
 exports.finalize = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const orderResult = await sql('SELECT * FROM orders WHERE id = $1', [id]);
+  try {
+    const { id } = req.params;
+    const orderResult = await sql("SELECT * FROM orders WHERE id = $1", [id]);
     const order = orderResult[0];
 
-    if (!order) {
-      return res.status(404).json({ error: "Pedido não encontrado." });
-    }
+    if (!order) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
 
-    await sql(
-      'UPDATE orders SET status = $1, finishedat = NOW() WHERE id = $2',
-      ['Entregue', id]
+    await sql(
+      "UPDATE orders SET status = $1, finishedat = NOW() WHERE id = $2",
+      ["Entregue", id]
     );
 
-    const items = order.items;
-    for (const item of items) {
-      await productsController.updateStock(item.productId, item.quantity);
-    }
+    const items = order.items;
+    for (const item of items) {
+      await productsController.updateStock(item.productId, item.quantity);
+    }
 
-    res.status(200).json({ message: "Pedido finalizado com sucesso." });
-  } catch (error) {
-    console.error("Erro ao finalizar pedido:", error);
-    res.status(500).json({ error: "Erro ao finalizar pedido." });
-  }
+    res.status(200).json({ message: "Pedido finalizado com sucesso." });
+  } catch (error) {
+    console.error("Erro ao finalizar pedido:", error);
+    res.status(500).json({ error: "Erro ao finalizar pedido." });
+  }
 };
 
-// Função update corrigida.
 exports.update = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { clientId, items, totalPrice, description, discount } = req.body;
-    const itemsJson = JSON.stringify(items);
+  const { id } = req.params;
+  const { clientId, items, totalPrice, description, discount } = req.body;
 
-    await sql(
-      `UPDATE orders
-       SET clientid = $1, items = $2::jsonb, totalprice = $3, description = $4, discount = $5
-       WHERE id = $6`,
-      [clientId, itemsJson, totalPrice, description, discount, id]
+  // Validação para garantir que os dados essenciais foram recebidos.
+  if (
+    clientId === undefined ||
+    items === undefined ||
+    totalPrice === undefined
+  ) {
+    return res
+      .status(400)
+      .json({
+        error:
+          "Dados incompletos. clientId, items e totalPrice são obrigatórios.",
+      });
+  }
+
+  try {
+    const itemsJson = JSON.stringify(items);
+    const result = await sql(
+      `
+      UPDATE orders
+      SET clientid = $1, items = $2::jsonb, totalprice = $3, description = $4, discount = $5
+      WHERE id = $6
+      RETURNING *
+    `,
+      [clientId, itemsJson, totalPrice, description || "", discount || 0, id]
     );
 
-    res.status(200).json({ message: "Pedido atualizado com sucesso." });
-  } catch (error) {
-    console.error("Erro ao atualizar pedido:", error);
-    res.status(500).json({ error: "Erro ao atualizar pedido." });
-  }
+    if (result.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Pedido não encontrado para atualizar." });
+    }
+
+    res.status(200).json(result[0]);
+  } catch (error) {
+    console.error("Erro ao atualizar pedido:", error);
+    console.error("Dados que causaram o erro:", req.body);
+    res.status(500).json({ error: "Erro ao atualizar pedido." });
+  }
 };
 
 // Função getClientStats corrigida.
 exports.getClientStats = async (req, res) => {
-  try {
-    const { clientId } = req.params;
-    if (!clientId) {
-      return res.status(400).json({ error: "O ID do cliente é obrigatório." });
-    }
+  try {
+    const { clientId } = req.params;
+    if (!clientId) {
+      return res.status(400).json({ error: "O ID do cliente é obrigatório." });
+    }
 
-    const result = await sql(
+    const result = await sql(
       `SELECT COUNT(id) AS "totalOrders", COALESCE(SUM(totalprice), 0) AS "totalSpent"
        FROM orders
        WHERE clientid = $1 AND status = 'Entregue'`,
       [clientId]
     );
-    const stats = result[0] || { totalOrders: 0, totalSpent: 0 };
-    res.status(200).json(stats);
-  } catch (error) {
-    console.error("Erro ao buscar estatísticas do cliente:", error);
-    res.status(500).json({ error: "Erro ao buscar estatísticas do cliente." });
-  }
+    const stats = result[0] || { totalOrders: 0, totalSpent: 0 };
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error("Erro ao buscar estatísticas do cliente:", error);
+    res.status(500).json({ error: "Erro ao buscar estatísticas do cliente." });
+  }
 };
-
