@@ -20,11 +20,11 @@ const OrdersForm = ({
 
   useEffect(() => {
     if (editingOrder) {
-      setClientId(editingOrder.clientId);
+      setClientId(editingOrder.clientid); // Corrigido para minúsculas
       setDescription(editingOrder.description || "");
       setItems(editingOrder.items || []);
       setDiscount(editingOrder.discount || 0);
-      setTotalPrice(editingOrder.totalPrice || 0);
+      setTotalPrice(editingOrder.totalprice || 0); // Corrigido para minúsculas
     }
   }, [editingOrder, brands, clients]);
 
@@ -48,7 +48,7 @@ const OrdersForm = ({
     const subtotal = items.reduce((total, item) => {
       return total + parseFloat(item.price || 0) * item.quantity;
     }, 0);
-    const discountAmount = subtotal * (discount / 100);
+    const discountAmount = subtotal * (parseFloat(discount || 0) / 100);
     setTotalPrice(subtotal - discountAmount);
   };
 
@@ -127,13 +127,21 @@ const OrdersForm = ({
       return;
     }
     try {
+      // <<< MUDANÇA CRÍTICA >>>
+      // Recalculamos o total aqui para garantir que o valor enviado é o mais atual.
+      const subtotal = items.reduce((total, item) => {
+        return total + parseFloat(item.price || 0) * item.quantity;
+      }, 0);
+      const discountAmount = subtotal * (parseFloat(discount || 0) / 100);
+      const finalTotal = subtotal - discountAmount;
+
       const orderData = {
         clientId,
         userId,
         description,
         items,
-        discount: parseFloat(discount),
-        totalPrice,
+        discount: parseFloat(discount || 0),
+        totalPrice: finalTotal, // Usamos o valor recém-calculado
       };
 
       if (editingOrder) {
@@ -150,12 +158,13 @@ const OrdersForm = ({
   };
 
   return (
+    // Seu JSX permanece o mesmo
     <div className="max-w-4xl mx-auto">
            {" "}
       <h2 className="text-2xl font-bold mb-6">
                 {editingOrder ? "Editar Pedido" : "Criar Novo Pedido"}     {" "}
       </h2>
-                  {" "}
+           {" "}
       <form
         onSubmit={handleSubmit}
         className="bg-white rounded-lg shadow-md p-6"
@@ -168,6 +177,7 @@ const OrdersForm = ({
             <label className="block text-sm font-medium text-gray-700 mb-2">
                             Cliente *            {" "}
             </label>
+                       {" "}
             <input
               type="text"
               placeholder="Buscar cliente..."
@@ -176,10 +186,13 @@ const OrdersForm = ({
               list="client-list"
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+                       {" "}
             <datalist id="client-list">
+                           {" "}
               {filteredClients.map(([id, name]) => (
                 <option key={id} value={name} />
               ))}
+                         {" "}
             </datalist>
                      {" "}
           </div>
@@ -223,8 +236,10 @@ const OrdersForm = ({
         <div className="mb-6">
                    {" "}
           <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-semibold">Produtos</h3>
+                        <h3 className="text-lg font-semibold">Produtos</h3>     
+                 {" "}
             <div className="flex space-x-2">
+                           {" "}
               <input
                 type="text"
                 placeholder="Buscar produto..."
@@ -233,11 +248,15 @@ const OrdersForm = ({
                 list="product-list"
                 className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+                           {" "}
               <datalist id="product-list">
+                               {" "}
                 {filteredProducts.map((product) => (
                   <option key={product.id} value={product.name} />
                 ))}
+                             {" "}
               </datalist>
+                           {" "}
               <button
                 type="button"
                 onClick={() => {
@@ -252,8 +271,9 @@ const OrdersForm = ({
                 }}
                 className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-600"
               >
-                Adicionar
+                                Adicionar              {" "}
               </button>
+                         {" "}
             </div>
                      {" "}
           </div>
@@ -372,7 +392,8 @@ const OrdersForm = ({
             <div className="mt-2 text-sm text-gray-600">
                             <span>Desconto: {discount}% </span>             {" "}
               <span>
-                (Desconto de R$ {((totalPrice * discount) / 100).toFixed(2)})
+                                (Desconto de R${" "}
+                {((totalPrice * discount) / 100).toFixed(2)})              {" "}
               </span>
                          {" "}
             </div>

@@ -19,7 +19,7 @@ const apiService = {
 
   updateClient: async (clientId, clientData) => {
     const response = await fetch(`${API_URL}/clients/${clientId}`, {
-      method: "PUT", // ou PATCH
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(clientData),
     });
@@ -58,14 +58,7 @@ const apiService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newOrderData),
     });
-
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      data = {};
-    }
-
+    const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Erro ao criar pedido.");
     return data;
   },
@@ -96,6 +89,17 @@ const apiService = {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
     if (!response.ok)
       throw new Error("Erro ao buscar relatório de vendas por representante.");
+    return response.json();
+  },
+
+  // <<< MUDANÇA CRÍTICA AQUI >>>
+  // A função agora está DENTRO do objeto apiService.
+  getReportStats: async (filters) => {
+    const queryString = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_URL}/reports/stats?${queryString}`);
+    if (!response.ok) {
+      throw new Error("Erro ao buscar estatísticas do relatório.");
+    }
     return response.json();
   },
 

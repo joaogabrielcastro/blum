@@ -88,7 +88,14 @@ const App = () => {
       case "dashboard":
         return <Dashboard onNavigate={setCurrentPage} username={username} />;
       case "orders":
-        return <OrdersPage userId={userId} brands={brands} reps={reps} />;
+        return (
+          <OrdersPage
+            userId={userId}
+            userRole={userRole}
+            brands={brands}
+            reps={reps}
+          />
+        );
       case "clients":
         return (
           <ClientsPage

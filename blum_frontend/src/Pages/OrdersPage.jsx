@@ -4,7 +4,7 @@ import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 
-const OrdersPage = ({ userId, reps, brands }) => {
+const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -23,7 +23,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
     try {
       setLoading(true);
       const [ordersData, clientsData] = await Promise.all([
-        apiService.getOrders(userId),
+        apiService.getOrders({ userId, userRole }),
         apiService.getClients(),
       ]);
 
@@ -42,8 +42,10 @@ const OrdersPage = ({ userId, reps, brands }) => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [userId]);
+    if (userId && userRole) {
+      fetchData();
+    }
+  }, [userId, userRole]);
 
   const handleEdit = (order) => {
     setEditingOrder(order);
@@ -200,8 +202,6 @@ const OrdersPage = ({ userId, reps, brands }) => {
     yPosition += 5;
     doc.text(`Cliente: ${clientName}`, margin, yPosition);
     yPosition += 5;
-    doc.text(`Vendedor: ${repName}`, margin, yPosition);
-    yPosition += 5;
 
     if (orderToPdf.description) {
       doc.text(`Descrição: ${orderToPdf.description}`, margin, yPosition);
@@ -234,9 +234,9 @@ const OrdersPage = ({ userId, reps, brands }) => {
       }
 
       const rowHeight = 8;
-      const itemTotal = (parseFloat(item.price || 0) * item.quantity).toFixed(
-        2
-      );
+      const itemTotal = (
+        parseFloat(item.price || 0) * (item.quantity || 0)
+      ).toFixed(2);
 
       if (index % 2 === 0) {
         doc.setFillColor(245, 245, 245);
@@ -260,7 +260,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
       doc.text(item.brand || "-", margin + 90, yPosition + 5);
       doc.text(item.quantity.toString(), pageWidth - 75, yPosition + 5);
       doc.text(
-        `R$ ${parseFloat(item.price || 0).toFixed(2)}`,
+        `R$ ${(parseFloat(item.price) || 0).toFixed(2)}`,
         pageWidth - 60,
         yPosition + 5
       );
@@ -276,7 +276,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
     doc.line(margin, tableBottom, pageWidth - margin, tableBottom);
     yPosition = tableBottom + 10;
 
-    const subtotal = parseFloat(orderToPdf.totalPrice || 0);
+    const subtotal = parseFloat(orderToPdf.totalp - rice || 0);
     const discountPercent = parseFloat(orderToPdf.discount || 0);
     const discountAmount = subtotal * (discountPercent / 100);
     const total = subtotal - discountAmount;
@@ -287,7 +287,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
 
     doc.setFont(undefined, "normal");
     doc.text(
-      `Subtotal: R$ ${subtotal.toFixed(2)}`,
+      `Subtotal: R$ ${(subtotal || 0).toFixed(2)}`,
       pageWidth - margin,
       yPosition,
       { align: "right" }
@@ -295,13 +295,15 @@ const OrdersPage = ({ userId, reps, brands }) => {
 
     if (discountPercent > 0) {
       doc.text(
-        `Desconto (${discountPercent}%): R$ ${discountAmount.toFixed(2)}`,
+        `Desconto (${discountPercent}%): R$ ${(discountAmount || 0).toFixed(
+          2
+        )}`,
         pageWidth - margin,
         yPosition + 5,
         { align: "right" }
       );
       doc.text(
-        `TOTAL: R$ ${total.toFixed(2)}`,
+        `TOTAL: R$ ${(total || 0).toFixed(2)}`,
         pageWidth - margin,
         yPosition + 10,
         { align: "right" }
@@ -309,7 +311,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
       yPosition += 15;
     } else {
       doc.text(
-        `TOTAL: R$ ${subtotal.toFixed(2)}`,
+        `TOTAL: R$ ${(subtotal || 0).toFixed(2)}`,
         pageWidth - margin,
         yPosition + 5,
         { align: "right" }
@@ -465,7 +467,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
         {orders.length > 0 ? (
           <ul className="divide-y divide-gray-200">
             {orders.map((order) => {
-              const totalWithDiscount = order.totalPrice;
+              const totalWithDiscount = order.totalprice;
 
               return (
                 <li
@@ -478,10 +480,7 @@ const OrdersPage = ({ userId, reps, brands }) => {
                         Pedido #{order.id}
                       </h2>
                       <p className="text-sm text-gray-500">
-                        Cliente: {clients[order.clientId] || "N/A"}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Vendedor: {reps[order.userId] || "N/A"}
+                        Cliente: {clients[order.clientid] || "N/A"}
                       </p>
                       {order.items && (
                         <p className="text-sm text-gray-500 mt-1">
@@ -504,16 +503,16 @@ const OrdersPage = ({ userId, reps, brands }) => {
                       {order.discount > 0 ? (
                         <>
                           <p className="text-sm text-gray-500 line-through">
-                            R$ {parseFloat(order.totalPrice || 0).toFixed(2)}
+                            R$ {(parseFloat(order.totalprice) || 0).toFixed(2)}
                           </p>
                           <p className="text-sm font-semibold text-green-700">
-                            R$ {totalWithDiscount.toFixed(2)}
+                            R$ {(totalWithDiscount || 0).toFixed(2)}
                           </p>
                         </>
                       ) : (
                         <p className="text-sm text-gray-700">
                           Total: R${" "}
-                          {parseFloat(order.totalPrice || 0).toFixed(2)}
+                          {(parseFloat(order.totalprice) || 0).toFixed(2)}
                         </p>
                       )}
                       <span
