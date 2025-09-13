@@ -17,8 +17,8 @@ const apiService = {
     return response.json();
   },
 
-  updateClient: async (clientId, clientData) => {
-    const response = await fetch(`${API_URL}/clients/${clientId}`, {
+  updateClient: async (clientid, clientData) => {
+    const response = await fetch(`${API_URL}/clients/${clientid}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(clientData),
@@ -110,10 +110,17 @@ const apiService = {
   },
 
   getClientStats: async (clientId) => {
-    const response = await fetch(`${API_URL}/orders/stats/${clientId}`);
-    if (!response.ok)
-      throw new Error("Falha ao buscar estatísticas do cliente.");
-    return response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/stats/${clientId}`);
+      if (!response.ok) {
+        return { totalOrders: 0, totalSpent: 0 };
+      }
+      const stats = await response.json();
+      return stats;
+    } catch (error) {
+      console.error("Erro ao buscar estatísticas:", error);
+      return { totalOrders: 0, totalSpent: 0 };
+    }
   },
 
   getSalesByRep: async () => {
@@ -165,23 +172,45 @@ const apiService = {
   },
 };
 
-export const deleteBrand = async (brandName) => {
+export const getClientById = async (clientId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/brands/${encodeURIComponent(brandName)}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
+    const response = await fetch(`${API_BASE_URL}/clients/${clientId}`);
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Erro ao excluir marca.');
+      throw new Error("Cliente não encontrado");
     }
-
-    return await response.json();
+    const clientData = await response.json();
+    return clientData;
   } catch (error) {
-    console.error('Erro na requisição deleteBrand:', error);
+    console.error("Erro ao buscar cliente:", error);
+    throw error;
+  }
+};
+
+export const getClientOrders = async (clientId) => {
+  try {
+    // Use clientid como parâmetro de query (minúsculo)
+    const response = await fetch(`${API_BASE_URL}/orders?clientid=${clientId}`);
+    
+    if (!response.ok) {
+      throw new Error('Erro ao buscar pedidos do cliente');
+    }
+    
+    const orders = await response.json();
+    
+    return orders.map(order => ({
+      id: order.id,
+      orderNumber: order.id.toString(),
+      orderDate: order.createdat,
+      seller: order.userid,
+      status: order.status || 'pending',
+      totalAmount: order.totalprice || 0,
+      discount: order.discount || 0,
+      paymentMethod: 'Não informado',
+      notes: order.description || '',
+      items: Array.isArray(order.items) ? order.items : tryParseJSON(order.items)
+    }));
+  } catch (error) {
+    console.error('Erro ao buscar pedidos do cliente:', error);
     throw error;
   }
 };

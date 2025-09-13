@@ -5,8 +5,8 @@ import ProductsForm from "../components/ProductsForm";
 import BrandForm from "../components/BrandForm";
 import FilterBar from "../components/FilterBar";
 import LoadingSpinner from "../components/LoadingSpinner";
-import ErrorMessagem from "../components/ErrorMessagem";
-import EmptysState from "../components/EmptysState";
+import ErrorMessage from "../components/ErrorMessage";
+import EmptyState from "../components/EmptyState";
 
 const ProductsPage = () => {
   const [products, setProducts] = useState([]);
@@ -241,9 +241,7 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {error && (
-        <ErrorMessagem message={error} onClose={() => setError(null)} />
-      )}
+      {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
       {/* Barra de filtros e busca */}
       <FilterBar
@@ -302,7 +300,7 @@ const ProductsPage = () => {
             />
           ))
         ) : (
-          <EmptysState
+          <EmptyState
             brandsCount={brands.length}
             hasSearchTerm={!!searchTerm}
             selectedBrand={selectedBrand}

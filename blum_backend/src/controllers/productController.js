@@ -52,7 +52,7 @@ exports.delete = async (req, res) => {
     res.status(204).end(); // Sucesso, sem conteúdo para retornar
   } catch (error) {
     console.error(`Erro ao excluir produto ${id}:`, error);
-    res.status(500).json({ error: 'Erro ao excluir produto.' });
+    res.status(500).json({ error: "Erro ao excluir produto." });
   }
 };
 
@@ -85,12 +85,17 @@ exports.update = async (req, res) => {
   }
 };
 
-exports.updateStock = async (id, quantity) => {
+exports.updateStock = async (productId, quantity) => {
   try {
-    const product = (await sql`SELECT * FROM products WHERE id = ${id}`)[0];
+    const product = (
+      await sql`SELECT * FROM products WHERE id = ${productId}`
+    )[0];
     if (!product) throw new Error("Produto não encontrado");
+
     const newStock = product.stock - quantity;
-    await sql`UPDATE products SET stock = ${newStock} WHERE id = ${id}`;
+    if (newStock < 0) throw new Error("Estoque insuficiente");
+
+    await sql`UPDATE products SET stock = ${newStock} WHERE id = ${productId}`;
     return newStock;
   } catch (error) {
     console.error("Erro ao atualizar estoque:", error);

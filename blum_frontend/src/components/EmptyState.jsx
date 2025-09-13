@@ -1,4 +1,4 @@
-const EmptysState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
+const EmptyState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
   if (hasSearchTerm) {
     return (
       <div className="col-span-full flex items-center justify-center py-12">
@@ -17,7 +17,9 @@ const EmptysState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
         <div className="text-center text-gray-500">
           <div className="text-4xl mb-4">📦</div>
           <h3 className="text-xl font-semibold">Nenhum produto nesta marca</h3>
-          <p className="mt-2">Adicione produtos para a marca "{selectedBrand}"</p>
+          <p className="mt-2">
+            Adicione produtos para a marca "{selectedBrand}"
+          </p>
         </div>
       </div>
     );
@@ -28,7 +30,9 @@ const EmptysState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
       <div className="text-center text-gray-500">
         <div className="text-4xl mb-4">📦</div>
         <h3 className="text-xl font-semibold">
-          {brandsCount === 0 ? "Adicione marcas primeiro" : "Nenhum produto cadastrado"}
+          {brandsCount === 0
+            ? "Adicione marcas primeiro"
+            : "Nenhum produto cadastrado"}
         </h3>
         <p className="mt-2">
           {brandsCount === 0
@@ -40,4 +44,4 @@ const EmptysState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
   );
 };
 
-export default EmptysState;
+export default EmptyState;

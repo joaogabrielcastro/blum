@@ -18,9 +18,9 @@ const App = () => {
   const [clients, setClients] = useState({});
   const [selectedClientId, setSelectedClientId] = useState(null);
 
-  // Adicionado: Estado para monitorar o status da conexão
+  // Estado para monitorar o status da conexão
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // NOVO ESTADO AQUI
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const userId = username;
   const reps = {
@@ -34,7 +34,7 @@ const App = () => {
       const clientsData = await apiService.getClients();
       const clientsMap = {};
       clientsData.forEach((client) => {
-        clientsMap[client.id] = client.companyName;
+        clientsMap[client.id] = client.companyName || client.companyname;
       });
       setClients(clientsMap);
     } catch (error) {
@@ -58,11 +58,22 @@ const App = () => {
 
   // Função para navegar para o histórico de um cliente
   const handleNavigateToClientHistory = (clientId) => {
-    setCurrentPage("clientHistory");
+    console.log("Navegando para histórico do cliente:", clientId);
+    if (!clientId) {
+      console.error("ClientId não fornecido!");
+      return;
+    }
     setSelectedClientId(clientId);
+    setCurrentPage("clientHistory");
   };
 
-  // Adicionado: useEffect para monitorar o status da conexão
+  // Função para voltar da página de histórico
+  const handleBackFromHistory = () => {
+    setCurrentPage("clients");
+    setSelectedClientId(null);
+  };
+
+  // Monitorar status da conexão
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -76,7 +87,7 @@ const App = () => {
     };
   }, []);
 
-  // useEffect para buscar os clientes ao logar
+  // Buscar clientes ao logar
   useEffect(() => {
     if (isLoggedIn) {
       fetchClients();
@@ -116,6 +127,7 @@ const App = () => {
         return (
           <ClientHistoryPage
             clientId={selectedClientId}
+            onBack={handleBackFromHistory}
             reps={reps}
             clients={clients}
           />
@@ -131,12 +143,13 @@ const App = () => {
         <div className="relative flex h-screen overflow-hidden bg-gray-100">
           <Sidebar
             isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)} // Passa a função para fechar
+            onClose={() => setIsSidebarOpen(false)}
             onNavigate={setCurrentPage}
             onLogout={handleLogout}
+            currentPage={currentPage}
           />
 
-          {/* Overlay para escurecer o fundo quando o menu estiver aberto no mobile */}
+          {/* Overlay para mobile */}
           {isSidebarOpen && (
             <div
               onClick={() => setIsSidebarOpen(false)}
@@ -145,10 +158,10 @@ const App = () => {
           )}
 
           <div className="flex flex-1 flex-col overflow-y-auto">
-            {/* Botão Hambúrguer - Visível apenas em telas pequenas */}
+            {/* Botão Hambúrguer - Visível apenas em mobile */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-4 text-gray-500 hover:text-gray-600 md:hidden"
+              className="p-4 text-gray-500 hover:text-gray-600 md:hidden z-20"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -166,12 +179,23 @@ const App = () => {
               </svg>
             </button>
 
+            {/* Banner de status offline */}
             {!isOnline && (
               <div className="bg-yellow-500 text-white text-center font-bold py-2 shadow-md">
-                Você está no modo offline.
+                ⚠️ Você está no modo offline. Algumas funcionalidades podem
+                estar limitadas.
               </div>
             )}
-            {renderPage()}
+
+            {/* Conteúdo principal */}
+            <main className="flex-1 p-4 md:p-6">{renderPage()}</main>
+
+            {/* Footer opcional */}
+            <footer className="bg-white border-t border-gray-200 py-4 px-6 mt-auto">
+              <div className="text-center text-sm text-gray-500">
+                Sistema de Gestão © {new Date().getFullYear()}
+              </div>
+            </footer>
           </div>
         </div>
       ) : (

@@ -8,13 +8,10 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [orderToDelete, setOrderToDelete] = useState(null);
-  const [orderToFinalize, setOrderToFinalize] = useState(null);
   const [editingOrder, setEditingOrder] = useState(null);
   const [clients, setClients] = useState({});
-  const [showPdfModal, setShowPdfModal] = useState(false);
-  const [orderToPdf, setOrderToPdf] = useState(null);
+  const [pdfOrder, setPdfOrder] = useState(null);
+  const [modalAction, setModalAction] = useState({ type: null, orderId: null });
 
   useEffect(() => {
     if (userId && userRole) fetchData();
@@ -42,66 +39,93 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
     }
   };
 
-  const handleEdit = (order) => {
-    setEditingOrder(order);
-    setShowForm(true);
-  };
+  const handleAction = async () => {
+    const { type, orderId } = modalAction;
+    if (!orderId) return;
 
-  const handleDelete = (orderId) => {
-    setOrderToDelete(orderId);
-    setShowModal(true);
-  };
-
-  const handleFinalize = (orderId) => {
-    setOrderToFinalize(orderId);
-    setShowModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!orderToDelete) return;
     try {
-      await apiService.deleteOrder(orderToDelete);
-      setOrders(orders.filter((order) => order.id !== orderToDelete));
+      if (type === "delete") {
+        await apiService.deleteOrder(orderId);
+        setOrders(orders.filter((order) => order.id !== orderId));
+      } else if (type === "finalize") {
+        await apiService.finalizeOrder(orderId);
+        setOrders(
+          orders.map((order) =>
+            order.id === orderId
+              ? {
+                  ...order,
+                  status: "Entregue",
+                  finishedAt: new Date().toISOString(),
+                }
+              : order
+          )
+        );
+      }
     } catch (error) {
-      alert("Falha ao excluir o pedido. Tente novamente.");
+      alert("Falha ao executar ação. Tente novamente.");
     } finally {
-      setShowModal(false);
-      setOrderToDelete(null);
+      setModalAction({ type: null, orderId: null });
     }
   };
 
-  const confirmFinalize = async () => {
-    if (!orderToFinalize) return;
-    try {
-      await apiService.finalizeOrder(orderToFinalize);
-      setOrders(
-        orders.map((order) =>
-          order.id === orderToFinalize
-            ? {
-                ...order,
-                status: "Entregue",
-                finishedAt: new Date().toISOString(),
+  const renderOrderActions = (order) => {
+    const isDelivered = order.status === "Entregue";
+
+    return (
+      <div
+        className={`flex flex-wrap gap-4 items-center ${
+          isDelivered ? "max-[450px]:justify-between max-[450px]:w-full" : ""
+        }`}
+      >
+        {isDelivered && (
+          <span className="inline-block px-3 py-1 text-sm font-semibold text-green-800 bg-green-100 rounded-full shadow-sm">
+            Entregue
+          </span>
+        )}
+        {!isDelivered && (
+          <>
+            <button
+              onClick={() => {
+                setEditingOrder(order);
+                setShowForm(true);
+              }}
+              className="px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() =>
+                setModalAction({ type: "finalize", orderId: order.id })
               }
-            : order
-        )
-      );
-    } catch (error) {
-      alert("Falha ao finalizar o pedido. Tente novamente.");
-    } finally {
-      setShowModal(false);
-      setOrderToFinalize(null);
-    }
+              className="px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
+            >
+              Finalizar
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setModalAction({ type: "delete", orderId: order.id })}
+          className="px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
+        >
+          Excluir
+        </button>
+        {isDelivered && (
+          <button
+            onClick={() => setPdfOrder(order)}
+            className="px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
+          >
+            Gerar PDF
+          </button>
+        )}
+      </div>
+    );
   };
 
-  const openPdfModal = (order) => {
-    setOrderToPdf(order);
-    setShowPdfModal(true);
-  };
-
-  if (loading)
+  if (loading) {
     return (
       <div className="p-8 text-center text-gray-500">Carregando pedidos...</div>
     );
+  }
 
   if (showForm) {
     return (
@@ -109,6 +133,8 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         <OrdersForm
           userId={userId}
           clients={clients}
+          brands={brands}
+          editingOrder={editingOrder}
           onOrderAdded={() => {
             setShowForm(false);
             setEditingOrder(null);
@@ -118,8 +144,6 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
             setShowForm(false);
             setEditingOrder(null);
           }}
-          brands={brands}
-          editingOrder={editingOrder}
         />
       </div>
     );
@@ -128,30 +152,23 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
   return (
     <div className="p-8">
       <ConfirmationModal
-        show={showModal}
-        onConfirm={orderToDelete ? confirmDelete : confirmFinalize}
-        onCancel={() => {
-          setShowModal(false);
-          setOrderToDelete(null);
-          setOrderToFinalize(null);
-        }}
+        show={!!modalAction.orderId}
+        onConfirm={handleAction}
+        onCancel={() => setModalAction({ type: null, orderId: null })}
         message={
-          orderToDelete
+          modalAction.type === "delete"
             ? "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
             : "Tem certeza que deseja finalizar este pedido? Esta ação não pode ser desfeita."
         }
       />
 
-      {showPdfModal && (
+      {pdfOrder && (
         <PdfGenerator
-          order={orderToPdf}
+          order={pdfOrder}
           clients={clients}
           reps={reps}
           brands={brands}
-          onClose={() => {
-            setShowPdfModal(false);
-            setOrderToPdf(null);
-          }}
+          onClose={() => setPdfOrder(null)}
         />
       )}
 
@@ -177,101 +194,52 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
         {orders.length > 0 ? (
           <ul className="divide-y divide-gray-200">
-            {orders.map((order) => {
-              const totalWithDiscount = order.totalprice;
-
-              return (
-                <li
-                  key={order.id}
-                  className="py-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
-                >
-                  <div className="flex-1">
-                    <h2 className="text-lg font-semibold text-gray-800">
-                      Pedido #{order.id}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      Cliente: {clients[order.clientid] || "N/A"}
-                    </p>
-                    {order.items && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Itens: {order.items.length}
-                      </p>
-                    )}
-                    <p className="text-sm text-gray-500 mt-1">
-                      Descrição: {order.description || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Finalizado em:{" "}
-                      {order.finishedAt
-                        ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
-                        : "N/A"}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-2 sm:gap-1 text-right">
-                    {order.discount > 0 ? (
-                      <>
-                        <p className="text-sm text-gray-500 line-through">
-                          R$ {(parseFloat(order.totalprice) || 0).toFixed(2)}
-                        </p>
-                        <p className="text-sm font-semibold text-green-700">
-                          R$ {(Number(totalWithDiscount) || 0).toFixed(2)}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-700">
-                        Total: R${" "}
+            {orders.map((order) => (
+              <li
+                key={order.id}
+                className="py-6 flex flex-row justify-between items-start gap-4 max-[450px]:flex-col"
+              >
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    Pedido #{order.id}
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    Cliente: {clients[order.clientid] || "N/A"}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Itens: {order.items?.length || 0}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Descrição: {order.description || "N/A"}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Finalizado em:{" "}
+                    {order.finishedAt
+                      ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
+                      : "N/A"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-3 text-right w-fit max-[450px]:w-full max-[450px]:items-start max-[450px]:text-left">
+                  <div className="flex flex-col items-end gap-2 max-[450px]:flex-row max-[450px]:justify-between max-[450px]:items-center max-[450px]:w-full">
+                    <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-fit">
+                      <p className="text-base font-bold text-gray-800">
+                        Total: R$
                         {(parseFloat(order.totalprice) || 0).toFixed(2)}
                       </p>
-                    )}
-                    <span
-                      className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${
-                        order.status === "Entregue"
-                          ? "bg-green-100 text-green-800"
-                          : order.status === "Em aberto"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {order.status || "N/A"}
-                    </span>
-
-                    <div className="flex flex-wrap gap-4 mt-3">
-                      {order.status === "Em aberto" && (
-                        <>
-                          <button
-                            onClick={() => handleEdit(order)}
-                            className="px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleFinalize(order.id)}
-                            className="px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
-                          >
-                            Finalizar
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => handleDelete(order.id)}
-                        className="px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
-                      >
-                        Excluir
-                      </button>
-                      {order.status === "Entregue" && (
-                        <button
-                          onClick={() => openPdfModal(order)}
-                          className="px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
-                        >
-                          Gerar PDF
-                        </button>
+                      {order.discount > 0 && (
+                        <p className="text-xs text-gray-500 line-through">
+                          R${" "}
+                          {(
+                            parseFloat(order.totalprice + order.discount) || 0
+                          ).toFixed(2)}
+                        </p>
                       )}
                     </div>
+                    {renderOrderActions(order)}
                   </div>
-                </li>
-              );
-            })}
+                </div>
+              </li>
+            ))}
           </ul>
         ) : (
           <div className="text-center text-gray-500">
