@@ -1,10 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 
 const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
-  const [selectedPdfBrand, setSelectedPdfBrand] = useState(
-    brands[0] || "Blumenau"
-  );
+  const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
+
+  // Inicializa o estado quando brands mudar
+  useEffect(() => {
+    if (brands && brands.length > 0) {
+      setSelectedPdfBrand(brands[0]);
+    } else {
+      setSelectedPdfBrand("Blumenau");
+    }
+  }, [brands]);
 
   const companyInfo = {
     Blumenau: {
@@ -94,8 +101,8 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
     doc.setFontSize(10);
     doc.setFont(undefined, "normal");
 
-    const clientName = clients[order.clientId] || "N/A";
-    const repName = reps[order.userId] || "N/A";
+    const clientName = clients[order.clientid] || "N/A";
+    const repName = reps[order.userid] || "N/A";
     const orderDate = order.finishedAt
       ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
       : new Date().toLocaleDateString("pt-BR");
@@ -105,6 +112,8 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
     });
     yPosition += 5;
     doc.text(`Cliente: ${clientName}`, margin, yPosition);
+    yPosition += 5;
+    doc.text(`Vendedor: ${repName}`, margin, yPosition);
     yPosition += 5;
 
     if (order.description) {
@@ -131,7 +140,12 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
     doc.setTextColor(0, 0, 0);
 
     let tableBottom = yPosition;
-    order.items.forEach((item, index) => {
+    
+    // Parse dos itens do pedido
+    const items = Array.isArray(order.items) ? order.items : 
+                 typeof order.items === 'string' ? JSON.parse(order.items || '[]') : [];
+    
+    items.forEach((item, index) => {
       if (yPosition > pageHeight - 50) {
         doc.addPage();
         yPosition = 20;
@@ -139,7 +153,7 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
 
       const rowHeight = 8;
       const itemTotal = (
-        parseFloat(item.price || 0) * (item.quantity || 0)
+        parseFloat(item.unitPrice || item.price || 0) * (item.quantity || 0)
       ).toFixed(2);
 
       if (index % 2 === 0) {
@@ -162,9 +176,9 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
       }
 
       doc.text(item.brand || "-", margin + 90, yPosition + 5);
-      doc.text(item.quantity.toString(), pageWidth - 75, yPosition + 5);
+      doc.text((item.quantity || 0).toString(), pageWidth - 75, yPosition + 5);
       doc.text(
-        `R$ ${(parseFloat(item.price) || 0).toFixed(2)}`,
+        `R$ ${(parseFloat(item.unitPrice || item.price) || 0).toFixed(2)}`,
         pageWidth - 60,
         yPosition + 5
       );
@@ -180,9 +194,8 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
     doc.line(margin, tableBottom, pageWidth - margin, tableBottom);
     yPosition = tableBottom + 10;
 
-    const subtotal = parseFloat(order.totalPrice || 0);
-    const discountPercent = parseFloat(order.discount || 0);
-    const discountAmount = subtotal * (discountPercent / 100);
+    const subtotal = parseFloat(order.totalprice || 0);
+    const discountAmount = parseFloat(order.discount || 0);
     const total = subtotal - discountAmount;
 
     doc.setFontSize(10);
@@ -197,11 +210,9 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
       { align: "right" }
     );
 
-    if (discountPercent > 0) {
+    if (discountAmount > 0) {
       doc.text(
-        `Desconto (${discountPercent}%): R$ ${(discountAmount || 0).toFixed(
-          2
-        )}`,
+        `Desconto: R$ ${(discountAmount || 0).toFixed(2)}`,
         pageWidth - margin,
         yPosition + 5,
         { align: "right" }
@@ -273,11 +284,20 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
             onChange={(e) => setSelectedPdfBrand(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {(brands || []).map((brandName) => (
-              <option key={brandName} value={brandName}>
-                {brandName}
-              </option>
-            ))}
+            {/* Opções padrão caso brands esteja vazio */}
+            {(!brands || brands.length === 0) ? (
+              <>
+                <option value="Blumenau">Blumenau</option>
+                <option value="Zagonel">Zagonel</option>
+                <option value="Padova">Padova</option>
+              </>
+            ) : (
+              brands.map((brandName) => (
+                <option key={brandName} value={brandName}>
+                  {brandName}
+                </option>
+              ))
+            )}
           </select>
         </div>
         <div className="flex justify-around space-x-4">
