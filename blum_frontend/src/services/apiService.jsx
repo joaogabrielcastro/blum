@@ -57,6 +57,24 @@ const apiService = {
     return response.json();
   },
 
+  updateProduct: async (productId, productData) => {
+    const response = await fetch(`${API_URL}/products/${productId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(productData),
+    });
+    if (!response.ok) throw new Error("Erro ao atualizar produto.");
+    return response.json();
+  },
+
+  // <<< NOVA FUNÇÃO PARA CORRESPONDER AO BACKEND >>>
+  deleteProduct: async (productId) => {
+    const response = await fetch(`${API_URL}/products/${productId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw new Error("Erro ao excluir produto.");
+  },
+
   getOrders: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const url = `${API_URL}/orders?${query}`;
@@ -105,8 +123,6 @@ const apiService = {
     return response.json();
   },
 
-  // <<< MUDANÇA CRÍTICA AQUI >>>
-  // A função agora está DENTRO do objeto apiService.
   getReportStats: async (filters) => {
     const queryString = new URLSearchParams(filters).toString();
     const response = await fetch(`${API_URL}/reports/stats?${queryString}`);
@@ -132,11 +148,42 @@ const apiService = {
     return response.json();
   },
 
+  deleteBrand: async (brandName) => {
+    const response = await fetch(
+      `${API_URL}/brands/${encodeURIComponent(brandName)}`,
+      {
+        method: "DELETE",
+      }
+    );
+    if (!response.ok) throw new Error("Erro ao excluir marca.");
+  },
+
   getStatus: async () => {
     const response = await fetch(`${API_URL}/status`);
     if (!response.ok) throw new Error("Erro ao buscar o status da API.");
     return response.json();
   },
+};
+
+export const deleteBrand = async (brandName) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/brands/${encodeURIComponent(brandName)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro ao excluir marca.');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Erro na requisição deleteBrand:', error);
+    throw error;
+  }
 };
 
 export default apiService;

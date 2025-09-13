@@ -1,182 +1,233 @@
-import { useState } from "react";
-import apiService from "../services/apiService";
+import { useState, useEffect } from "react";
 
-const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
-  const [name, setName] = useState("");
-  const [productCode, setProductCode] = useState("");
-  const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("");
-  // Seta a primeira marca da lista como padrão, se houver
-  const [brand, setBrand] = useState(brands[0] || "Blumenau");
-  const [newBrand, setNewBrand] = useState("");
-  const [loading, setLoading] = useState(false);
+const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
+  const [formData, setFormData] = useState({
+    name: "",
+    productcode: "",
+    price: "",
+    brand: "",
+    stock: "",
+    minstock: "",
+  });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Debug: verifique o que está recebendo
+  console.log("Brands no formulário:", brands);
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name || "",
+        productcode: product.productcode || "",
+        price: product.price?.toString() || "",
+        brand: product.brand || "",
+        stock: product.stock?.toString() || "",
+        minstock: product.minstock?.toString() || "",
+      });
+    }
+  }, [product]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
+    if (!formData.productcode.trim()) newErrors.productcode = "Código é obrigatório";
+    if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = "Preço deve ser maior que zero";
+    if (!formData.brand) newErrors.brand = "Marca é obrigatória";
+    if (!formData.stock || parseInt(formData.stock) < 0) newErrors.stock = "Estoque não pode ser negativo";
+    if (!formData.minstock || parseInt(formData.minstock) < 0) newErrors.minstock = "Estoque mínimo não pode ser negativo";
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const productBrand = brand === "other" ? newBrand : brand;
-
-    if (
-      !name ||
-      !productCode ||
-      !productBrand ||
-      isNaN(parseFloat(price)) ||
-      parseFloat(price) <= 0 ||
-      isNaN(parseInt(stock, 10)) ||
-      parseInt(stock, 10) < 0
-    ) {
-      alert("Por favor, preencha todos os campos corretamente.");
-      return;
-    }
-
-    setLoading(true);
+    
+    if (!validateForm()) return;
+    
+    setIsSubmitting(true);
+    
     try {
-      const newProduct = {
-        name,
-        productCode,
-        price: parseFloat(price),
-        stock: parseInt(stock, 10),
-        brand: productBrand,
+      const productData = {
+        name: formData.name.trim(),
+        productcode: formData.productcode.trim(),
+        price: parseFloat(formData.price),
+        brand: formData.brand,
+        stock: parseInt(formData.stock),
+        minstock: parseInt(formData.minstock),
       };
-      await apiService.createProduct(newProduct);
-      alert("Produto salvo com sucesso!");
-      onProductAdded();
+      
+      await onSubmit(productData);
     } catch (error) {
-      console.error("Erro ao adicionar produto:", error);
-      alert("Falha ao adicionar produto. Tente novamente.");
+      console.error("Erro no formulário:", error);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Limpar erro do campo quando usuário começar a digitar
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // Função para extrair o nome da marca (se for objeto ou string)
+  const getBrandName = (brand) => {
+    if (typeof brand === 'object' && brand !== null) {
+      return brand.name || brand;
+    }
+    return brand;
+  };
+
+  // Função para extrair o valor da marca (se for objeto ou string)
+  const getBrandValue = (brand) => {
+    if (typeof brand === 'object' && brand !== null) {
+      return brand.name || brand;
+    }
+    return brand;
+  };
+
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-xl w-full border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">
-        Adicionar Novo Produto
+    <div>
+      <h2 className="text-xl font-bold mb-4">
+        {product ? "Editar Produto" : "Adicionar Novo Produto"}
       </h2>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label
-              className="block text-gray-700 text-sm font-medium mb-2"
-              htmlFor="name"
-            >
-              Nome do Produto
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="text"
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label
-              className="block text-gray-700 text-sm font-medium mb-2"
-              htmlFor="price"
-            >
-              Preço (R$)
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="number"
-              id="price"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              step="0.01"
-              required
-            />
-          </div>
-          <div>
-            <label
-              className="block text-gray-700 text-sm font-medium mb-2"
-              htmlFor="stock"
-            >
-              Estoque
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="number"
-              id="stock"
-              value={stock}
-              onChange={(e) => setStock(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label
-              className="block text-gray-700 text-sm font-medium mb-2"
-              htmlFor="productCode"
-            >
-              Código do Produto
-            </label>
-            <input
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              type="text"
-              id="productCode"
-              value={productCode}
-              onChange={(e) => setProductCode(e.target.value)}
-              required
-            />
-          </div>
-          <div className="col-span-1 md:col-span-2">
-            <label
-              className="block text-gray-700 text-sm font-medium mb-2"
-              htmlFor="brand"
-            >
-              Marca
-            </label>
-            <select
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              id="brand"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              required
-            >
-              {brands.map((brandName) => (
-                <option key={brandName} value={brandName}>
-                  {brandName}
-                </option>
-              ))}
-              <option value="other">Outra (digitar)</option>
-            </select>
-          </div>
-          {brand === "other" && (
-            <div className="col-span-1 md:col-span-2">
-              <label
-                className="block text-gray-700 text-sm font-medium mb-2"
-                htmlFor="newBrand"
-              >
-                Nova Marca
-              </label>
-              <input
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                type="text"
-                id="newBrand"
-                value={newBrand}
-                onChange={(e) => setNewBrand(e.target.value)}
-                placeholder="Digite a nova marca"
-                required
-              />
-            </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-gray-700 mb-2">
+            Nome do Produto:
+          </label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.name ? "border-red-500" : "border-gray-300"
+            }`}
+            placeholder="Digite o nome do produto"
+          />
+          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">
+            Código do Produto:
+          </label>
+          <input
+            type="text"
+            name="productcode"
+            value={formData.productcode}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.productcode ? "border-red-500" : "border-gray-300"
+            }`}
+            placeholder="Digite o código do produto"
+          />
+          {errors.productcode && <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>}
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">Preço:</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            name="price"
+            value={formData.price}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.price ? "border-red-500" : "border-gray-300"
+            }`}
+            placeholder="Digite o preço do produto"
+          />
+          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">Marca:</label>
+          <select
+            name="brand"
+            value={formData.brand}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.brand ? "border-red-500" : "border-gray-300"
+            }`}
+            disabled={!brands || brands.length === 0}
+          >
+            <option value="">Selecione uma marca</option>
+            {brands && brands.map((brand, index) => (
+              <option key={index} value={getBrandValue(brand)}>
+                {getBrandName(brand)}
+              </option>
+            ))}
+          </select>
+          {errors.brand && <p className="text-red-500 text-xs mt-1">{errors.brand}</p>}
+          {(!brands || brands.length === 0) && (
+            <p className="text-red-500 text-xs mt-1">
+              Você precisa adicionar uma marca primeiro
+            </p>
           )}
         </div>
-        <div className="flex justify-end space-x-4 mt-6">
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 mb-2">Estoque:</label>
+            <input
+              type="number"
+              min="0"
+              name="stock"
+              value={formData.stock}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.stock ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="Quantidade em estoque"
+            />
+            {errors.stock && <p className="text-red-500 text-xs mt-1">{errors.stock}</p>}
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">
+              Estoque Mínimo:
+            </label>
+            <input
+              type="number"
+              min="0"
+              name="minstock"
+              value={formData.minstock}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.minstock ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="Estoque mínimo"
+            />
+            {errors.minstock && <p className="text-red-500 text-xs mt-1">{errors.minstock}</p>}
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors duration-200"
+            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            disabled={isSubmitting}
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:bg-blue-300"
-            disabled={loading}
+            disabled={isSubmitting || !brands || brands.length === 0}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Salvando..." : "Salvar Produto"}
+            {isSubmitting ? "Salvando..." : product ? "Atualizar" : "Adicionar"}
           </button>
         </div>
       </form>
@@ -184,4 +235,4 @@ const ProductsForm = ({ onProductAdded, onCancel, brands }) => {
   );
 };
 
-export default ProductsForm;
+export default ProductForm;

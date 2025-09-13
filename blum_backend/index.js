@@ -30,24 +30,28 @@ const setupDatabase = async () => {
   try {
     console.log("Conectando ao banco de dados Neon...");
 
-    // MUDANÇA: Todas as queries CREATE TABLE foram reescritas em uma única linha.
-    await sql`CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, "companyName" VARCHAR(255) NOT NULL, "contactPerson" VARCHAR(255), phone VARCHAR(255), region VARCHAR(255), cnpj VARCHAR(255), "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
+    await sql`CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, companyname VARCHAR(255) NOT NULL, contactperson VARCHAR(255), phone VARCHAR(255), region VARCHAR(255), cnpj VARCHAR(255), createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
 
-    await sql`CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, "productCode" VARCHAR(255), price DECIMAL(10,2) NOT NULL, stock INTEGER NOT NULL, brand VARCHAR(255), "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
+    // <<< MUDANÇA CRÍTICA AQUI >>>
+    // Nomes das colunas padronizados para minúsculas (ex: "productCode" virou productcode)
+    await sql`CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, productcode VARCHAR(255), price DECIMAL(10,2) NOT NULL, stock INTEGER NOT NULL, brand VARCHAR(255), createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
 
-    await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, clientId INTEGER REFERENCES clients(id) ON DELETE CASCADE, userId VARCHAR(255) NOT NULL, items JSONB, totalPrice DECIMAL(10,2) NOT NULL, status VARCHAR(50) DEFAULT 'Em aberto', description TEXT, createdAt TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, finishedAt TIMESTAMP WITH TIME ZONE)`;
+    await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, clientid INTEGER REFERENCES clients(id) ON DELETE CASCADE, userid VARCHAR(255) NOT NULL, items JSONB, totalprice DECIMAL(10,2) NOT NULL, status VARCHAR(50) DEFAULT 'Em aberto', description TEXT, createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, finishedat TIMESTAMP WITH TIME ZONE)`;
 
     await sql`CREATE TABLE IF NOT EXISTS brands (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL)`;
 
-    const columnCheck =
+    // Adiciona a coluna 'discount' na tabela 'orders' se não existir
+    const columnCheckOrders =
       await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'discount'`;
-
-    if (columnCheck.length === 0) {
-      console.log(
-        "Coluna 'discount' não encontrada na tabela 'orders'. Adicionando..."
-      );
+    if (columnCheckOrders.length === 0) {
       await sql`ALTER TABLE orders ADD COLUMN discount DECIMAL(10, 2) DEFAULT 0`;
-      console.log("Coluna 'discount' adicionada com sucesso.");
+    }
+
+    // Adiciona a coluna 'minstock' na tabela 'products' se não existir
+    const columnCheckProducts =
+      await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'minstock'`;
+    if (columnCheckProducts.length === 0) {
+      await sql`ALTER TABLE products ADD COLUMN minstock INTEGER DEFAULT 0`;
     }
 
     console.log("Tabelas verificadas e criadas com sucesso.");
@@ -57,6 +61,7 @@ const setupDatabase = async () => {
   }
 };
 
+// ... (resto do seu arquivo index.js)
 // Rota de status do servidor
 app.get("/api/v1/status", async (req, res) => {
   try {

@@ -201,62 +201,49 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
         Detalhes dos Pedidos
       </h2>
+
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
         {ordersToDisplay.length > 0 ? (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Pedido ID
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Cliente
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Valor Total
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Data de Finalização
-                </th>
-              </tr>
-            </thead>
-            {/* <<< MUDANÇA AQUI: Removido o espaço em branco >>> */}
-            <tbody className="bg-white divide-y divide-gray-200">
-              {ordersToDisplay.map((order) => (
-                <tr key={order.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* CORREÇÃO: Usa 'clientid' em minúsculas */}
-                    {clients[order.clientid] || "N/A"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* CORREÇÃO: Usa 'totalprice' em minúsculas e formata */}
-                    {formatCurrency(order.totalprice)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* CORREÇÃO: Usa 'finishedat' em minúsculas */}
-                    {order.finishedat
-                      ? new Date(order.finishedat).toLocaleDateString("pt-BR")
-                      : "N/A"}
-                  </td>
+          <div className="overflow-x-auto max-w-full min-h-[150px]">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pedido ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Data de Finalização
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {ordersToDisplay.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {clients[order.clientid] || "N/A"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(order.totalprice)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.finishedat
+                        ? new Date(order.finishedat).toLocaleDateString("pt-BR")
+                        : "N/A"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="text-center text-gray-500">
             Nenhum pedido encontrado para o período selecionado.
@@ -270,49 +257,43 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
       <p className="text-gray-600 mb-4">
         Este relatório consolida o valor total de vendas por representante.
       </p>
+
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
         {userRole === "admin" && salesByRep.length > 0 ? (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Representante
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Valor Total de Vendas
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Comissão (6%)
-                </th>
-              </tr>
-            </thead>
-            {/* <<< MUDANÇA AQUI: Removido o espaço em branco >>> */}
-            <tbody className="bg-white divide-y divide-gray-200">
-              {salesByRep.map((sale, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {/* CORREÇÃO: 'userId' vem da lista 'salesByRep', que já corrigimos na criação */}
-                    {getRepName(sale.userId)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatCurrency(sale.totalSales)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {formatCurrency((parseFloat(sale.totalSales) || 0) * 0.06)}
-                  </td>
+          <div className="overflow-x-auto max-w-full min-h-[150px]">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Representante
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor Total de Vendas
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Comissão (6%)
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {salesByRep.map((sale, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {getRepName(sale.userId)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(sale.totalSales)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatCurrency(
+                        (parseFloat(sale.totalSales) || 0) * 0.06
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="text-center text-gray-500">
             {userRole === "admin"

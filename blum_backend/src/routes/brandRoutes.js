@@ -1,9 +1,10 @@
-const express = require('express');
-const brandController = require('../controllers/brandController');
-
+const express = require("express");
 const router = express.Router();
+const brandController = require("../controllers/brandController"); // Verifique o caminho!
 
-router.get('/', brandController.getBrands);
-router.post('/', brandController.createBrand);
+// Rotas para marcas
+router.get("/", brandController.getBrands);
+router.post("/", brandController.createBrand);
+router.delete("/:name", brandController.deleteBrand); // ← Esta deve ser a linha problemática
 
 module.exports = router;
