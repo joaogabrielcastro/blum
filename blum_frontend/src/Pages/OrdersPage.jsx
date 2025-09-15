@@ -28,7 +28,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
       ]);
 
       // Formata os pedidos usando a função importada
-      const formattedOrders = ordersData.map(order => formatOrderData(order));
+      const formattedOrders = ordersData.map((order) => formatOrderData(order));
       setOrders(formattedOrders);
 
       const clientsMap = {};
@@ -227,11 +227,16 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                   <div className="flex flex-col items-end gap-2 max-[450px]:flex-row max-[450px]:justify-between max-[450px]:items-center max-[450px]:w-full">
                     <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-fit">
                       <p className="text-base font-bold text-gray-800">
-                        Total: {formatCurrency(order.totalPrice)} {/* ← Formatação de moeda */}
+                        Total: {formatCurrency(order.totalPrice)}{" "}
+                        {/* ← Formatação de moeda */}
                       </p>
                       {order.discount > 0 && (
                         <p className="text-xs text-gray-500 line-through">
-                          {formatCurrency(parseFloat(order.totalPrice) + parseFloat(order.discount))} {/* ← Formatação de moeda */}
+                          {formatCurrency(
+                            parseFloat(order.totalPrice) +
+                              parseFloat(order.discount)
+                          )}{" "}
+                          {/* ← Formatação de moeda */}
                         </p>
                       )}
                     </div>
