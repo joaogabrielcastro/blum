@@ -18,13 +18,30 @@ const OrdersForm = ({
   const [productSearch, setProductSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
 
+  // Função segura para toFixed
+  const safeToFixed = (value, decimals = 2) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0.00';
+    return num.toFixed(decimals);
+  };
+
+  // Calcular subtotal e desconto CORRETAMENTE
+  const subtotal = items.reduce((total, item) => {
+    const price = parseFloat(item.price) || 0;
+    const quantity = parseInt(item.quantity) || 1;
+    return total + (price * quantity);
+  }, 0);
+
+  const discountAmount = subtotal * (parseFloat(discount) / 100);
+  const netTotal = subtotal - discountAmount;
+
   useEffect(() => {
     if (editingOrder) {
-      setClientId(editingOrder.clientid); // Corrigido para minúsculas
+      setClientId(editingOrder.clientid);
       setDescription(editingOrder.description || "");
       setItems(editingOrder.items || []);
       setDiscount(editingOrder.discount || 0);
-      setTotalPrice(editingOrder.totalprice || 0); // Corrigido para minúsculas
+      setTotalPrice(editingOrder.totalprice || 0);
     }
   }, [editingOrder, brands, clients]);
 
@@ -41,16 +58,9 @@ const OrdersForm = ({
   }, []);
 
   useEffect(() => {
-    calculateTotal();
-  }, [items, discount]);
-
-  const calculateTotal = () => {
-    const subtotal = items.reduce((total, item) => {
-      return total + parseFloat(item.price || 0) * item.quantity;
-    }, 0);
-    const discountAmount = subtotal * (parseFloat(discount || 0) / 100);
-    setTotalPrice(subtotal - discountAmount);
-  };
+    // Atualiza o total sempre que items ou discount mudar
+    setTotalPrice(netTotal);
+  }, [items, discount, netTotal]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
@@ -127,21 +137,17 @@ const OrdersForm = ({
       return;
     }
     try {
-      // <<< MUDANÇA CRÍTICA >>>
-      // Recalculamos o total aqui para garantir que o valor enviado é o mais atual.
-      const subtotal = items.reduce((total, item) => {
-        return total + parseFloat(item.price || 0) * item.quantity;
-      }, 0);
-      const discountAmount = subtotal * (parseFloat(discount || 0) / 100);
-      const finalTotal = subtotal - discountAmount;
-
       const orderData = {
-        clientId,
-        userId,
-        description,
-        items,
-        discount: parseFloat(discount || 0),
-        totalPrice: finalTotal, // Usamos o valor recém-calculado
+        clientid: parseInt(clientId),
+        userId: userId,
+        description: description,
+        items: items.map(item => ({
+          ...item,
+          price: parseFloat(item.price) || 0,
+          quantity: parseInt(item.quantity) || 1
+        })),
+        discount: parseFloat(discount) || 0,
+        totalPrice: parseFloat(netTotal) || 0,
       };
 
       if (editingOrder) {
@@ -165,11 +171,16 @@ const OrdersForm = ({
 
       {/* Scroll horizontal em telas menores que 420px */}
       <div className="overflow-x-auto max-[420px]:overflow-x-scroll scroll-smooth">
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-lg p-8 space-y-8 min-w-[420px]">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white rounded-xl shadow-lg p-8 space-y-8 min-w-[420px]"
+        >
           {/* Cliente e Desconto */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Cliente *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Cliente *
+              </label>
               <input
                 type="text"
                 placeholder="Buscar cliente..."
@@ -186,14 +197,16 @@ const OrdersForm = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Desconto (%)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Desconto (%)
+              </label>
               <input
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
                 value={discount}
-                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setDiscount(parseFloat(e.target.value))}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -201,7 +214,9 @@ const OrdersForm = ({
 
           {/* Descrição */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Descrição
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -233,7 +248,8 @@ const OrdersForm = ({
                   type="button"
                   onClick={() => {
                     const productToAdd = products.find(
-                      (p) => p.name.toLowerCase() === productSearch.toLowerCase()
+                      (p) =>
+                        p.name.toLowerCase() === productSearch.toLowerCase()
                     );
                     if (productToAdd) {
                       handleProductSelect(productToAdd);
@@ -255,18 +271,24 @@ const OrdersForm = ({
                 className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
               >
                 <div className="md:col-span-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Produto *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nome do Produto *
+                  </label>
                   <input
                     type="text"
                     value={item.productName}
-                    onChange={(e) => handleItemChange(index, "productName", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(index, "productName", e.target.value)
+                    }
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Marca
+                  </label>
                   <input
                     type="text"
                     value={item.brand}
@@ -276,24 +298,36 @@ const OrdersForm = ({
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantidade
+                  </label>
                   <input
                     type="number"
                     min="1"
                     value={item.quantity}
-                    onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value))}
+                    onChange={(e) =>
+                      handleItemChange(
+                        index,
+                        "quantity",
+                        parseInt(e.target.value)
+                      )
+                    }
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Preço Unitário *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preço Unitário *
+                  </label>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={item.price}
-                    onChange={(e) => handleItemChange(index, "price", e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(index, "price", e.target.value)
+                    }
                     className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                     disabled
                   />
@@ -315,13 +349,19 @@ const OrdersForm = ({
           {/* Total */}
           <div className="bg-gray-100 p-4 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-gray-700">Total do Pedido:</span>
-              <span className="text-2xl font-bold text-green-700">R$ {totalPrice.toFixed(2)}</span>
+              <span className="text-lg font-semibold text-gray-700">
+                Total do Pedido:
+              </span>
+              <span className="text-2xl font-bold text-green-700">
+                R$ {safeToFixed(totalPrice)}
+              </span>
             </div>
             {discount > 0 && (
               <div className="mt-2 text-sm text-gray-600">
                 <span>Desconto: {discount}%</span>
-                <span className="ml-2">(Desconto de R$ {((totalPrice * discount) / 100).toFixed(2)})</span>
+                <span className="ml-2">
+                  (Desconto de R$ {safeToFixed(discountAmount)})
+                </span>
               </div>
             )}
           </div>

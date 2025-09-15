@@ -284,7 +284,6 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
     </div>
   );
 };
-
 // Componente do Modal de Detalhes
 const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrderStatus, getSellerName }) => {
   // Parse dos items se for string JSON
@@ -365,26 +364,36 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {items.map((item, index) => (
-                  <tr key={index}>
-                    <td className="px-4 py-3">
-                      <div>
-                        <div className="font-medium">{item.productName || "Produto não especificado"}</div>
-                        {item.productCode && (
-                          <div className="text-sm text-gray-600">Código: {item.productCode}</div>
-                        )}
-                        {item.productId && (
-                          <div className="text-sm text-gray-600">ID: {item.productId}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{item.quantity || 1}</td>
-                    <td className="px-4 py-3">{formatCurrency(item.unitPrice || 0)}</td>
-                    <td className="px-4 py-3 font-semibold">
-                      {formatCurrency((item.quantity || 1) * (item.unitPrice || 0))}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item, index) => {
+                  // Corrigido: usa item.price ou item.unitPrice
+                  const unitPrice = item.price || item.unitPrice || 0;
+                  const quantity = item.quantity || 1;
+                  const subtotal = unitPrice * quantity;
+                  
+                  return (
+                    <tr key={index}>
+                      <td className="px-4 py-3">
+                        <div>
+                          <div className="font-medium">{item.productName || item.name || "Produto não especificado"}</div>
+                          {item.productCode && (
+                            <div className="text-sm text-gray-600">Código: {item.productCode}</div>
+                          )}
+                          {item.productId && (
+                            <div className="text-sm text-gray-600">ID: {item.productId}</div>
+                          )}
+                          {item.brand && (
+                            <div className="text-sm text-gray-600">Marca: {item.brand}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{quantity}</td>
+                      <td className="px-4 py-3">{formatCurrency(unitPrice)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatCurrency(subtotal)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>

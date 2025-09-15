@@ -3,6 +3,8 @@ import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
+import { formatOrderData } from "../utils/format"; // ← Importação correta
+import formatCurrency from "../utils/format"; // ← Importa a formatação de moeda
 
 const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [orders, setOrders] = useState([]);
@@ -25,7 +27,9 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         apiService.getClients(),
       ]);
 
-      setOrders(ordersData);
+      // Formata os pedidos usando a função importada
+      const formattedOrders = ordersData.map(order => formatOrderData(order));
+      setOrders(formattedOrders);
 
       const clientsMap = {};
       clientsData.forEach((client) => {
@@ -204,7 +208,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                     Pedido #{order.id}
                   </h2>
                   <p className="text-sm text-gray-500">
-                    Cliente: {clients[order.clientid] || "N/A"}
+                    Cliente: {clients[order.clientId] || "N/A"}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
                     Itens: {order.items?.length || 0}
@@ -223,15 +227,11 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                   <div className="flex flex-col items-end gap-2 max-[450px]:flex-row max-[450px]:justify-between max-[450px]:items-center max-[450px]:w-full">
                     <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-fit">
                       <p className="text-base font-bold text-gray-800">
-                        Total: R$
-                        {(parseFloat(order.totalprice) || 0).toFixed(2)}
+                        Total: {formatCurrency(order.totalPrice)} {/* ← Formatação de moeda */}
                       </p>
                       {order.discount > 0 && (
                         <p className="text-xs text-gray-500 line-through">
-                          R${" "}
-                          {(
-                            parseFloat(order.totalprice + order.discount) || 0
-                          ).toFixed(2)}
+                          {formatCurrency(parseFloat(order.totalPrice) + parseFloat(order.discount))} {/* ← Formatação de moeda */}
                         </p>
                       )}
                     </div>
