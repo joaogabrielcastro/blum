@@ -58,7 +58,7 @@ exports.delete = async (req, res) => {
 
 exports.update = async (req, res) => {
   const { id } = req.params;
-  const { name, productcode, price, stock, brand, minstock } = req.body;
+  const { name, productcode, price, stock, brand, minstock } = req.body; // ← productcode em minúsculo
 
   if (!name || price === undefined || stock === undefined) {
     return res
@@ -67,6 +67,7 @@ exports.update = async (req, res) => {
   }
 
   try {
+    // CORREÇÃO: Usar productcode (minúsculo) em vez de productCode
     const result = await sql(
       `UPDATE products 
        SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6
@@ -81,7 +82,10 @@ exports.update = async (req, res) => {
     res.status(200).json(result[0]);
   } catch (error) {
     console.error("Erro ao atualizar produto:", error);
-    res.status(500).json({ error: "Erro ao atualizar produto." });
+    res.status(500).json({ 
+      error: "Erro ao atualizar produto.",
+      details: error.message
+    });
   }
 };
 

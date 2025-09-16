@@ -1,15 +1,42 @@
 const { neon } = require("@neondatabase/serverless");
 const sql = neon(process.env.DATABASE_URL);
-const productsController = require("./productController");
 
-// Função getAll corrigida - USANDO clientid (minúsculo)
+// Função utilitária para atualizar estoque (evita importação cíclica)
+const updateProductStock = async (productId, quantity) => {
+  try {
+    await sql`
+      UPDATE products 
+      SET stock = stock - ${quantity} 
+      WHERE id = ${productId}
+    `;
+  } catch (error) {
+    console.error("Erro ao atualizar estoque:", error);
+    throw error;
+  }
+};
+
+// Função para buscar taxa de comissão
+const getBrandCommissionRate = async (brandName) => {
+  if (!brandName) return 0;
+
+  try {
+    const result = await sql`
+      SELECT commission_rate FROM brands WHERE name = ${brandName}
+    `;
+    return result[0]?.commission_rate || 0;
+  } catch (error) {
+    console.error("Erro ao buscar comissão da marca:", error);
+    return 0;
+  }
+};
+
+// GET ALL - Buscar todos os pedidos
 exports.getAll = async (req, res) => {
   try {
     const { userId, clientid, userRole } = req.query;
     let query = "SELECT * FROM orders";
     const params = [];
 
-    // USANDO O NOME CORRETO: clientid (minúsculo)
     if (userRole === "admin") {
       if (clientid) {
         query += " WHERE clientid = $1";
@@ -39,31 +66,65 @@ exports.getAll = async (req, res) => {
   }
 };
 
-// Função create corrigida - USANDO clientid (minúsculo)
+// CREATE - Criar um novo pedido
 exports.create = async (req, res) => {
-  const { clientid, userId, items, totalPrice, description, discount } = req.body;
-
-  if (!clientid || !userId || items === undefined || totalPrice === undefined) {
-    console.error("Erro: Dados incompletos recebidos.", req.body);
-    return res.status(400).json({ error: "Dados incompletos." });
-  }
-
   try {
-    const itemsJson = JSON.stringify(items);
-    const result = await sql(
-      `INSERT INTO orders (clientid, userid, items, totalprice, description, discount, status, createdat)
-       VALUES ($1, $2, $3::jsonb, $4, $5, $6, 'Em aberto', NOW())
-       RETURNING *`,
-      [clientid, userId, itemsJson, totalPrice, description || "", discount || 0]
+    const { clientid, userid, description, items, discount, totalprice } =
+      req.body;
+
+    // Validação completa
+    if (
+      !clientid ||
+      !userid ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      return res.status(400).json({
+        error:
+          "Dados incompletos. clientid, userid e items (array) são obrigatórios.",
+      });
+    }
+
+    // Calcular comissões
+    const itemsWithCommission = await Promise.all(
+      items.map(async (item) => {
+        const commissionRate = await getBrandCommissionRate(item.brand);
+        const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
+        const commissionAmount = (itemTotal * commissionRate) / 100;
+
+        return {
+          ...item,
+          commission_rate: commissionRate,
+          commission_amount: commissionAmount,
+        };
+      })
     );
+
+    const totalCommission = itemsWithCommission.reduce(
+      (total, item) => total + (item.commission_amount || 0),
+      0
+    );
+
+    const result = await sql`
+      INSERT INTO orders 
+        (clientid, userid, description, items, discount, totalprice, total_commission, status, createdat)
+      VALUES 
+        (${clientid}, ${userid}, ${description || ""}, 
+         ${JSON.stringify(itemsWithCommission)}, 
+         ${discount || 0}, ${totalprice}, ${totalCommission}, 
+         'Em aberto', NOW())
+      RETURNING *
+    `;
+
     res.status(201).json(result[0]);
   } catch (error) {
     console.error("Erro ao criar pedido:", error);
-    res.status(500).json({ error: error.message || "Erro ao criar pedido." });
+    res.status(500).json({ error: "Erro ao criar pedido." });
   }
 };
 
-// Função delete
+// DELETE - Excluir um pedido
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
@@ -75,7 +136,7 @@ exports.delete = async (req, res) => {
   }
 };
 
-// Função finalize
+// FINALIZE - Finalizar um pedido
 exports.finalize = async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,25 +147,28 @@ exports.finalize = async (req, res) => {
       return res.status(404).json({ error: "Pedido não encontrado." });
     }
 
+    // Atualiza status
     await sql(
       "UPDATE orders SET status = $1, finishedat = NOW() WHERE id = $2",
       ["Entregue", id]
     );
 
-    // Atualiza o estoque dos produtos
-    if (order.items && Array.isArray(order.items)) {
-      for (const item of order.items) {
-        await productsController.updateStock(item.productId, item.quantity);
-      }
-    } else if (typeof order.items === 'string') {
-      // Se items for string JSON, faz o parse
+    // Atualiza estoque dos produtos
+    let itemsArray = [];
+
+    if (Array.isArray(order.items)) {
+      itemsArray = order.items;
+    } else if (typeof order.items === "string") {
       try {
-        const items = JSON.parse(order.items);
-        for (const item of items) {
-          await productsController.updateStock(item.productId, item.quantity);
-        }
+        itemsArray = JSON.parse(order.items);
       } catch (parseError) {
         console.error("Erro ao fazer parse dos items:", parseError);
+      }
+    }
+
+    for (const item of itemsArray) {
+      if (item.productId && item.quantity) {
+        await updateProductStock(item.productId, item.quantity);
       }
     }
 
@@ -115,26 +179,52 @@ exports.finalize = async (req, res) => {
   }
 };
 
-// Função update corrigida - USANDO clientid (minúsculo)
+// UPDATE - Atualizar um pedido
 exports.update = async (req, res) => {
-  const { id } = req.params;
-  const { clientid, items, totalPrice, description, discount } = req.body;
-
-  if (clientid === undefined || items === undefined || totalPrice === undefined) {
-    return res.status(400).json({
-      error: "Dados incompletos. clientid, items e totalPrice são obrigatórios.",
-    });
-  }
-
   try {
-    const itemsJson = JSON.stringify(items);
-    const result = await sql(
-      `UPDATE orders 
-       SET clientid = $1, items = $2::jsonb, totalprice = $3, description = $4, discount = $5
-       WHERE id = $6
-       RETURNING *`,
-      [clientid, itemsJson, totalPrice, description || "", discount || 0, id]
+    const { id } = req.params;
+    const { clientid, userid, description, items, discount, totalprice } =
+      req.body;
+
+    if (!clientid || !userid || !items || !Array.isArray(items)) {
+      return res.status(400).json({
+        error:
+          "Dados incompletos. clientid, userid e items (array) são obrigatórios.",
+      });
+    }
+
+    // Recalcular comissões
+    const itemsWithCommission = await Promise.all(
+      items.map(async (item) => {
+        const commissionRate = await getBrandCommissionRate(item.brand);
+        const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
+        const commissionAmount = (itemTotal * commissionRate) / 100;
+
+        return {
+          ...item,
+          commission_rate: commissionRate,
+          commission_amount: commissionAmount,
+        };
+      })
     );
+
+    const totalCommission = itemsWithCommission.reduce(
+      (total, item) => total + (item.commission_amount || 0),
+      0
+    );
+
+    const result = await sql`
+      UPDATE orders 
+      SET clientid = ${clientid},
+          userid = ${userid},
+          description = ${description || ""},
+          items = ${JSON.stringify(itemsWithCommission)},
+          discount = ${discount || 0},
+          totalprice = ${totalprice},
+          total_commission = ${totalCommission}
+      WHERE id = ${id}
+      RETURNING *
+    `;
 
     if (result.length === 0) {
       return res.status(404).json({ error: "Pedido não encontrado." });
@@ -147,7 +237,7 @@ exports.update = async (req, res) => {
   }
 };
 
-// Função getClientStats corrigida - USANDO clientid (minúsculo)
+// GET CLIENT STATS - Estatísticas do cliente
 exports.getClientStats = async (req, res) => {
   try {
     const { clientId } = req.params;
@@ -170,16 +260,16 @@ exports.getClientStats = async (req, res) => {
   }
 };
 
-// Função adicional: Buscar pedidos por vendedor
+// GET ORDERS BY SELLER - Pedidos por vendedor
 exports.getOrdersBySeller = async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const orders = await sql(
       "SELECT * FROM orders WHERE userid = $1 ORDER BY createdat DESC",
       [userId]
     );
-    
+
     res.status(200).json(orders);
   } catch (error) {
     console.error("Erro ao buscar pedidos do vendedor:", error);
@@ -187,7 +277,7 @@ exports.getOrdersBySeller = async (req, res) => {
   }
 };
 
-// Função adicional: Atualizar status do pedido
+// UPDATE STATUS - Atualizar status do pedido
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -210,5 +300,23 @@ exports.updateStatus = async (req, res) => {
   } catch (error) {
     console.error("Erro ao atualizar status do pedido:", error);
     res.status(500).json({ error: "Erro ao atualizar status do pedido." });
+  }
+};
+
+// GET BY ID - Buscar pedido por ID
+exports.getById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await sql("SELECT * FROM orders WHERE id = $1", [id]);
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: "Pedido não encontrado." });
+    }
+
+    res.status(200).json(result[0]);
+  } catch (error) {
+    console.error("Erro ao buscar pedido:", error);
+    res.status(500).json({ error: "Erro ao buscar pedido." });
   }
 };

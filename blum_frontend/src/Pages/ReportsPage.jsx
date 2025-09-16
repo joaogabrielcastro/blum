@@ -8,6 +8,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState("monthly");
   const [salesByRep, setSalesByRep] = useState([]);
+  const [commissionsByRep, setCommissionsByRep] = useState([]);
   const [clients, setClients] = useState({});
   const [chartData, setChartData] = useState([]);
   const monthlyTarget = 80000;
@@ -16,7 +17,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        // CORREÇÃO: Passa um objeto com userRole e userId para a API, como o backend espera.
         const ordersData = await apiService.getOrders({
           userRole,
           userId,
@@ -34,8 +34,8 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         );
         setAllOrders(finishedOrders);
 
+        // Calcular vendas por representante
         const salesMap = finishedOrders.reduce((acc, order) => {
-          // CORREÇÃO: Usa 'userid' e 'totalprice' em minúsculas
           const repId = order.userid || "N/A";
           const total = parseFloat(order.totalprice) || 0;
           acc[repId] = (acc[repId] || 0) + total;
@@ -47,13 +47,31 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
           totalSales: salesMap[repId],
         }));
         setSalesByRep(salesByRepList);
+
+        // Calcular comissões reais por representante
+        const commissionsMap = finishedOrders.reduce((acc, order) => {
+          const repId = order.userid || "N/A";
+          const commission = parseFloat(order.total_commission) || 0;
+          acc[repId] = (acc[repId] || 0) + commission;
+          return acc;
+        }, {});
+
+        const commissionsByRepList = Object.keys(commissionsMap).map((repId) => ({
+          userId: repId,
+          totalCommission: commissionsMap[repId],
+          totalSales: salesMap[repId] || 0,
+          commissionRate: commissionsMap[repId] > 0 ? 
+            ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2) : '0.00'
+        }));
+        setCommissionsByRep(commissionsByRepList);
+
       } catch (error) {
         console.error("Erro ao buscar relatórios:", error);
       } finally {
         setLoading(false);
       }
     };
-    // Garante que a busca só ocorra se tivermos as informações do usuário
+    
     if (userId && userRole) {
       fetchOrders();
     }
@@ -63,7 +81,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const prepareChartData = () => {
       const currentMonthOrders = allOrders
         .filter((order) => {
-          // CORREÇÃO: Usa 'finishedat' em minúsculas
           const orderDate = new Date(order.finishedat);
           const today = new Date();
           return (
@@ -75,7 +92,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
 
       let cumulativeSales = 0;
       const data = currentMonthOrders.map((order) => {
-        // CORREÇÃO: Usa 'totalprice' em minúsculas
         cumulativeSales += parseFloat(order.totalprice || 0);
         return {
           date: new Date(order.finishedat).toLocaleDateString("pt-BR"),
@@ -92,10 +108,10 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const filterDate = new Date();
     filterDate.setDate(today.getDate() - days);
     return allOrders.filter(
-      // CORREÇÃO: Usa 'finishedat' em minúsculas
       (order) => order.finishedat && new Date(order.finishedat) >= filterDate
     );
   };
+
   const weeklyOrders = getFilteredOrders(7);
   const monthlyOrders = getFilteredOrders(30);
 
@@ -107,8 +123,12 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
       : allOrders;
 
   const totalSales = ordersToDisplay.reduce(
-    // CORREÇÃO: Usa 'totalprice' em minúsculas
     (acc, order) => acc + (parseFloat(order.totalprice) || 0),
+    0
+  );
+
+  const totalCommissions = ordersToDisplay.reduce(
+    (acc, order) => acc + (parseFloat(order.total_commission) || 0),
     0
   );
 
@@ -124,10 +144,9 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     );
 
   return (
-    // SEU CORPO/LAYOUT DA PÁGINA PERMANECE EXATAMENTE O MESMO
     <div className="p-8">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        Relatórios de Vendas
+        Relatórios de Vendas e Comissões
       </h1>
 
       <div className="flex items-center gap-2 flex-wrap mb-8">
@@ -166,7 +185,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
           <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center gap-4">
             <span>Total de Pedidos</span>
@@ -189,6 +208,20 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
             {formatCurrency(totalSales)}
           </p>
         </div>
+        <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center gap-4">
+            <span>Total de Comissões</span>
+            <span className="material-symbols-outlined text-green-500 text-[22px]">
+              paid
+            </span>
+          </h2>
+          <p className="text-4xl font-bold text-green-600">
+            {formatCurrency(totalCommissions)}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            {totalSales > 0 ? ((totalCommissions / totalSales) * 100).toFixed(2) : '0.00'}% das vendas
+          </p>
+        </div>
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
@@ -202,7 +235,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         Detalhes dos Pedidos
       </h2>
 
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
+      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200 mb-8">
         {ordersToDisplay.length > 0 ? (
           <div className="overflow-x-auto max-w-full min-h-[150px]">
             <table className="min-w-full divide-y divide-gray-200">
@@ -216,6 +249,9 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor Total
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Comissão
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Data de Finalização
@@ -234,6 +270,9 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatCurrency(order.totalprice)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
+                      {formatCurrency(order.total_commission || 0)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {order.finishedat
                         ? new Date(order.finishedat).toLocaleDateString("pt-BR")
@@ -251,15 +290,15 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         )}
       </div>
 
-      <h2 className="text-2xl font-bold text-gray-800 mt-10 mb-4">
-        Vendas por Representante
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">
+        Comissões por Representante
       </h2>
       <p className="text-gray-600 mb-4">
-        Este relatório consolida o valor total de vendas por representante.
+        Este relatório mostra as comissões reais calculadas por marca dos produtos vendidos.
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
-        {userRole === "admin" && salesByRep.length > 0 ? (
+        {userRole === "admin" && commissionsByRep.length > 0 ? (
           <div className="overflow-x-auto max-w-full min-h-[150px]">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -271,12 +310,15 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
                     Valor Total de Vendas
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comissão (6%)
+                    Comissão Real
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    % Comissão
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {salesByRep.map((sale, index) => (
+                {commissionsByRep.map((sale, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getRepName(sale.userId)}
@@ -284,10 +326,11 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatCurrency(sale.totalSales)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
+                      {formatCurrency(sale.totalCommission)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(
-                        (parseFloat(sale.totalSales) || 0) * 0.06
-                      )}
+                      {sale.commissionRate}%
                     </td>
                   </tr>
                 ))}

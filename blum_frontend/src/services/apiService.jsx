@@ -58,14 +58,25 @@ const apiService = {
   },
 
   updateProduct: async (productId, productData) => {
+  try {
     const response = await fetch(`${API_URL}/products/${productId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(productData),
     });
-    if (!response.ok) throw new Error("Erro ao atualizar produto.");
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      // Mensagem de erro mais específica
+      throw new Error(errorData.details || errorData.error || "Erro ao atualizar produto.");
+    }
+    
     return response.json();
-  },
+  } catch (error) {
+    console.error("Erro detalhado ao atualizar produto:", error);
+    throw error;
+  }
+},
 
   // <<< NOVA FUNÇÃO PARA CORRESPONDER AO BACKEND >>>
   deleteProduct: async (productId) => {
@@ -89,9 +100,13 @@ const apiService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newOrderData),
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Erro ao criar pedido.");
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Erro ao criar pedido.");
+    }
+
+    return response.json();
   },
 
   deleteOrder: async (orderId) => {
@@ -186,31 +201,65 @@ export const getClientById = async (clientId) => {
   }
 };
 
+export const updateBrand = async (oldName, brandData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/brands/${oldName}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(brandData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Erro ao atualizar marca");
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
+export const getBrandsWithCommission = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/brands`);
+
+    if (!response.ok) {
+      throw new Error("Erro ao buscar marcas");
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw new Error(error.message);
+  }
+};
+
 export const getClientOrders = async (clientId) => {
   try {
     // Use clientid como parâmetro de query (minúsculo)
     const response = await fetch(`${API_BASE_URL}/orders?clientid=${clientId}`);
-    
+
     if (!response.ok) {
-      throw new Error('Erro ao buscar pedidos do cliente');
+      throw new Error("Erro ao buscar pedidos do cliente");
     }
-    
+
     const orders = await response.json();
-    
-    return orders.map(order => ({
+
+    return orders.map((order) => ({
       id: order.id,
       orderNumber: order.id.toString(),
       orderDate: order.createdat,
       seller: order.userid,
-      status: order.status || 'pending',
+      status: order.status || "pending",
       totalAmount: order.totalprice || 0,
       discount: order.discount || 0,
-      paymentMethod: 'Não informado',
-      notes: order.description || '',
-      items: Array.isArray(order.items) ? order.items : tryParseJSON(order.items)
+      paymentMethod: "Não informado",
+      notes: order.description || "",
+      items: Array.isArray(order.items)
+        ? order.items
+        : tryParseJSON(order.items),
     }));
   } catch (error) {
-    console.error('Erro ao buscar pedidos do cliente:', error);
+    console.error("Erro ao buscar pedidos do cliente:", error);
     throw error;
   }
 };

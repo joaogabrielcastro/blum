@@ -32,9 +32,16 @@ const setupDatabase = async () => {
 
     await sql`CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, companyname VARCHAR(255) NOT NULL, contactperson VARCHAR(255), phone VARCHAR(255), region VARCHAR(255), cnpj VARCHAR(255), createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
 
-    // <<< MUDANÇA CRÍTICA AQUI >>>
-    // Nomes das colunas padronizados para minúsculas (ex: "productCode" virou productcode)
-    await sql`CREATE TABLE IF NOT EXISTS products (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, productcode VARCHAR(255), price DECIMAL(10,2) NOT NULL, stock INTEGER NOT NULL, brand VARCHAR(255), createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
+    await sql`CREATE TABLE IF NOT EXISTS products (
+  id SERIAL PRIMARY KEY, 
+  name VARCHAR(255) NOT NULL, 
+  productcode VARCHAR(255),
+  price DECIMAL(10,2) NOT NULL, 
+  stock INTEGER NOT NULL, 
+  brand VARCHAR(255), 
+  minstock INTEGER DEFAULT 0,
+  createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+)`;
 
     await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, clientid INTEGER REFERENCES clients(id) ON DELETE CASCADE, userid VARCHAR(255) NOT NULL, items JSONB, totalprice DECIMAL(10,2) NOT NULL, status VARCHAR(50) DEFAULT 'Em aberto', description TEXT, createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, finishedat TIMESTAMP WITH TIME ZONE)`;
 

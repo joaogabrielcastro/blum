@@ -21,7 +21,7 @@ const OrdersForm = ({
   // Função segura para toFixed
   const safeToFixed = (value, decimals = 2) => {
     const num = parseFloat(value);
-    if (isNaN(num)) return '0.00';
+    if (isNaN(num)) return "0.00";
     return num.toFixed(decimals);
   };
 
@@ -29,7 +29,7 @@ const OrdersForm = ({
   const subtotal = items.reduce((total, item) => {
     const price = parseFloat(item.price) || 0;
     const quantity = parseInt(item.quantity) || 1;
-    return total + (price * quantity);
+    return total + price * quantity;
   }, 0);
 
   const discountAmount = subtotal * (parseFloat(discount) / 100);
@@ -139,15 +139,15 @@ const OrdersForm = ({
     try {
       const orderData = {
         clientid: parseInt(clientId),
-        userId: userId,
+        userid: userId, // ← userid em minúsculo
         description: description,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           ...item,
           price: parseFloat(item.price) || 0,
-          quantity: parseInt(item.quantity) || 1
+          quantity: parseInt(item.quantity) || 1,
         })),
         discount: parseFloat(discount) || 0,
-        totalPrice: parseFloat(netTotal) || 0,
+        totalprice: parseFloat(netTotal) || 0, // ← totalprice em minúsculo
       };
 
       if (editingOrder) {

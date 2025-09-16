@@ -5,6 +5,7 @@ const ordersController = require("../controllers/orderController");
 // Rotas para pedidos
 router.get("/", ordersController.getAll);
 router.post("/", ordersController.create);
+router.get("/:id", ordersController.getById);
 router.delete("/:id", ordersController.delete);
 router.put("/:id/finalize", ordersController.finalize);
 router.put("/:id", ordersController.update);
