@@ -18,6 +18,7 @@ const FilterBar = ({
   searchTerm,
   onSearchChange,
   onDeleteBrand,
+  onEditBrand,
   confirmDelete,
   deleteType,
   deleteId,
@@ -25,10 +26,46 @@ const FilterBar = ({
   onCancelDelete
 }) => {
   const [showAllBrands, setShowAllBrands] = useState(false);
+  const [editingBrand, setEditingBrand] = useState(null);
+  const [editCommission, setEditCommission] = useState("");
   
   // Limitar a exibição de marcas a 5 inicialmente
   const displayedBrands = showAllBrands ? brands : brands.slice(0, 5);
   
+  const handleEditClick = (brand, e) => {
+    e.stopPropagation();
+    setEditingBrand(brand.name);
+    setEditCommission(brand.commission_rate?.toString() || "0");
+  };
+  
+  const handleSaveEdit = async (brandName, e) => {
+    e.stopPropagation();
+    try {
+      await onEditBrand(brandName, { 
+        name: brandName, 
+        commission_rate: parseFloat(editCommission) 
+      });
+      setEditingBrand(null);
+      setEditCommission("");
+    } catch (error) {
+      console.error("Erro ao editar marca:", error);
+    }
+  };
+  
+  const handleCancelEdit = (e) => {
+    e.stopPropagation();
+    setEditingBrand(null);
+    setEditCommission("");
+  };
+  
+  const handleCommissionChange = (e) => {
+    const value = e.target.value;
+    // Permitir apenas números e ponto decimal
+    if (/^\d*\.?\d*$/.test(value) && (value === "" || parseFloat(value) <= 100)) {
+      setEditCommission(value);
+    }
+  };
+
   return (
     <div className="mb-8 bg-white p-4 rounded-lg shadow">
       <div className="flex flex-col md:flex-row gap-4 justify-between">
@@ -88,29 +125,81 @@ const FilterBar = ({
             </button>
 
             {brands && brands.length > 0 ? (
-              displayedBrands.map((brand, index) => (
-                <div key={brand.id || `brand-${index}`} className="relative group">
+              displayedBrands.map((brand) => (
+                <div key={brand.name} className="relative group">
                   <button
-                    onClick={() => onBrandSelect(brand)}
-                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                      selectedBrand === brand
+                    onClick={() => onBrandSelect(brand.name)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 relative ${
+                      selectedBrand === brand.name
                         ? "bg-blue-600 text-white shadow-md"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                   >
-                    {fixEncoding(brand)}
+                    {fixEncoding(brand.name)}
+                    {/* Badge de comissão */}
+                    <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
+                      {brand.commission_rate}%
+                    </span>
                   </button>
-                  <button
-                    onClick={() => onDeleteBrand("brand", brand, brand)}
-                    className="ml-1 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity absolute -right-2 -top-2 bg-white rounded-full p-1 shadow-md"
-                    title="Excluir marca"
-                  >
-                    {confirmDelete === brand && deleteType === "brand" ? (
-                      <span className="text-xs font-bold">✓</span>
-                    ) : (
-                      <span className="text-xs">✕</span>
-                    )}
-                  </button>
+                  
+                  {/* Botões de ação */}
+                  <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => handleEditClick(brand, e)}
+                      className="bg-blue-500 text-white rounded-full p-1 shadow-md hover:bg-blue-600"
+                      title="Editar marca"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteBrand("brand", brand.name, brand.name);
+                      }}
+                      className="bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                      title="Excluir marca"
+                    >
+                      {confirmDelete === brand.name && deleteType === "brand" ? (
+                        <span className="text-xs font-bold">✓</span>
+                      ) : (
+                        <span className="text-xs">✕</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Modal de edição inline */}
+                  {editingBrand === brand.name && (
+                    <div className="absolute top-full left-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-64">
+                      <h4 className="font-semibold text-sm mb-2">Editar Comissão</h4>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={editCommission}
+                          onChange={handleCommissionChange}
+                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder="0.00"
+                        />
+                        <span className="text-gray-600">%</span>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={(e) => handleSaveEdit(brand.name, e)}
+                          className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                        >
+                          Salvar
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (

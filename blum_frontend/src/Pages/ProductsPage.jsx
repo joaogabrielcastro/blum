@@ -90,7 +90,8 @@ const ProductsPage = () => {
       filtered = filtered.filter(
         (product) =>
           product.name.toLowerCase().includes(term) ||
-          product.productcode.toLowerCase().includes(term) ||
+          (product.productcode &&
+            product.productcode.toLowerCase().includes(term)) ||
           product.brand.toLowerCase().includes(term)
       );
     }
@@ -98,11 +99,11 @@ const ProductsPage = () => {
     return filtered;
   }, [products, selectedBrand, searchTerm]);
 
-  const handleAddBrand = async (brandName) => {
-    if (brandName.trim()) {
+  const handleAddBrand = async (brandData) => {
+    if (brandData.name && brandData.name.trim()) {
       try {
         setError(null);
-        await apiService.createBrand({ name: brandName });
+        await apiService.createBrand(brandData);
         setShowBrandForm(false);
 
         // Recarregar marcas
@@ -141,11 +142,11 @@ const ProductsPage = () => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
-      productcode: product.productcode,
+      productcode: product.productcode || "",
       price: product.price.toString(),
       brand: product.brand,
       stock: product.stock.toString(),
-      minstock: product.minstock.toString(),
+      minstock: product.minstock ? product.minstock.toString() : "0",
     });
     setShowProductForm(true);
   };
@@ -160,6 +161,20 @@ const ProductsPage = () => {
     } catch (err) {
       setError("Erro ao excluir produto. Tente novamente.");
       console.error("Erro ao excluir produto:", err);
+    }
+  };
+
+  const handleEditBrand = async (brandName, brandData) => {
+    try {
+      setError(null);
+      await apiService.updateBrand(brandName, brandData);
+
+      // Recarregar marcas
+      const brandsData = await apiService.getBrands();
+      setBrands(brandsData);
+    } catch (err) {
+      setError("Erro ao editar marca. Tente novamente.");
+      console.error("Erro ao editar marca:", err);
     }
   };
 
@@ -251,6 +266,7 @@ const ProductsPage = () => {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onDeleteBrand={confirmDeleteAction}
+        onEditBrand={handleEditBrand} // ← Nova prop
         confirmDelete={confirmDelete}
         deleteType={deleteType}
         deleteId={deleteId}
@@ -291,6 +307,7 @@ const ProductsPage = () => {
               onDelete={confirmDeleteAction}
               confirmDelete={confirmDelete}
               deleteType={deleteType}
+              deleteId={deleteId}
               onConfirmDelete={handleDeleteProduct}
               onCancelDelete={() => {
                 setConfirmDelete(null);
@@ -315,10 +332,12 @@ const ProductsPage = () => {
             <ProductsForm
               product={editingProduct}
               brands={brands}
+              initialData={productForm}
               onSubmit={handleSaveProduct}
               onCancel={() => {
                 setShowProductForm(false);
                 setEditingProduct(null);
+                resetForms();
               }}
             />
           </div>
