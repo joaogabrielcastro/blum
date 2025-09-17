@@ -77,6 +77,33 @@ const apiService = {
     throw error;
   }
 },
+queryCNPJ: async (cnpj) => {
+  try {
+    // Remove caracteres não numéricos
+    const cleanCnpj = cnpj.replace(/\D/g, '');
+    
+    const response = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
+    
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error("Limite de consultas excedido. Tente novamente mais tarde.");
+      }
+      throw new Error("CNPJ não encontrado");
+    }
+    
+    const data = await response.json();
+    
+    // Extrai apenas as informações necessárias para o formulário
+    return {
+      nome: data.razao_social || data.estabelecimento?.nome_fantasia || '',
+      telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || '',
+      uf: data.estabelecimento?.estado?.sigla || ''
+    };
+  } catch (error) {
+    console.error("Erro na consulta de CNPJ:", error);
+    throw error;
+  }
+},
 
   // <<< NOVA FUNÇÃO PARA CORRESPONDER AO BACKEND >>>
   deleteProduct: async (productId) => {
