@@ -30,25 +30,29 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
-    if (!formData.productcode.trim()) newErrors.productcode = "Código é obrigatório";
-    if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = "Preço deve ser maior que zero";
-    if (!formData.brand) newErrors.brand = "Marca é obrigatória";
-    if (!formData.stock || parseInt(formData.stock) < 0) newErrors.stock = "Estoque não pode ser negativo";
-    if (!formData.minstock || parseInt(formData.minstock) < 0) newErrors.minstock = "Estoque mínimo não pode ser negativo";
-    
+    if (!formData.productcode.trim())
+      newErrors.productcode = "Código é obrigatório";
+    if (!formData.price || parseFloat(formData.price) <= 0)
+      newErrors.price = "Preço deve ser maior que zero";
+    if (!formData.brand) newErrors.brand = "Representada é obrigatória";
+    if (!formData.stock || parseInt(formData.stock) < 0)
+      newErrors.stock = "Estoque não pode ser negativo";
+    if (!formData.minstock || parseInt(formData.minstock) < 0)
+      newErrors.minstock = "Estoque mínimo não pode ser negativo";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
       const productData = {
         name: formData.name.trim(),
@@ -58,7 +62,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
         stock: parseInt(formData.stock),
         minstock: parseInt(formData.minstock),
       };
-      
+
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
@@ -69,25 +73,25 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
     // Limpar erro do campo quando usuário começar a digitar
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Função para extrair o nome da marca (se for objeto ou string)
+  // Função para extrair o nome da Representada (se for objeto ou string)
   const getBrandName = (brand) => {
-    if (typeof brand === 'object' && brand !== null) {
+    if (typeof brand === "object" && brand !== null) {
       return brand.name || brand;
     }
     return brand;
   };
 
-  // Função para extrair o valor da marca (se for objeto ou string)
+  // Função para extrair o valor da Representada (se for objeto ou string)
   const getBrandValue = (brand) => {
-    if (typeof brand === 'object' && brand !== null) {
+    if (typeof brand === "object" && brand !== null) {
       return brand.name || brand;
     }
     return brand;
@@ -101,9 +105,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-gray-700 mb-2">
-            Nome do Produto:
-          </label>
+          <label className="block text-gray-700 mb-2">Nome do Produto:</label>
           <input
             type="text"
             name="name"
@@ -114,13 +116,13 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
             }`}
             placeholder="Digite o nome do produto"
           />
-          {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+          {errors.name && (
+            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+          )}
         </div>
 
         <div>
-          <label className="block text-gray-700 mb-2">
-            Código do Produto:
-          </label>
+          <label className="block text-gray-700 mb-2">Código do Produto:</label>
           <input
             type="text"
             name="productcode"
@@ -131,7 +133,9 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
             }`}
             placeholder="Digite o código do produto"
           />
-          {errors.productcode && <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>}
+          {errors.productcode && (
+            <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
+          )}
         </div>
 
         <div>
@@ -148,11 +152,13 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
             }`}
             placeholder="Digite o preço do produto"
           />
-          {errors.price && <p className="text-red-500 text-xs mt-1">{errors.price}</p>}
+          {errors.price && (
+            <p className="text-red-500 text-xs mt-1">{errors.price}</p>
+          )}
         </div>
 
         <div>
-          <label className="block text-gray-700 mb-2">Marca:</label>
+          <label className="block text-gray-700 mb-2">Representada:</label>
           <select
             name="brand"
             value={formData.brand}
@@ -162,17 +168,20 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
             }`}
             disabled={!brands || brands.length === 0}
           >
-            <option value="">Selecione uma marca</option>
-            {brands && brands.map((brand, index) => (
-              <option key={index} value={getBrandValue(brand)}>
-                {getBrandName(brand)}
-              </option>
-            ))}
+            <option value="">Selecione uma Representada</option>
+            {brands &&
+              brands.map((brand, index) => (
+                <option key={index} value={getBrandValue(brand)}>
+                  {getBrandName(brand)}
+                </option>
+              ))}
           </select>
-          {errors.brand && <p className="text-red-500 text-xs mt-1">{errors.brand}</p>}
+          {errors.brand && (
+            <p className="text-red-500 text-xs mt-1">{errors.brand}</p>
+          )}
           {(!brands || brands.length === 0) && (
             <p className="text-red-500 text-xs mt-1">
-              Você precisa adicionar uma marca primeiro
+              Você precisa adicionar uma Representada primeiro
             </p>
           )}
         </div>
@@ -191,13 +200,13 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
               }`}
               placeholder="Quantidade em estoque"
             />
-            {errors.stock && <p className="text-red-500 text-xs mt-1">{errors.stock}</p>}
+            {errors.stock && (
+              <p className="text-red-500 text-xs mt-1">{errors.stock}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-gray-700 mb-2">
-              Estoque Mínimo:
-            </label>
+            <label className="block text-gray-700 mb-2">Estoque Mínimo:</label>
             <input
               type="number"
               min="0"
@@ -209,7 +218,9 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
               }`}
               placeholder="Estoque mínimo"
             />
-            {errors.minstock && <p className="text-red-500 text-xs mt-1">{errors.minstock}</p>}
+            {errors.minstock && (
+              <p className="text-red-500 text-xs mt-1">{errors.minstock}</p>
+            )}
           </div>
         </div>
 

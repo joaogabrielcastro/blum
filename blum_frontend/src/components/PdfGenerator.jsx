@@ -130,7 +130,7 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
 
     doc.text("Cód", margin + 5, yPosition + 5);
     doc.text("Produto", margin + 25, yPosition + 5);
-    doc.text("Marca", margin + 90, yPosition + 5);
+    doc.text("Representada", margin + 90, yPosition + 5);
     doc.text("Qtd", pageWidth - 75, yPosition + 5);
     doc.text("Preço Unit.", pageWidth - 60, yPosition + 5);
     doc.text("Total", pageWidth - 25, yPosition + 5, { align: "right" });
@@ -276,7 +276,7 @@ const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
       <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full mx-4 text-center">
         <h3 className="text-xl font-bold mb-4">Gerar PDF</h3>
         <p className="text-gray-600 mb-6">
-          Escolha a marca para o rodapé do PDF:
+          Escolha a Representada para o rodapé do PDF:
         </p>
         <div className="mb-6">
           <select

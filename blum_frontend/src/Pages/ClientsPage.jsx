@@ -27,7 +27,8 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
           client.contactPerson?.toLowerCase().includes(term) ||
           client.phone?.includes(term) ||
           client.region?.toLowerCase().includes(term) ||
-          client.cnpj?.includes(term)
+          client.cnpj?.includes(term) ||
+          client.email?.toLowerCase().includes(term)
       );
       setFilteredClients(filtered);
     } else {
@@ -164,6 +165,9 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
                         Telefone
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Região
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -190,6 +194,9 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                           {client.phone || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-600">
+                          {client.email || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                           {client.region || "-"}

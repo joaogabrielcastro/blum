@@ -16,9 +16,9 @@ const EmptyState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
       <div className="col-span-full flex items-center justify-center py-12">
         <div className="text-center text-gray-500">
           <div className="text-4xl mb-4">📦</div>
-          <h3 className="text-xl font-semibold">Nenhum produto nesta marca</h3>
+          <h3 className="text-xl font-semibold">Nenhum produto nesta Representada</h3>
           <p className="mt-2">
-            Adicione produtos para a marca "{selectedBrand}"
+            Adicione produtos para a Representada "{selectedBrand}"
           </p>
         </div>
       </div>
@@ -31,12 +31,12 @@ const EmptyState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
         <div className="text-4xl mb-4">📦</div>
         <h3 className="text-xl font-semibold">
           {brandsCount === 0
-            ? "Adicione marcas primeiro"
+            ? "Adicione Representadas primeiro"
             : "Nenhum produto cadastrado"}
         </h3>
         <p className="mt-2">
           {brandsCount === 0
-            ? "Você precisa adicionar marcas antes de adicionar produtos"
+            ? "Você precisa adicionar Representadas antes de adicionar produtos"
             : "Adicione produtos para começar"}
         </p>
       </div>

@@ -37,7 +37,8 @@ exports.getClientById = async (req, res) => {
 
 // Create client
 exports.create = async (req, res) => {
-  const { companyName, contactPerson, phone, region, cnpj } = req.body;
+  // 1. Adicione 'email' aqui
+  const { companyName, contactPerson, phone, region, cnpj, email } = req.body;
 
   if (!companyName || !cnpj) {
     return res.status(400).json({ error: "Nome da empresa e CNPJ são obrigatórios." });
@@ -45,10 +46,12 @@ exports.create = async (req, res) => {
 
   try {
     const result = await sql(
-      `INSERT INTO clients ("companyName", "contactPerson", phone, region, cnpj, "createdAt")
-       VALUES ($1, $2, $3, $4, $5, NOW())
+      // 2. Adicione a coluna "email" e o placeholder $6
+      `INSERT INTO clients ("companyName", "contactPerson", phone, region, cnpj, "email", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
        RETURNING *`,
-      [companyName, contactPerson, phone, region, cnpj]
+      // 3. Adicione a variável 'email' na lista
+      [companyName, contactPerson, phone, region, cnpj, email]
     );
     res.status(201).json(result[0]);
   } catch (error) {

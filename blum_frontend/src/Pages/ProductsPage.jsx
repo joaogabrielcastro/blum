@@ -43,12 +43,12 @@ const ProductsPage = () => {
       setLoading(true);
       setError(null);
 
-      // Buscar produtos com filtro de marca
+      // Buscar produtos com filtro de Representada
       const productsData = await apiService.getProducts(
         selectedBrand !== "all" ? selectedBrand : "all"
       );
 
-      // Buscar marcas apenas se necessário
+      // Buscar Representadas apenas se necessário
       if (brands.length === 0) {
         const brandsData = await apiService.getBrands();
         setBrands(brandsData);
@@ -63,14 +63,14 @@ const ProductsPage = () => {
     }
   }, [selectedBrand, brands.length]);
 
-  // Carregar marcas separadamente
+  // Carregar Representadas separadamente
   useEffect(() => {
     const fetchBrands = async () => {
       try {
         const brandsData = await apiService.getBrands();
         setBrands(brandsData);
       } catch (err) {
-        console.error("Erro ao buscar marcas:", err);
+        console.error("Erro ao buscar Representadas:", err);
       }
     };
 
@@ -106,12 +106,12 @@ const ProductsPage = () => {
         await apiService.createBrand(brandData);
         setShowBrandForm(false);
 
-        // Recarregar marcas
+        // Recarregar Representadas
         const brandsData = await apiService.getBrands();
         setBrands(brandsData);
       } catch (err) {
-        setError("Erro ao adicionar marca. Tente novamente.");
-        console.error("Erro ao adicionar marca:", err);
+        setError("Erro ao adicionar Representada. Tente novamente.");
+        console.error("Erro ao adicionar Representada:", err);
       }
     }
   };
@@ -169,12 +169,12 @@ const ProductsPage = () => {
       setError(null);
       await apiService.updateBrand(brandName, brandData);
 
-      // Recarregar marcas
+      // Recarregar Representadas
       const brandsData = await apiService.getBrands();
       setBrands(brandsData);
     } catch (err) {
-      setError("Erro ao editar marca. Tente novamente.");
-      console.error("Erro ao editar marca:", err);
+      setError("Erro ao editar Representada. Tente novamente.");
+      console.error("Erro ao editar Representada:", err);
     }
   };
 
@@ -185,13 +185,13 @@ const ProductsPage = () => {
       setConfirmDelete(null);
       await fetchData();
 
-      // Se a marca selecionada foi deletada, voltar para "Todas"
+      // Se a Representada selecionada foi deletada, voltar para "Todas"
       if (selectedBrand === brandName) {
         setSelectedBrand("all");
       }
     } catch (err) {
-      setError(err.message || "Erro ao excluir marca. Tente novamente.");
-      console.error("Erro ao excluir marca:", err);
+      setError(err.message || "Erro ao excluir Representada. Tente novamente.");
+      console.error("Erro ao excluir Representada:", err);
     }
   };
 
@@ -232,7 +232,7 @@ const ProductsPage = () => {
             Catálogo de Produtos
           </h1>
           <p className="text-gray-600 mt-2">
-            Gerencie seu inventário de produtos e marcas
+            Gerencie seu inventário de produtos e Representadas
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -241,7 +241,7 @@ const ProductsPage = () => {
             className="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
           >
             <span>+</span>
-            <span>Adicionar Marca</span>
+            <span>Adicionar Representada</span>
           </button>
           <button
             onClick={() => {
@@ -287,11 +287,11 @@ const ProductsPage = () => {
         <div className="flex justify-between items-center">
           <p className="text-gray-600">
             {filteredProducts.length} produto(s) encontrado(s)
-            {selectedBrand !== "all" && ` para a marca "${selectedBrand}"`}
+            {selectedBrand !== "all" && ` para a Representada "${selectedBrand}"`}
             {searchTerm && ` contendo "${searchTerm}"`}
           </p>
           <div className="text-sm text-gray-500">
-            Total de marcas: {brands.length}
+            Total de Representadas: {brands.length}
           </div>
         </div>
       </div>
@@ -344,7 +344,7 @@ const ProductsPage = () => {
         </div>
       )}
 
-      {/* Modal para adicionar marca */}
+      {/* Modal para adicionar Representada */}
       {showBrandForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">

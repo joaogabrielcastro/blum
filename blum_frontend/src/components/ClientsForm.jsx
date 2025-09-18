@@ -7,7 +7,8 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
     contactPerson: "",
     phone: "",
     region: "",
-    cnpj: ""
+    cnpj: "",
+    email: "",
   });
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -15,26 +16,26 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
 
   const handleCnpjChange = async (e) => {
     const newCnpj = e.target.value.replace(/\D/g, "");
-    setFormData(prev => ({ ...prev, cnpj: newCnpj }));
-    setErrors(prev => ({ ...prev, cnpj: "" }));
+    setFormData((prev) => ({ ...prev, cnpj: newCnpj }));
+    setErrors((prev) => ({ ...prev, cnpj: "" }));
 
     if (newCnpj.length === 14) {
       setIsSearching(true);
       try {
         const data = await apiService.queryCNPJ(newCnpj);
         if (data.nome) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             companyName: data.nome,
             phone: data.telefone || "",
-            region: data.uf || ""
+            region: data.uf || "",
           }));
         } else {
-          setErrors(prev => ({ ...prev, cnpj: "CNPJ não encontrado" }));
+          setErrors((prev) => ({ ...prev, cnpj: "CNPJ não encontrado" }));
         }
       } catch (error) {
         console.error("Erro ao buscar CNPJ:", error);
-        setErrors(prev => ({ ...prev, cnpj: "Falha ao consultar CNPJ" }));
+        setErrors((prev) => ({ ...prev, cnpj: "Falha ao consultar CNPJ" }));
       } finally {
         setIsSearching(false);
       }
@@ -43,25 +44,27 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.companyName.trim()) newErrors.companyName = "Nome da empresa é obrigatório";
+    if (!formData.companyName.trim())
+      newErrors.companyName = "Nome da empresa é obrigatório";
     if (!formData.cnpj.trim()) newErrors.cnpj = "CNPJ é obrigatório";
-    if (formData.cnpj.length !== 14) newErrors.cnpj = "CNPJ deve ter 14 dígitos";
-    
+    if (formData.cnpj.length !== 14)
+      newErrors.cnpj = "CNPJ deve ter 14 dígitos";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     setLoading(true);
@@ -82,7 +85,7 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
         Adicionar Novo Cliente
       </h2>
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="md:col-span-2">
@@ -100,8 +103,14 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
               placeholder="00.000.000/0000-00"
               maxLength={14}
             />
-            {errors.cnpj && <p className="text-red-500 text-xs mt-1">{errors.cnpj}</p>}
-            {isSearching && <p className="text-blue-500 text-xs mt-1">Buscando dados do CNPJ...</p>}
+            {errors.cnpj && (
+              <p className="text-red-500 text-xs mt-1">{errors.cnpj}</p>
+            )}
+            {isSearching && (
+              <p className="text-blue-500 text-xs mt-1">
+                Buscando dados do CNPJ...
+              </p>
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -118,7 +127,9 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
               onChange={handleChange}
               required
             />
-            {errors.companyName && <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>}
+            {errors.companyName && (
+              <p className="text-red-500 text-xs mt-1">{errors.companyName}</p>
+            )}
           </div>
 
           <div>
@@ -143,6 +154,19 @@ const ClientsForm = ({ onClientAdded, onCancel }) => {
               type="tel"
               name="phone"
               value={formData.phone}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div>
+            <label className="block text-gray-700 text-sm font-medium mb-2">
+              Email
+            </label>
+            <input
+              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
             />
           </div>

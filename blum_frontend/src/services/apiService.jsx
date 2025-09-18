@@ -97,7 +97,8 @@ queryCNPJ: async (cnpj) => {
     return {
       nome: data.razao_social || data.estabelecimento?.nome_fantasia || '',
       telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || '',
-      uf: data.estabelecimento?.estado?.sigla || ''
+      uf: data.estabelecimento?.estado?.sigla || '',
+      email: data.estabelecimento?.email || '',
     };
   } catch (error) {
     console.error("Erro na consulta de CNPJ:", error);

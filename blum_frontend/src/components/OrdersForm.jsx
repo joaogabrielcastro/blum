@@ -287,7 +287,7 @@ const OrdersForm = ({
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Marca
+                    Representada
                   </label>
                   <input
                     type="text"

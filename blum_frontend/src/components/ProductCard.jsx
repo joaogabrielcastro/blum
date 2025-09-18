@@ -52,7 +52,7 @@ const ProductCard = ({
       </div>
       
       <p className="text-sm text-gray-500 mt-2">
-        Marca: {product.brand}
+        Representada: {product.brand}
       </p>
       
       <p className="text-xs text-gray-400 mt-2">
