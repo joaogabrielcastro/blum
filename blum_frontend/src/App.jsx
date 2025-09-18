@@ -42,6 +42,15 @@ const App = () => {
     }
   };
 
+  const fetchBrands = async () => {
+  try {
+    const brandsData = await apiService.getBrands();
+    setBrands(brandsData);
+  } catch (error) {
+    console.error("Erro ao carregar marcas:", error);
+  }
+ };
+
   const handleLogin = (role, user) => {
     setIsLoggedIn(true);
     setUserRole(role);
@@ -91,6 +100,7 @@ const App = () => {
   useEffect(() => {
     if (isLoggedIn) {
       fetchClients();
+      fetchBrands();
     }
   }, [isLoggedIn]);
 
