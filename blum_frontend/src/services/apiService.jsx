@@ -26,7 +26,7 @@ const apiService = {
     if (!response.ok) throw new Error("Falha ao atualizar cliente.");
     return response.json();
   },
-
+  
   updateOrder: async (orderId, orderData) => {
     const response = await fetch(`${API_URL}/orders/${orderId}`, {
       method: "PUT",
@@ -154,7 +154,7 @@ queryCNPJ: async (cnpj) => {
 
   getClientStats: async (clientId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/orders/stats/${clientId}`);
+      const response = await fetch(`${API_URL}/orders/stats/${clientId}`);
       if (!response.ok) {
         return { totalOrders: 0, totalSpent: 0 };
       }
@@ -165,6 +165,40 @@ queryCNPJ: async (cnpj) => {
       return { totalOrders: 0, totalSpent: 0 };
     }
   },
+
+  processPurchasePdf: async (formData) => {
+    try {
+      const response = await fetch(`${API_URL}/purchases/process-pdf`, {
+        method: 'POST',
+        body: formData, // FormData já configura o header 'Content-Type' para 'multipart/form-data'
+      });
+      if (!response.ok) {
+        throw new Error('A resposta da rede não foi OK');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao processar PDF:', error);
+      throw error;
+    }
+  },
+
+  finalizePurchase: async (items) => {
+  try {
+    const response = await fetch(`${API_URL}/purchases/finalize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erro ao finalizar a compra.');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao finalizar a compra:', error);
+    throw error;
+  }
+},
 
   getSalesByRep: async () => {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);

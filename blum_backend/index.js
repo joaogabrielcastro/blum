@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const purchaseRoutes = require("./src/routes/purchaseRoutes");
 const { neon } = require("@neondatabase/serverless");
 
 const app = express();
@@ -25,6 +26,7 @@ app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/brands", brandRoutes);
+app.use("/api/v1/purchases", purchaseRoutes);
 
 const setupDatabase = async () => {
   try {

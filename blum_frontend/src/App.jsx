@@ -5,6 +5,7 @@ import Dashboard from "./Pages/Dashboard";
 import ProductsPage from "./Pages/ProductsPage";
 import ClientsPage from "./Pages/ClientsPage";
 import OrdersPage from "./Pages/OrdersPage";
+import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import apiService from "./services/apiService";
@@ -117,6 +118,10 @@ const App = () => {
             reps={reps}
           />
         );
+        
+      case "purchases":
+        return <PurchasesPage />;
+
       case "clients":
         return (
           <ClientsPage
