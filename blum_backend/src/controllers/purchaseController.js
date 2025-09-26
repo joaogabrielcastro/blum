@@ -1,88 +1,183 @@
-const pdf = require('pdf-parse');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-require('dotenv').config();
+const pdf = require("pdf-parse");
+const { neon } = require("@neondatabase/serverless");
+require("dotenv").config();
 
-// Verifica se a chave da API está carregada
-if (!process.env.GEMINI_API_KEY) {
-  console.error("ERRO CRÍTICO: A variável GEMINI_API_KEY não foi encontrada no .env!");
+// Conexão com o banco Neon
+const sql = neon(process.env.DATABASE_URL);
+
+// ✅ MODELOS DISPONÍVEIS PARA SUA CONTA (baseado no teste)
+const AVAILABLE_MODELS = [
+  'gemini-1.5-flash',          // Modelo mais rápido e econômico
+  'gemini-1.5-flash-002',      // Versão estável
+  'gemini-1.5-flash-8b',       // Versão compacta
+  'gemini-1.5-pro',            // Modelo mais capaz
+  'gemini-2.0-flash',          // Versão 2.0
+  'gemini-2.5-flash',          // Mais recente
+];
+
+// ✅ FUNÇÃO OTIMIZADA PARA CHAMAR A API
+async function callGeminiAPI(promptText) {
+  console.log("🔗 Conectando à API Gemini...");
+  
+  for (const modelName of AVAILABLE_MODELS) {
+    try {
+      console.log(`🧪 Tentando: ${modelName}`);
+      
+      const API_URL = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
+      const requestBody = {
+        contents: [{
+          parts: [{
+            text: promptText
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+        }
+      };
+
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (response.status === 404) {
+          console.log(`❌ ${modelName} não disponível`);
+          continue; // Tenta próximo modelo
+        }
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        throw new Error('Resposta da API em formato inesperado');
+      }
+      
+      console.log(`✅ Sucesso com: ${modelName}`);
+      return {
+        text: data.candidates[0].content.parts[0].text,
+        modelUsed: modelName
+      };
+      
+    } catch (error) {
+      console.log(`❌ ${modelName} falhou: ${error.message}`);
+      // Continua para o próximo modelo
+    }
+  }
+  
+  throw new Error('Nenhum dos modelos disponíveis funcionou. Verifique sua chave API.');
 }
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 exports.processPdf = async (req, res) => {
-  console.log("\n--- [NOVA TENTATIVA] Iniciando processamento de PDF ---");
+  console.log("\n--- [PROCESSAMENTO DE PDF] ---");
   try {
     if (!req.file) {
-      console.log("-> Erro: Nenhum arquivo foi recebido.");
-      return res.status(400).json({ error: 'Nenhum arquivo PDF enviado.' });
+      console.log("❌ Nenhum arquivo recebido");
+      return res.status(400).json({ error: "Nenhum arquivo PDF enviado." });
     }
-    console.log("-> 1. Arquivo recebido:", req.file.originalname);
+    
+    console.log("📄 Arquivo recebido:", req.file.originalname);
 
+    // Extrai texto do PDF
     const data = await pdf(req.file.buffer);
-    console.log("-> 2. Texto extraído do PDF com sucesso.");
-    
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    
+    console.log("✅ Texto extraído do PDF");
+
     const prompt = `
-      Você é um assistente especialista em extrair dados de documentos.
-      Analise o texto a seguir, que foi extraído de um PDF de orçamento de compra.
-      Identifique cada item na lista de produtos e extraia as seguintes informações para cada um:
-      - O código do produto (coluna "Produto").
-      - A descrição completa do produto (coluna "Descrição").
-      - A quantidade solicitada (coluna "Quant. Solic.").
-      - O preço unitário líquido (coluna "Preço Unit. Liq.").
-
-      Retorne os dados estritamente como um array de objetos JSON VÁLIDO. Cada objeto deve ter as chaves: "productCode", "description", "quantity", e "unitPrice".
-      Se um valor numérico não for encontrado, use 0. Se um valor de texto não for encontrado, use uma string vazia.
-      NÃO inclua formatação markdown como \`\`\`json ou qualquer texto explicativo antes ou depois do array JSON. A resposta deve começar com '[' e terminar com ']'.
-
+      Você é um especialista em extrair dados de documentos de orçamento.
+      
+      ANALISE este texto extraído de um PDF e extraia TODOS os produtos listados.
+      
+      PARA CADA ITEM, extraia estas informações:
+      - productCode: código do produto (coluna "Produto" ou similar)
+      - description: descrição completa do produto
+      - quantity: quantidade solicitada (converta para número)
+      - unitPrice: preço unitário líquido (converta para número decimal)
+      
+      REGRAS IMPORTANTES:
+      - Retorne APENAS um array JSON válido, sem texto adicional
+      - Formato: [{"productCode": "123", "description": "Nome", "quantity": 10, "unitPrice": 25.50}]
+      - Use 0 para valores numéricos não encontrados
+      - Use "" para textos não encontrados
+      - Inclua TODOS os itens da lista
+      
       TEXTO DO PDF:
-      ---
       ${data.text}
-      ---
     `;
 
-    console.log("-> 3. Enviando prompt para a API de IA...");
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const aiText = response.text();
-    
-    console.log("-> 4. RESPOSTA BRUTA DA IA:\n", aiText);
+    console.log("🤖 Enviando prompt para IA...");
+    const result = await callGeminiAPI(prompt);
+    const aiText = result.text;
+    const modelUsed = result.modelUsed;
+
+    console.log("📝 Resposta recebida do modelo:", modelUsed);
 
     let parsedData;
     try {
-      // Tenta fazer o parse do JSON
-      parsedData = JSON.parse(aiText.trim());
-      console.log("-> 5. JSON parseado com sucesso. Enviando para o frontend.");
+      // Limpa o texto para parse JSON
+      const cleanedText = aiText
+        .trim()
+        .replace(/```json/g, '')
+        .replace(/```/g, '')
+        .replace(/^[^{[]*/, '') // Remove texto antes do JSON
+        .replace(/[^}\]]*$/, ''); // Remove texto depois do JSON
+      
+      parsedData = JSON.parse(cleanedText);
+      console.log("✅ JSON parseado com sucesso. Itens encontrados:", parsedData.length);
     } catch (parseError) {
-      console.error("!!! ERRO AO FAZER O PARSE DO JSON DA IA:", parseError);
-      console.error("A IA retornou um texto que não é um JSON válido.");
-      // Retorna um erro específico para o frontend saber o que aconteceu
-      return res.status(500).json({ error: 'A resposta da IA não estava em um formato JSON válido.' });
+      console.error("❌ Erro no parse do JSON:", parseError.message);
+      console.log("📄 Texto recebido (primeiros 500 chars):", aiText.substring(0, 500));
+      
+      // Tenta corrigir o JSON
+      try {
+        // Encontra o primeiro [ e último ]
+        const start = aiText.indexOf('[');
+        const end = aiText.lastIndexOf(']') + 1;
+        if (start !== -1 && end !== -1) {
+          const jsonText = aiText.substring(start, end);
+          parsedData = JSON.parse(jsonText);
+          console.log("✅ JSON corrigido com sucesso!");
+        } else {
+          throw new Error('Não foi possível encontrar JSON na resposta');
+        }
+      } catch (secondError) {
+        return res.status(500).json({
+          error: "Resposta da IA em formato inválido",
+          suggestion: "A IA não retornou um JSON válido",
+          rawResponse: aiText.substring(0, 300) + "..."
+        });
+      }
     }
-    
-    res.status(200).json(parsedData);
 
+    res.status(200).json(parsedData);
+    
   } catch (error) {
-    // Este catch agora pegará erros de conexão com a API, etc.
-    console.error("!!! ERRO GERAL NO BACKEND:", error);
-      res.status(500).json({ error: 'Falha ao se comunicar com a API de IA ou processar o PDF.' });
-    }
-  };
-  
-  exports.finalizePurchase = async (req, res) => {
-    const { items } = req.body;
+    console.error("💥 ERRO NO PROCESSAMENTO:", error.message);
+    res.status(500).json({
+      error: "Falha no processamento do PDF",
+      details: error.message
+    });
+  }
+};
+
+exports.finalizePurchase = async (req, res) => {
+  const { items } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Nenhum item válido foi recebido.' });
+    return res.status(400).json({ error: "Nenhum item válido foi recebido." });
   }
 
   try {
-    // Usar uma transação para garantir que todas as atualizações ocorram com sucesso
     await sql.transaction(async (tx) => {
       for (const item of items) {
-        // Valida se cada item tem os dados necessários
         if (!item.mappedProductId || !item.quantity || item.unitPrice == null) {
-          throw new Error('Item inválido encontrado na lista: ' + JSON.stringify(item));
+          throw new Error("Item inválido: " + JSON.stringify(item));
         }
 
         const quantity = parseInt(item.quantity, 10);
@@ -90,23 +185,43 @@ exports.processPdf = async (req, res) => {
         const productId = parseInt(item.mappedProductId, 10);
 
         if (isNaN(quantity) || isNaN(price) || isNaN(productId)) {
-             throw new Error('Dados numéricos inválidos para o item: ' + JSON.stringify(item));
+          throw new Error("Dados numéricos inválidos: " + JSON.stringify(item));
         }
 
-        // Atualiza o estoque (adicionando a nova quantidade) e o preço de custo do produto
         await tx`
-          UPDATE products
-          SET 
-            stock = stock + ${quantity},
-            price = ${price}
+          UPDATE products 
+          SET stock = stock + ${quantity}, price = ${price}
           WHERE id = ${productId}
         `;
       }
     });
 
-    res.status(200).json({ message: 'Estoque atualizado com sucesso!' });
+    res.status(200).json({ message: "Estoque atualizado com sucesso!" });
   } catch (error) {
-    console.error("Erro ao finalizar a compra e atualizar o estoque:", error);
-    res.status(500).json({ error: 'Falha ao atualizar o estoque no banco de dados.' });
+    console.error("Erro ao finalizar compra:", error);
+    res.status(500).json({ error: "Falha ao atualizar estoque." });
+  }
+};
+
+// ✅ Rota de teste
+exports.testConnection = async (req, res) => {
+  try {
+    console.log("🧪 Testando conexão com modelos disponíveis...");
+    
+    const testPrompt = "Responda apenas com a palavra 'CONECTADO'";
+    const result = await callGeminiAPI(testPrompt);
+    
+    res.status(200).json({
+      success: true,
+      message: "Conexão estabelecida com sucesso!",
+      modelUsed: result.modelUsed,
+      response: result.text
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 };

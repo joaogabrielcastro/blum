@@ -11,4 +11,7 @@ router.post('/process-pdf', upload.single('purchasePdf'), purchaseController.pro
 // Rota para finalizar compra
 router.post('/finalize', purchaseController.finalizePurchase);
 
+// Adicione esta linha nas suas rotas
+router.get('/api/test', purchaseController.testConnection);
+
 module.exports = router;
