@@ -184,18 +184,29 @@ queryCNPJ: async (cnpj) => {
 
   finalizePurchase: async (items) => {
   try {
+    console.log("📤 Enviando dados para finalizar compra:", items);
+    
     const response = await fetch(`${API_URL}/purchases/finalize`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ items }),
     });
+
+    console.log("📥 Resposta do servidor:", response.status);
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || 'Erro ao finalizar a compra.');
+      console.error("❌ Erro da API:", errorData);
+      throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
     }
-    return await response.json();
+
+    const data = await response.json();
+    console.log("✅ Compra finalizada com sucesso:", data);
+    return data;
   } catch (error) {
-    console.error('Erro ao finalizar a compra:', error);
+    console.error("💥 Erro ao finalizar compra:", error);
     throw error;
   }
 },
