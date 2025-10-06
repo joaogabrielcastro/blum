@@ -8,7 +8,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import EmptyState from "../components/EmptyState";
 
-const ProductsPage = () => {
+const ProductsPage = ({ userRole }) => {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
   const [showBrandForm, setShowBrandForm] = useState(false);
@@ -235,6 +235,7 @@ const ProductsPage = () => {
             Gerencie seu inventário de produtos e Representadas
           </p>
         </div>
+        {userRole === "admin" && (
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setShowBrandForm(true)}
@@ -254,6 +255,7 @@ const ProductsPage = () => {
             <span>Adicionar Produto</span>
           </button>
         </div>
+        )}
       </div>
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}

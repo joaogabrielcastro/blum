@@ -24,6 +24,7 @@ const FilterBar = ({
   deleteId,
   onConfirmDelete,
   onCancelDelete,
+  userRole,
 }) => {
   const [showAllBrands, setShowAllBrands] = useState(false);
   const [editingBrand, setEditingBrand] = useState(null);
@@ -164,13 +165,14 @@ const FilterBar = ({
                     }`}
                   >
                     {fixEncoding(brand.name)}
-                    {/* Badge de comissão */}
+                     {/* Badge de comissão */}
                     <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
                       {brand.commission_rate}%
                     </span>
                   </button>
 
                   {/* Botões de ação */}
+
                   <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => handleEditClick(brand, e)}
@@ -192,6 +194,7 @@ const FilterBar = ({
                       </svg>
                     </button>
 
+                    {/* Badge de comissão */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -210,7 +213,7 @@ const FilterBar = ({
                   </div>
 
                   {/* Modal de edição inline */}
-                  {editingBrand === brand.name && (
+                  {userRole === "admin" && editingBrand === brand.name && (
                     <div className="absolute top-full left-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-64">
                       <h4 className="font-semibold text-sm mb-2">
                         Editar Comissão
@@ -251,7 +254,7 @@ const FilterBar = ({
           </div>
 
           {/* Mensagem de confirmação para exclusão de Representada */}
-          {confirmDelete && deleteType === "brand" && (
+          {userRole === "admin" && confirmDelete && deleteType === "brand" && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
               <p className="text-yellow-800 font-medium">
                 Confirmar exclusão da Representada "{fixEncoding(confirmDelete)}

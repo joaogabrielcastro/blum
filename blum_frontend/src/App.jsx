@@ -120,6 +120,10 @@ const App = () => {
         );
         
       case "purchases":
+
+        if (userRole !== "admin") {
+          return <Dashboard onNavigate={setCurrentPage} username={username} />;
+        }
         return <PurchasesPage />;
 
       case "clients":
@@ -162,6 +166,7 @@ const App = () => {
             onNavigate={setCurrentPage}
             onLogout={handleLogout}
             currentPage={currentPage}
+            userRole={userRole}
           />
 
           {/* Overlay para mobile */}
