@@ -615,6 +615,208 @@ exports.debugPdf = async (req, res) => {
     });
   }
 };
+// ✅ NOVO CONTROLLER PARA IMPORTAR CSV
+exports.importCsv = async (req, res) => {
+  console.log("\n--- [IMPORTAÇÃO DE CSV] ---");
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo CSV enviado." });
+    }
+
+    console.log("📄 CSV recebido:", req.file.originalname);
+
+    // Converte buffer para string
+    const csvText = req.file.buffer.toString('utf8');
+    
+    // Processa o CSV
+    const products = await processCsvData(csvText);
+    
+    console.log(`✅ CSV processado: ${products.length} produtos encontrados`);
+
+    // ✅ DEBUG: Verifica se há dados válidos
+    if (products.length === 0) {
+      console.log("❌ Nenhum produto válido encontrado no CSV");
+      return res.status(400).json({ 
+        error: "Nenhum produto válido encontrado no CSV",
+        details: "Verifique os cabeçalhos e formato do arquivo"
+      });
+    }
+
+    // ✅ DEBUG: Verifica dados dos primeiros produtos
+    console.log("🔍 Amostra dos dados processados:");
+    products.slice(0, 3).forEach((product, index) => {
+      console.log(`   ${index + 1}. Código: "${product.productCode}", Nome: "${product.name.substring(0, 30)}...", Preço: ${product.price}, Estoque: ${product.stock}, Marca: "${product.brand}"`);
+    });
+
+    // Importa para o banco
+    console.log("🚀 Iniciando importação para o banco de dados...");
+    const results = await importProductsToDatabase(products);
+
+    res.status(200).json({
+      message: `Importação concluída! ${results.created} novos produtos, ${results.updated} atualizados`,
+      results: results,
+      type: "success"
+    });
+
+  } catch (error) {
+    console.error("💥 ERRO na importação CSV:", error);
+    res.status(500).json({
+      error: "Falha na importação do CSV",
+      details: error.message
+    });
+  }
+};
+
+// ✅ PROCESSADOR DE CSV
+async function processCsvData(csvText) {
+  const lines = csvText.split('\n').filter(line => line.trim());
+  const products = [];
+  
+  // Assume que a primeira linha é cabeçalho
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  
+  console.log("📋 Cabeçalhos do CSV:", headers);
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCsvLine(lines[i]);
+    
+    // Mapeia colunas baseado nos cabeçalhos
+    const product = {
+      productCode: getValueByHeader(headers, values, ['codigo', 'sku', 'productcode', 'código']),
+      name: getValueByHeader(headers, values, ['nome', 'descricao', 'descrição', 'name', 'product']),
+      price: parseFloat(getValueByHeader(headers, values, ['preco', 'preço', 'price', 'valor'])) || 0,
+      stock: parseInt(getValueByHeader(headers, values, ['estoque', 'stock', 'quantidade', 'qtd'])) || 0,
+      brand: getValueByHeader(headers, values, ['marca', 'brand', 'fabricante']) || 'BLUMENAU',
+      category: getValueByHeader(headers, values, ['categoria', 'category', 'grupo']),
+      ncm: getValueByHeader(headers, values, ['ncm']),
+      ipi: parseFloat(getValueByHeader(headers, values, ['ipi'])) || 0
+    };
+    
+    // Só adiciona se tiver código e nome
+    if (product.productCode && product.name) {
+      products.push(product);
+    }
+  }
+  
+  return products;
+}
+
+// ✅ FUNÇÃO AUXILIAR PARA MAPEAR COLUNAS
+function getValueByHeader(headers, values, possibleHeaders) {
+  for (const header of possibleHeaders) {
+    const index = headers.indexOf(header);
+    if (index !== -1 && values[index]) {
+      return values[index].trim();
+    }
+  }
+  return '';
+}
+
+// ✅ PARSER DE LINHA CSV (simples)
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current);
+  return result.map(val => val.replace(/^"|"$/g, '').trim());
+}
+
+// ✅ IMPORTAR PARA BANCO (reutiliza lógica similar à do PDF)
+async function importProductsToDatabase(products) {
+  const results = {
+    created: 0,
+    updated: 0,
+    errors: 0,
+    details: []
+  };
+
+  console.log(`🔄 Iniciando importação de ${products.length} produtos...`);
+
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i];
+    
+    try {
+      console.log(`\n📦 Processando produto ${i + 1}/${products.length}:`);
+      console.log(`   Código: ${product.productCode}`);
+      console.log(`   Nome: ${product.name.substring(0, 50)}...`);
+
+      // Verifica se produto já existe
+      const existing = await sql`
+        SELECT id, name, productcode, stock, price 
+        FROM products 
+        WHERE productcode = ${product.productCode}
+      `;
+
+      console.log(`   🔍 Busca no BD: ${existing.length} produtos encontrados com código ${product.productCode}`);
+
+      if (existing.length > 0) {
+        // ✅ ATUALIZA produto existente
+        console.log(`   ⚡ Atualizando produto existente: ID ${existing[0].id}`);
+        
+        const updateResult = await sql`
+          UPDATE products SET 
+            name = ${product.name},
+            price = ${product.price},
+            stock = stock + ${product.stock},
+            brand = ${product.brand},
+            updatedat = NOW()
+          WHERE productcode = ${product.productCode}
+          RETURNING id, name, stock, price
+        `;
+        
+        console.log(`   ✅ Produto atualizado:`, updateResult[0]);
+        results.updated++;
+        results.details.push(`✅ Atualizado: ${product.productCode} - ${product.name.substring(0, 30)}...`);
+      } else {
+        // ✅ CRIA novo produto (SEM category, ncm, ipi)
+        console.log(`   🆕 Criando novo produto...`);
+        
+        const newProduct = await sql`
+          INSERT INTO products (
+            name, productcode, price, stock, brand,
+            minstock, createdat
+          ) VALUES (
+            ${product.name}, ${product.productCode}, ${product.price}, 
+            ${product.stock}, ${product.brand}, 0, NOW()
+          )
+          RETURNING id, name, productcode, brand
+        `;
+        
+        console.log(`   ✅ Novo produto criado: ID ${newProduct[0].id}`);
+        results.created++;
+        results.details.push(`🆕 Criado: ${product.productCode} - ${product.name.substring(0, 30)}...`);
+      }
+
+    } catch (error) {
+      console.error(`   ❌ ERRO no produto ${product.productCode}:`, error.message);
+      results.errors++;
+      results.details.push(`❌ Erro: ${product.productCode} - ${error.message}`);
+    }
+  }
+
+  console.log(`\n📊 RESUMO DA IMPORTAÇÃO:`);
+  console.log(`   ✅ Criados: ${results.created}`);
+  console.log(`   🔄 Atualizados: ${results.updated}`);
+  console.log(`   ❌ Erros: ${results.errors}`);
+  console.log(`   📋 Total processado: ${results.created + results.updated + results.errors}`);
+
+  return results;
+};
 
 // ✅ EXPORTAR OS MODELOS DISPONÍVEIS
 exports.AVAILABLE_MODELS = AVAILABLE_MODELS;
