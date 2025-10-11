@@ -5,9 +5,13 @@ const ProductCard = ({
   confirmDelete, 
   deleteType, 
   onConfirmDelete, 
-  onCancelDelete 
+  onCancelDelete,
+  userRole // ✅ NOVA PROP PARA PERMISSÕES
 }) => {
   const isLowStock = product.stock <= product.minstock;
+  
+  // ✅ VERIFICA SE É ADMIN
+  const isAdmin = userRole === "admin";
 
   return (
     <div className={`bg-white p-6 rounded-2xl shadow-md border ${isLowStock ? "border-red-500" : "border-gray-200"} flex flex-col h-full`}>
@@ -15,22 +19,26 @@ const ProductCard = ({
         <h2 className="text-xl font-semibold text-gray-800 mb-2 line-clamp-2">
           {product.name}
         </h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => onEdit(product)}
-            className="text-sm text-blue-600 hover:text-blue-800"
-            title="Editar produto"
-          >
-            Editar
-          </button>
-          <button
-            onClick={() => onDelete("product", product.id, product.name)}
-            className="text-sm text-red-600 hover:text-red-800"
-            title="Excluir produto"
-          >
-            {confirmDelete === product.name && deleteType === "product" ? "Confirmar" : "Excluir"}
-          </button>
-        </div>
+        
+        {/* ✅ BOTÕES DE AÇÃO - APENAS ADMIN PODE EDITAR/DELETAR */}
+        {isAdmin && (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onEdit(product)}
+              className="text-sm text-blue-600 hover:text-blue-800"
+              title="Editar produto"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => onDelete("product", product.id, product.name)}
+              className="text-sm text-red-600 hover:text-red-800"
+              title="Excluir produto"
+            >
+              {confirmDelete === product.name && deleteType === "product" ? "Confirmar" : "Excluir"}
+            </button>
+          </div>
+        )}
       </div>
       
       <p className="text-gray-500 text-sm mb-4">
@@ -59,8 +67,8 @@ const ProductCard = ({
         Estoque Mínimo: {product.minstock}
       </p>
 
-      {/* Confirmação de exclusão para produto */}
-      {confirmDelete === product.name && deleteType === "product" && (
+      {/* ✅ CONFIRMAÇÃO DE EXCLUSÃO - APENAS PARA ADMIN */}
+      {isAdmin && confirmDelete === product.name && deleteType === "product" && (
         <div className="mt-3 p-2 bg-yellow-100 text-yellow-800 rounded-md text-xs">
           <p>Clique em "Confirmar" para excluir "{product.name}"</p>
           <div className="flex space-x-2 mt-2">

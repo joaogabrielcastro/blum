@@ -58,55 +58,52 @@ const apiService = {
   },
 
   updateProduct: async (productId, productData) => {
-  try {
-    const response = await fetch(`${API_URL}/products/${productId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productData),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      // Mensagem de erro mais específica
-      throw new Error(errorData.details || errorData.error || "Erro ao atualizar produto.");
-    }
-    
-    return response.json();
-  } catch (error) {
-    console.error("Erro detalhado ao atualizar produto:", error);
-    throw error;
-  }
-},
-queryCNPJ: async (cnpj) => {
-  try {
-    // Remove caracteres não numéricos
-    const cleanCnpj = cnpj.replace(/\D/g, '');
-    
-    const response = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
-    
-    if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("Limite de consultas excedido. Tente novamente mais tarde.");
+    try {
+      const response = await fetch(`${API_URL}/products/${productId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.error || "Erro ao atualizar produto.");
       }
-      throw new Error("CNPJ não encontrado");
+      
+      return response.json();
+    } catch (error) {
+      console.error("Erro detalhado ao atualizar produto:", error);
+      throw error;
     }
-    
-    const data = await response.json();
-    
-    // Extrai apenas as informações necessárias para o formulário
-    return {
-      nome: data.razao_social || data.estabelecimento?.nome_fantasia || '',
-      telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || '',
-      uf: data.estabelecimento?.estado?.sigla || '',
-      email: data.estabelecimento?.email || '',
-    };
-  } catch (error) {
-    console.error("Erro na consulta de CNPJ:", error);
-    throw error;
-  }
-},
+  },
 
-  // <<< NOVA FUNÇÃO PARA CORRESPONDER AO BACKEND >>>
+  queryCNPJ: async (cnpj) => {
+    try {
+      const cleanCnpj = cnpj.replace(/\D/g, '');
+      
+      const response = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
+      
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error("Limite de consultas excedido. Tente novamente mais tarde.");
+        }
+        throw new Error("CNPJ não encontrado");
+      }
+      
+      const data = await response.json();
+      
+      return {
+        nome: data.razao_social || data.estabelecimento?.nome_fantasia || '',
+        telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || '',
+        uf: data.estabelecimento?.estado?.sigla || '',
+        email: data.estabelecimento?.email || '',
+      };
+    } catch (error) {
+      console.error("Erro na consulta de CNPJ:", error);
+      throw error;
+    }
+  },
+
   deleteProduct: async (productId) => {
     const response = await fetch(`${API_URL}/products/${productId}`, {
       method: "DELETE",
@@ -170,7 +167,7 @@ queryCNPJ: async (cnpj) => {
     try {
       const response = await fetch(`${API_URL}/purchases/process-pdf`, {
         method: 'POST',
-        body: formData, // FormData já configura o header 'Content-Type' para 'multipart/form-data'
+        body: formData,
       });
       if (!response.ok) {
         throw new Error('A resposta da rede não foi OK');
@@ -183,33 +180,55 @@ queryCNPJ: async (cnpj) => {
   },
 
   finalizePurchase: async (items) => {
-  try {
-    console.log("📤 Enviando dados para finalizar compra:", items);
-    
-    const response = await fetch(`${API_URL}/purchases/finalize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ items }),
-    });
+    try {
+      console.log("📤 Enviando dados para finalizar compra:", items);
+      
+      const response = await fetch(`${API_URL}/purchases/finalize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items }),
+      });
 
-    console.log("📥 Resposta do servidor:", response.status);
+      console.log("📥 Resposta do servidor:", response.status);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("❌ Erro da API:", errorData);
-      throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("❌ Erro da API:", errorData);
+        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("✅ Compra finalizada com sucesso:", data);
+      return data;
+    } catch (error) {
+      console.error("💥 Erro ao finalizar compra:", error);
+      throw error;
     }
+  },
+  
+  finalizePurchaseFromPdf: async (payload) => {
+    try {
+      const response = await fetch(`${API_URL}/purchases/finalize-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Erro no apiService.finalizePurchaseFromPdf:', error);
+      throw error;
+    }
+  },
 
-    const data = await response.json();
-    console.log("✅ Compra finalizada com sucesso:", data);
-    return data;
-  } catch (error) {
-    console.error("💥 Erro ao finalizar compra:", error);
-    throw error;
-  }
-},
 
   getSalesByRep: async () => {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
@@ -258,82 +277,100 @@ queryCNPJ: async (cnpj) => {
     if (!response.ok) throw new Error("Erro ao buscar o status da API.");
     return response.json();
   },
-};
 
-export const getClientById = async (clientId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/clients/${clientId}`);
-    if (!response.ok) {
-      throw new Error("Cliente não encontrado");
+  // ✅ FUNÇÃO IMPORT CSV CORRIGIDA - DENTRO DO OBJETO
+importCsv: async (formData) => {
+    try {
+      const response = await fetch(`${API_URL}/purchases/import-csv`, {
+        method: 'POST',
+        body: formData, // ✅ Já inclui brandId no formData
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Erro no apiService.importCsv:', error);
+      throw error;
     }
-    const clientData = await response.json();
-    return clientData;
-  } catch (error) {
-    console.error("Erro ao buscar cliente:", error);
-    throw error;
-  }
-};
+  },
 
-export const updateBrand = async (oldName, brandData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/brands/${oldName}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(brandData),
-    });
 
-    if (!response.ok) {
-      throw new Error("Erro ao atualizar marca");
+  // ✅ ADICIONE AS OUTRAS FUNÇÕES COMO MÉTODOS DO OBJETO
+  getClientById: async (clientId) => {
+    try {
+      const response = await fetch(`${API_URL}/clients/${clientId}`);
+      if (!response.ok) {
+        throw new Error("Cliente não encontrado");
+      }
+      const clientData = await response.json();
+      return clientData;
+    } catch (error) {
+      console.error("Erro ao buscar cliente:", error);
+      throw error;
     }
+  },
 
-    return await response.json();
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+  updateBrand: async (oldName, brandData) => {
+    try {
+      const response = await fetch(`${API_URL}/brands/${encodeURIComponent(oldName)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(brandData),
+      });
 
-export const getBrandsWithCommission = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/brands`);
+      if (!response.ok) {
+        throw new Error("Erro ao atualizar marca");
+      }
 
-    if (!response.ok) {
-      throw new Error("Erro ao buscar marcas");
+      return await response.json();
+    } catch (error) {
+      throw new Error(error.message);
     }
+  },
 
-    return await response.json();
-  } catch (error) {
-    throw new Error(error.message);
-  }
-};
+  getBrandsWithCommission: async () => {
+    try {
+      const response = await fetch(`${API_URL}/brands`);
 
-export const getClientOrders = async (clientId) => {
-  try {
-    // Use clientid como parâmetro de query (minúsculo)
-    const response = await fetch(`${API_BASE_URL}/orders?clientid=${clientId}`);
+      if (!response.ok) {
+        throw new Error("Erro ao buscar marcas");
+      }
 
-    if (!response.ok) {
-      throw new Error("Erro ao buscar pedidos do cliente");
+      return await response.json();
+    } catch (error) {
+      throw new Error(error.message);
     }
+  },
 
-    const orders = await response.json();
+  getClientOrders: async (clientId) => {
+    try {
+      const response = await fetch(`${API_URL}/orders?clientid=${clientId}`);
 
-    return orders.map((order) => ({
-      id: order.id,
-      orderNumber: order.id.toString(),
-      orderDate: order.createdat,
-      seller: order.userid,
-      status: order.status || "pending",
-      totalAmount: order.totalprice || 0,
-      discount: order.discount || 0,
-      paymentMethod: "Não informado",
-      notes: order.description || "",
-      items: Array.isArray(order.items)
-        ? order.items
-        : tryParseJSON(order.items),
-    }));
-  } catch (error) {
-    console.error("Erro ao buscar pedidos do cliente:", error);
-    throw error;
+      if (!response.ok) {
+        throw new Error("Erro ao buscar pedidos do cliente");
+      }
+
+      const orders = await response.json();
+
+      return orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.id.toString(),
+        orderDate: order.createdat,
+        seller: order.userid,
+        status: order.status || "pending",
+        totalAmount: order.totalprice || 0,
+        discount: order.discount || 0,
+        paymentMethod: "Não informado",
+        notes: order.description || "",
+        items: Array.isArray(order.items) ? order.items : [],
+      }));
+    } catch (error) {
+      console.error("Erro ao buscar pedidos do cliente:", error);
+      throw error;
+    }
   }
 };
 

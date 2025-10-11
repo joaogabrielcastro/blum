@@ -9,20 +9,74 @@ const PurchasesPage = () => {
   const [error, setError] = useState(null);
   const [userProducts, setUserProducts] = useState([]);
   const [showNewProducts, setShowNewProducts] = useState(false);
+  const [brands, setBrands] = useState([]);
+  const [selectedBrandId, setSelectedBrandId] = useState("");
+
+  const handleItemChange = (index, field, value) => {
+    setParsedItems((prevItems) => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        [field]: value,
+        // Se mudou o mapeamento, atualiza o status de novo produto
+        ...(field === "mappedProductId" && {
+          isNewProduct: !value,
+        }),
+      };
+      return updatedItems;
+    });
+  };
 
   // Carrega os produtos do usuário
   useEffect(() => {
-    const fetchUserProducts = async () => {
+    const fetchUserData = async () => {
       try {
-        const productsData = await apiService.getProducts();
+        const [productsData, brandsData] = await Promise.all([
+          apiService.getProducts(),
+          apiService.getBrands(),
+        ]);
+
         setUserProducts(productsData);
+        setBrands(brandsData);
+
+        // ✅ DEBUG DETALHADO DAS BRANDS
+        console.log("🔍 Brands recebidas da API:", brandsData);
+
+        if (brandsData.length > 0) {
+          // ✅ VERIFICA A ESTRUTURA DE CADA BRAND
+          brandsData.forEach((brand, index) => {
+            console.log(`🔍 Brand ${index}:`, brand);
+            console.log(`   - ID: ${brand.id} (tipo: ${typeof brand.id})`);
+            console.log(`   - Name: ${brand.name}`);
+            console.log(`   - Commission Rate: ${brand.commission_rate}`);
+          });
+
+          // ✅ SELECIONA A PRIMEIRA BRAND VÁLIDA
+          const firstBrand = brandsData[0];
+          if (firstBrand && firstBrand.id) {
+            const brandId = String(firstBrand.id);
+            setSelectedBrandId(brandId);
+            console.log(
+              "✅ Representada padrão definida:",
+              brandId,
+              "Nome:",
+              firstBrand.name
+            );
+          } else {
+            console.error(
+              "❌ Primeira brand não tem estrutura válida:",
+              firstBrand
+            );
+          }
+        } else {
+          console.warn("⚠️ Nenhuma Representada disponível");
+        }
       } catch (err) {
-        console.error("Erro ao buscar produtos do usuário:", err);
+        console.error("Erro ao buscar dados do usuário:", err);
       }
     };
-    fetchUserProducts();
+    fetchUserData();
   }, []);
-
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
@@ -82,7 +136,12 @@ const PurchasesPage = () => {
     console.log("🔄 Iniciando confirmação de compra...");
     console.log("📋 Itens a serem processados:", parsedItems);
 
-    // VALIDAÇÃO
+    // ✅ VALIDAÇÃO ATUALIZADA - verifica também a Representada
+    if (!selectedBrandId) {
+      alert("Erro: Selecione uma Representada para os produtos.");
+      return;
+    }
+
     const invalidItems = parsedItems.filter(
       (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0
     );
@@ -99,12 +158,32 @@ const PurchasesPage = () => {
     const newProductsCount = parsedItems.filter(
       (item) => item.isNewProduct
     ).length;
+    console.log("🔄 Iniciando confirmação de compra...");
+    console.log("📋 Itens a serem processados:", parsedItems);
+
+    // ✅ DEBUG DETALHADO
+    console.log("🔍 DEBUG - Brand ID:", selectedBrandId);
+    console.log("🔍 DEBUG - Tipo do Brand ID:", typeof selectedBrandId);
+    console.log("🔍 DEBUG - Brands disponíveis:", brands);
+
+    // ✅ VALIDAÇÃO ATUALIZADA - verifica também a Representada
+    if (
+      !selectedBrandId ||
+      selectedBrandId === "" ||
+      selectedBrandId === "NaN"
+    ) {
+      console.error("❌ Brand ID inválido:", selectedBrandId);
+      alert("Erro: Selecione uma Representada válida para os produtos.");
+      return;
+    }
     if (newProductsCount > 0) {
+      const selectedBrand = brands.find((b) => b.id === selectedBrandId);
       const confirmMessage =
         `⚠️ ATENÇÃO!\n\n` +
         `${newProductsCount} produtos NÃO EXISTEM no seu catálogo e serão CRIADOS AUTOMATICAMENTE.\n\n` +
         `• Produtos existentes: ${parsedItems.length - newProductsCount}\n` +
-        `• Novos produtos: ${newProductsCount}\n\n` +
+        `• Novos produtos: ${newProductsCount}\n` +
+        `• Representada: ${selectedBrand?.name || "Não selecionada"}\n\n` +
         `Deseja continuar?`;
 
       if (!window.confirm(confirmMessage)) {
@@ -116,18 +195,21 @@ const PurchasesPage = () => {
     setError(null);
 
     try {
-      // PREPARA OS DADOS
-      const payload = parsedItems.map((item) => ({
-        mappedProductId: item.mappedProductId || "", // Garante que seja string vazia se null/undefined
-        productCode: item.productCode,
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-      }));
+      // ✅ PREPARA OS DADOS ATUALIZADOS - inclui brandId
+      const payload = {
+        brandId: selectedBrandId, // ✅ NOVO: ID da Representada selecionada
+        items: parsedItems.map((item) => ({
+          mappedProductId: item.mappedProductId || "",
+          productCode: item.productCode,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+        })),
+      };
 
       console.log("📤 Payload enviado para API:", payload);
 
-      const result = await apiService.finalizePurchase(payload);
+      const result = await apiService.finalizePurchaseFromPdf(payload);
 
       console.log("✅ Resposta da API:", result);
 
@@ -135,7 +217,10 @@ const PurchasesPage = () => {
         `✅ ${result.message}\n\n` +
           `📦 Resumo:\n` +
           `• ${parsedItems.length - newProductsCount} produtos atualizados\n` +
-          `• ${newProductsCount} novos produtos criados`
+          `• ${newProductsCount} novos produtos criados\n` +
+          `• Representada: ${
+            brands.find((b) => b.id === selectedBrandId)?.name
+          }`
       );
 
       // Limpa a tela
@@ -157,6 +242,7 @@ const PurchasesPage = () => {
   // ✅ COMPONENTE PARA MOSTRAR RESUMO DE NOVOS PRODUTOS
   const renderNewProductsSummary = () => {
     const newProducts = parsedItems.filter((item) => item.isNewProduct);
+    const selectedBrand = brands.find((b) => b.id === selectedBrandId);
 
     if (newProducts.length === 0) return null;
 
@@ -169,7 +255,8 @@ const PurchasesPage = () => {
         </div>
         <p className="text-yellow-700 mb-3">
           {newProducts.length} produtos não existem no seu catálogo e serão
-          criados automaticamente:
+          criados automaticamente na Representada{" "}
+          <strong>{selectedBrand?.name || "Não selecionada"}</strong>:
         </p>
         <div className="max-h-40 overflow-y-auto">
           {newProducts.map((item, index) => (
@@ -332,6 +419,46 @@ const PurchasesPage = () => {
         Envie o arquivo PDF do seu fornecedor para extrair os itens da compra
         automaticamente.
       </p>
+
+      {/* ✅ CORRIGIDO: Seletor de Representada usa ID numérico */}
+      <div className="mb-4 text-left">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          📋 Representada dos Produtos:
+        </label>
+        <select
+          value={selectedBrandId}
+          onChange={(e) => setSelectedBrandId(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="">Selecione uma Representada...</option>
+          {brands.map((brand) => {
+            const displayName =
+              typeof brand.name === "string"
+                ? brand.name
+                : brand.name && typeof brand.name === "object"
+                ? // try common nested fields or fallback to JSON
+                  (brand.name.label || brand.name.value || JSON.stringify(brand.name))
+                : String(brand.name || "");
+
+            const commissionValue =
+              typeof brand.commission_rate === "number" || typeof brand.commission_rate === "string"
+                ? brand.commission_rate
+                : brand.commission_rate && typeof brand.commission_rate === "object"
+                ? brand.commission_rate.value || brand.commission_rate.rate || ""
+                : "";
+
+            return (
+              <option key={brand.id} value={brand.id}>
+                {displayName}{commissionValue ? ` (${commissionValue}%)` : ""}
+              </option>
+            );
+          })}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Todos os novos produtos criados serão associados a esta Representada
+        </p>
+      </div>
+
       <div className="flex flex-col items-center gap-4">
         <input
           type="file"
@@ -341,7 +468,7 @@ const PurchasesPage = () => {
         />
         <button
           onClick={handleUpload}
-          disabled={!selectedFile || isLoading}
+          disabled={!selectedFile || !selectedBrandId || isLoading}
           className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:opacity-50"
         >
           {isLoading ? "Processando..." : "Processar PDF"}
@@ -350,6 +477,140 @@ const PurchasesPage = () => {
       {error && <p className="text-red-500 mt-4">{error}</p>}
     </div>
   );
+  const CsvImportSection = () => {
+    const [csvFile, setCsvFile] = useState(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [importResult, setImportResult] = useState(null);
+    const [selectedCsvBrandId, setSelectedCsvBrandId] = useState("");
+
+    // ✅ Define Representada padrão quando as brands são carregadas
+    useEffect(() => {
+      if (brands.length > 0 && !selectedCsvBrandId) {
+        setSelectedCsvBrandId(String(brands[0].id));
+      }
+    }, [brands, selectedCsvBrandId]);
+
+    const handleCsvImport = async () => {
+      if (!csvFile) {
+        alert("Por favor, selecione um arquivo CSV");
+        return;
+      }
+
+      // ✅ VALIDAÇÃO DA REPRESENTADA PARA CSV
+      if (!selectedCsvBrandId) {
+        alert("Por favor, selecione uma Representada para os produtos do CSV");
+        return;
+      }
+
+      setIsImporting(true);
+      setImportResult(null);
+
+      try {
+        const formData = new FormData();
+        formData.append("productsCsv", csvFile);
+        formData.append("brandId", selectedCsvBrandId); // ✅ ENVIA BRAND ID
+
+        const result = await apiService.importCsv(formData);
+
+        setImportResult(result);
+        alert(`✅ ${result.message}`);
+
+        // Limpa o arquivo
+        setCsvFile(null);
+
+        // Recarrega produtos
+        const updatedProducts = await apiService.getProducts();
+        setUserProducts(updatedProducts);
+      } catch (error) {
+        setImportResult({ error: error.message });
+        alert(`❌ Erro na importação: ${error.message}`);
+      } finally {
+        setIsImporting(false);
+      }
+    };
+
+    return (
+      <div className="bg-white p-6 rounded-xl shadow-md border mb-6">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">
+          📥 Importar Produtos do CSV
+        </h3>
+
+        <div className="space-y-4">
+          {/* ✅ SELETOR DE Representada PARA CSV */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📋 Representada dos Produtos:
+            </label>
+            <select
+              value={selectedCsvBrandId}
+              onChange={(e) => setSelectedCsvBrandId(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">Selecione uma Representada...</option>
+              {brands.map((brand) => {
+                const displayName =
+                  typeof brand.name === "string"
+                    ? brand.name
+                    : brand.name && typeof brand.name === "object"
+                    ? (brand.name.label || brand.name.value || JSON.stringify(brand.name))
+                    : String(brand.name || "");
+
+                const commissionValue =
+                  typeof brand.commission_rate === "number" || typeof brand.commission_rate === "string"
+                    ? brand.commission_rate
+                    : brand.commission_rate && typeof brand.commission_rate === "object"
+                    ? brand.commission_rate.value || brand.commission_rate.rate || ""
+                    : "";
+
+                return (
+                  <option key={brand.id} value={brand.id}>
+                    {displayName}{commissionValue ? ` (${commissionValue}%)` : ""}
+                  </option>
+                );
+              })}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Todos os produtos do CSV serão associados a esta Representada
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Arquivo CSV com produtos:
+            </label>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setCsvFile(e.target.files[0])}
+              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+            />
+          </div>
+
+          <button
+            onClick={handleCsvImport}
+            disabled={!csvFile || !selectedCsvBrandId || isImporting}
+            className="bg-green-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+          >
+            {isImporting ? "Importando..." : "Importar CSV"}
+          </button>
+
+          {importResult && (
+            <div
+              className={`p-4 rounded-lg ${
+                importResult.error
+                  ? "bg-red-50 text-red-700"
+                  : "bg-green-50 text-green-700"
+              }`}
+            >
+              <pre className="text-sm whitespace-pre-wrap">
+                {importResult.error || importResult.message}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -357,14 +618,18 @@ const PurchasesPage = () => {
         Gestão de Compras
       </h1>
 
-      {isLoading && (
+      <CsvImportSection />
+
+      {/* Suas seções existentes para PDF */}
+      {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <LoadingSpinner />
         </div>
+      ) : parsedItems.length === 0 ? (
+        renderUploadSection()
+      ) : (
+        renderVerificationTable()
       )}
-
-      {!isLoading && parsedItems.length === 0 && renderUploadSection()}
-      {!isLoading && parsedItems.length > 0 && renderVerificationTable()}
     </div>
   );
 };

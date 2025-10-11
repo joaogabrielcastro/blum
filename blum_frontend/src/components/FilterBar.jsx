@@ -30,6 +30,9 @@ const FilterBar = ({
   const [editingBrand, setEditingBrand] = useState(null);
   const [editCommission, setEditCommission] = useState("");
 
+  // ✅ VERIFICA SE É ADMIN
+  const isAdmin = userRole === "admin";
+
   // Limitar a exibição de Representadas a 5 inicialmente
   const displayedBrands = showAllBrands ? brands : brands.slice(0, 5);
 
@@ -165,55 +168,55 @@ const FilterBar = ({
                     }`}
                   >
                     {fixEncoding(brand.name)}
-                     {/* Badge de comissão */}
+                    {/* ✅ BADGE DE COMISSÃO - VISÍVEL PARA TODOS */}
                     <span className="absolute -top-2 -right-2 bg-purple-600 text-white text-xs px-2 py-1 rounded-full">
                       {brand.commission_rate}%
                     </span>
                   </button>
 
-                  {/* Botões de ação */}
-
-                  <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => handleEditClick(brand, e)}
-                      className="bg-blue-500 text-white rounded-full p-1 shadow-md hover:bg-blue-600"
-                      title="Editar Representada"
-                    >
-                      <svg
-                        className="w-3 h-3"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                  {/* ✅ BOTÕES DE AÇÃO - APENAS ADMIN */}
+                  {isAdmin && (
+                    <div className="absolute -right-2 -top-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => handleEditClick({ name: displayName }, e)}
+                        className="bg-blue-500 text-white rounded-full p-1 shadow-md hover:bg-blue-600"
+                        title="Editar Representada"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
-                      </svg>
-                    </button>
+                        <svg
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
 
-                    {/* Badge de comissão */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteBrand("brand", brand.name, brand.name);
-                      }}
-                      className="bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
-                      title="Excluir Representada"
-                    >
-                      {confirmDelete === brand.name &&
-                      deleteType === "brand" ? (
-                        <span className="text-xs font-bold">✓</span>
-                      ) : (
-                        <span className="text-xs">✕</span>
-                      )}
-                    </button>
-                  </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteBrand("brand", displayName, displayName);
+                        }}
+                        className="bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                        title="Excluir Representada"
+                      >
+                        {confirmDelete === brand.name &&
+                        deleteType === "brand" ? (
+                            <span className="text-xs font-bold">✓</span>
+                        ) : (
+                          <span className="text-xs">✕</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
-                  {/* Modal de edição inline */}
-                  {userRole === "admin" && editingBrand === brand.name && (
+                  {/* ✅ MODAL DE EDIÇÃO - APENAS PARA ADMIN */}
+                  {isAdmin && editingBrand === brand.name && (
                     <div className="absolute top-full left-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-64">
                       <h4 className="font-semibold text-sm mb-2">
                         Editar Comissão
@@ -236,7 +239,7 @@ const FilterBar = ({
                           Cancelar
                         </button>
                         <button
-                          onClick={(e) => handleSaveEdit(brand.name, e)}
+                          onClick={(e) => handleSaveEdit(displayName, e)}
                           className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
                         >
                           Salvar
@@ -253,8 +256,8 @@ const FilterBar = ({
             )}
           </div>
 
-          {/* Mensagem de confirmação para exclusão de Representada */}
-          {userRole === "admin" && confirmDelete && deleteType === "brand" && (
+          {/* ✅ MENSAGEM DE CONFIRMAÇÃO - APENAS ADMIN */}
+          {isAdmin && confirmDelete && deleteType === "brand" && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm">
               <p className="text-yellow-800 font-medium">
                 Confirmar exclusão da Representada "{fixEncoding(confirmDelete)}

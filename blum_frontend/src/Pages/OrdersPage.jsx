@@ -3,8 +3,7 @@ import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
-import { formatOrderData } from "../utils/format"; // ← Importação correta
-import formatCurrency from "../utils/format"; // ← Importa a formatação de moeda
+import formatCurrency, { formatOrderData } from "../utils/format";
 
 const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [orders, setOrders] = useState([]);
@@ -14,6 +13,19 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [clients, setClients] = useState({});
   const [pdfOrder, setPdfOrder] = useState(null);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
+
+  // DEBUG: Verificar as brands recebidas
+  console.log("DEBUG - Brands received:", brands);
+  console.log("DEBUG - Brands type:", typeof brands);
+
+  // Validar e transformar brands para garantir segurança
+  const safeBrands = Array.isArray(brands) 
+    ? brands.map(brand => ({
+        id: brand.id,
+        name: brand.name || '',
+        commission_rate: brand.commission_rate || 0
+      }))
+    : [];
 
   useEffect(() => {
     if (userId && userRole) fetchData();
@@ -27,8 +39,16 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         apiService.getClients(),
       ]);
 
+      // DEBUG: Verificar dados brutos
+      console.log("DEBUG - Raw orders data:", ordersData);
+      console.log("DEBUG - Raw clients data:", clientsData);
+
       // Formata os pedidos usando a função importada
       const formattedOrders = ordersData.map((order) => formatOrderData(order));
+      
+      // DEBUG: Verificar dados formatados
+      console.log("DEBUG - Formatted orders:", formattedOrders);
+      
       setOrders(formattedOrders);
 
       const clientsMap = {};
@@ -137,7 +157,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         <OrdersForm
           userId={userId}
           clients={clients}
-          brands={brands}
+          brands={safeBrands} // ← Usando safeBrands validado
           editingOrder={editingOrder}
           onOrderAdded={() => {
             setShowForm(false);
@@ -171,7 +191,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
           order={pdfOrder}
           clients={clients}
           reps={reps}
-          brands={brands}
+          brands={safeBrands} // ← Usando safeBrands validado
           onClose={() => setPdfOrder(null)}
         />
       )}
@@ -227,16 +247,14 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                   <div className="flex flex-col items-end gap-2 max-[450px]:flex-row max-[450px]:justify-between max-[450px]:items-center max-[450px]:w-full">
                     <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-fit">
                       <p className="text-base font-bold text-gray-800">
-                        Total: {formatCurrency(order.totalPrice)}{" "}
-                        {/* ← Formatação de moeda */}
+                        Total: {formatCurrency(order.totalPrice)}
                       </p>
                       {order.discount > 0 && (
                         <p className="text-xs text-gray-500 line-through">
                           {formatCurrency(
                             parseFloat(order.totalPrice) +
                               parseFloat(order.discount)
-                          )}{" "}
-                          {/* ← Formatação de moeda */}
+                          )}
                         </p>
                       )}
                     </div>

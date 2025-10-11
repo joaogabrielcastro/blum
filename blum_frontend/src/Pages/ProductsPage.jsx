@@ -22,6 +22,9 @@ const ProductsPage = ({ userRole }) => {
   const [deleteId, setDeleteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // ✅ VERIFICA SE É ADMIN
+  const isAdmin = userRole === "admin";
+
   // Estado para o formulário de produto
   const [productForm, setProductForm] = useState({
     name: "",
@@ -235,15 +238,21 @@ const ProductsPage = ({ userRole }) => {
             Gerencie seu inventário de produtos e Representadas
           </p>
         </div>
-        {userRole === "admin" && (
+        
+        {/* ✅ BOTÕES CONDICIONAIS BASEADOS NA ROLE */}
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setShowBrandForm(true)}
-            className="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
-          >
-            <span>+</span>
-            <span>Adicionar Representada</span>
-          </button>
+          {/* Botão Adicionar Representada - APENAS ADMIN */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowBrandForm(true)}
+              className="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            >
+              <span>+</span>
+              <span>Adicionar Representada</span>
+            </button>
+          )}
+          
+          {/* Botão Adicionar Produto - TODOS OS USUÁRIOS */}
           <button
             onClick={() => {
               resetForms();
@@ -255,7 +264,6 @@ const ProductsPage = ({ userRole }) => {
             <span>Adicionar Produto</span>
           </button>
         </div>
-        )}
       </div>
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
@@ -268,7 +276,7 @@ const ProductsPage = ({ userRole }) => {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onDeleteBrand={confirmDeleteAction}
-        onEditBrand={handleEditBrand} // ← Nova prop
+        onEditBrand={handleEditBrand}
         confirmDelete={confirmDelete}
         deleteType={deleteType}
         deleteId={deleteId}
@@ -282,6 +290,7 @@ const ProductsPage = ({ userRole }) => {
           setDeleteType(null);
           setDeleteId(null);
         }}
+        userRole={userRole} // ✅ PASSA A ROLE
       />
 
       {/* Resumo de resultados */}
@@ -316,6 +325,7 @@ const ProductsPage = ({ userRole }) => {
                 setDeleteType(null);
                 setDeleteId(null);
               }}
+              userRole={userRole} // ✅ PASSA A ROLE
             />
           ))
         ) : (
@@ -346,8 +356,8 @@ const ProductsPage = ({ userRole }) => {
         </div>
       )}
 
-      {/* Modal para adicionar Representada */}
-      {showBrandForm && (
+      {/* Modal para adicionar Representada - APENAS ADMIN */}
+      {isAdmin && showBrandForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <BrandForm
