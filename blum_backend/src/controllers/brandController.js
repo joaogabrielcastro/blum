@@ -1,10 +1,10 @@
 const { neon } = require("@neondatabase/serverless");
 const sql = neon(process.env.DATABASE_URL);
 
-// Função para buscar marcas
+// ✅ CORRIGIDO: Agora retorna o ID também
 exports.getBrands = async (req, res) => {
   try {
-    const brands = await sql`SELECT name, commission_rate FROM brands ORDER BY name ASC`;
+    const brands = await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
     res.status(200).json(brands);
   } catch (error) {
     console.error("Erro ao buscar marcas:", error);
@@ -50,7 +50,7 @@ exports.updateBrand = async (req, res) => {
   }
 };
 
-// Função para deletar marca - VERIFIQUE SE ESTÁ PRESENTE!
+// Função para deletar marca
 exports.deleteBrand = async (req, res) => {
   const { name } = req.params;
 

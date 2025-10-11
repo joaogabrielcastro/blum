@@ -624,29 +624,58 @@ exports.importCsv = async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo CSV enviado." });
     }
 
+    // ✅ RECEBE BRAND ID DO CSV
+    const { brandId } = req.body;
+    console.log("🏷️ Brand ID recebido para CSV:", brandId);
+
+    if (!brandId) {
+      return res
+        .status(400)
+        .json({ error: "ID da marca é obrigatório para importação CSV." });
+    }
+
+    // ✅ BUSCA A MARCA
+    const brandResult =
+      await sql`SELECT id, name FROM brands WHERE id = ${parseInt(
+        brandId,
+        10
+      )}`;
+    if (brandResult.length === 0) {
+      return res.status(400).json({ error: "Marca não encontrada." });
+    }
+
+    const brandName = brandResult[0].name;
+    console.log(`🏷️ Usando marca para CSV: ${brandName} (ID: ${brandId})`);
+
     console.log("📄 CSV recebido:", req.file.originalname);
 
     // Converte buffer para string
-    const csvText = req.file.buffer.toString('utf8');
-    
+    const csvText = req.file.buffer.toString("utf8");
+
     // Processa o CSV
-    const products = await processCsvData(csvText);
-    
+    const products = await processCsvData(csvText, brandName); // ✅ PASSA A MARCA
+
     console.log(`✅ CSV processado: ${products.length} produtos encontrados`);
 
     // ✅ DEBUG: Verifica se há dados válidos
     if (products.length === 0) {
       console.log("❌ Nenhum produto válido encontrado no CSV");
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "Nenhum produto válido encontrado no CSV",
-        details: "Verifique os cabeçalhos e formato do arquivo"
+        details: "Verifique os cabeçalhos e formato do arquivo",
       });
     }
 
     // ✅ DEBUG: Verifica dados dos primeiros produtos
     console.log("🔍 Amostra dos dados processados:");
     products.slice(0, 3).forEach((product, index) => {
-      console.log(`   ${index + 1}. Código: "${product.productCode}", Nome: "${product.name.substring(0, 30)}...", Preço: ${product.price}, Estoque: ${product.stock}, Marca: "${product.brand}"`);
+      console.log(
+        `   ${index + 1}. Código: "${
+          product.productCode
+        }", Nome: "${product.name.substring(0, 30)}...", Preço: ${
+          product.price
+        }, Estoque: ${product.stock}, Marca: "${product.brand}"`
+      );
     });
 
     // Importa para o banco
@@ -654,51 +683,82 @@ exports.importCsv = async (req, res) => {
     const results = await importProductsToDatabase(products);
 
     res.status(200).json({
-      message: `Importação concluída! ${results.created} novos produtos, ${results.updated} atualizados`,
+      message: `Importação concluída! ${results.created} novos produtos, ${results.updated} atualizados na marca ${brandName}`,
       results: results,
-      type: "success"
+      type: "success",
+      brandUsed: brandName,
     });
-
   } catch (error) {
     console.error("💥 ERRO na importação CSV:", error);
     res.status(500).json({
       error: "Falha na importação do CSV",
-      details: error.message
+      details: error.message,
     });
   }
 };
 
-// ✅ PROCESSADOR DE CSV
-async function processCsvData(csvText) {
-  const lines = csvText.split('\n').filter(line => line.trim());
+// ✅ PROCESSADOR DE CSV ATUALIZADO - USA MARCA SELECIONADA
+async function processCsvData(csvText, selectedBrand) {
+  const lines = csvText.split("\n").filter((line) => line.trim());
   const products = [];
-  
+
   // Assume que a primeira linha é cabeçalho
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+
   console.log("📋 Cabeçalhos do CSV:", headers);
-  
+
   for (let i = 1; i < lines.length; i++) {
     const values = parseCsvLine(lines[i]);
-    
+
     // Mapeia colunas baseado nos cabeçalhos
     const product = {
-      productCode: getValueByHeader(headers, values, ['codigo', 'sku', 'productcode', 'código']),
-      name: getValueByHeader(headers, values, ['nome', 'descricao', 'descrição', 'name', 'product']),
-      price: parseFloat(getValueByHeader(headers, values, ['preco', 'preço', 'price', 'valor'])) || 0,
-      stock: parseInt(getValueByHeader(headers, values, ['estoque', 'stock', 'quantidade', 'qtd'])) || 0,
-      brand: getValueByHeader(headers, values, ['marca', 'brand', 'fabricante']) || 'BLUMENAU',
-      category: getValueByHeader(headers, values, ['categoria', 'category', 'grupo']),
-      ncm: getValueByHeader(headers, values, ['ncm']),
-      ipi: parseFloat(getValueByHeader(headers, values, ['ipi'])) || 0
+      productCode: getValueByHeader(headers, values, [
+        "codigo",
+        "sku",
+        "productcode",
+        "código",
+      ]),
+      name: getValueByHeader(headers, values, [
+        "nome",
+        "descricao",
+        "descrição",
+        "name",
+        "product",
+      ]),
+      price:
+        parseFloat(
+          getValueByHeader(headers, values, [
+            "preco",
+            "preço",
+            "price",
+            "valor",
+          ])
+        ) || 0,
+      stock:
+        parseInt(
+          getValueByHeader(headers, values, [
+            "estoque",
+            "stock",
+            "quantidade",
+            "qtd",
+          ])
+        ) || 0,
+      brand: selectedBrand, // ✅ USA A MARCA SELECIONADA, NÃO DO CSV
+      category: getValueByHeader(headers, values, [
+        "categoria",
+        "category",
+        "grupo",
+      ]),
+      ncm: getValueByHeader(headers, values, ["ncm"]),
+      ipi: parseFloat(getValueByHeader(headers, values, ["ipi"])) || 0,
     };
-    
+
     // Só adiciona se tiver código e nome
     if (product.productCode && product.name) {
       products.push(product);
     }
   }
-  
+
   return products;
 }
 
@@ -710,33 +770,34 @@ function getValueByHeader(headers, values, possibleHeaders) {
       return values[index].trim();
     }
   }
-  return '';
+  return "";
 }
 
 // ✅ PARSER DE LINHA CSV (simples)
 function parseCsvLine(line) {
   const result = [];
-  let current = '';
+  let current = "";
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
-    
+
     if (char === '"') {
       inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
+    } else if (char === "," && !inQuotes) {
       result.push(current);
-      current = '';
+      current = "";
     } else {
       current += char;
     }
   }
-  
+
   result.push(current);
-  return result.map(val => val.replace(/^"|"$/g, '').trim());
+  return result.map((val) => val.replace(/^"|"$/g, "").trim());
 }
 
 // ✅ IMPORTAR PARA BANCO (reutiliza lógica similar à do PDF)
+// ✅ IMPORTAR PARA BANCO CORRIGIDO
 async function importProductsToDatabase(products) {
   const results = {
     created: 0,
@@ -765,7 +826,7 @@ async function importProductsToDatabase(products) {
       console.log(`   🔍 Busca no BD: ${existing.length} produtos encontrados com código ${product.productCode}`);
 
       if (existing.length > 0) {
-        // ✅ ATUALIZA produto existente
+        // ✅ ATUALIZA produto existente - REMOVE updatedat
         console.log(`   ⚡ Atualizando produto existente: ID ${existing[0].id}`);
         
         const updateResult = await sql`
@@ -773,8 +834,7 @@ async function importProductsToDatabase(products) {
             name = ${product.name},
             price = ${product.price},
             stock = stock + ${product.stock},
-            brand = ${product.brand},
-            updatedat = NOW()
+            brand = ${product.brand}
           WHERE productcode = ${product.productCode}
           RETURNING id, name, stock, price
         `;
@@ -816,6 +876,203 @@ async function importProductsToDatabase(products) {
   console.log(`   📋 Total processado: ${results.created + results.updated + results.errors}`);
 
   return results;
+}
+// ✅ CONTROLLER PARA FINALIZAR COMPRA DE PDF - CORRIGIDO
+exports.finalizePurchaseFromPdf = async (req, res) => {
+  const { brandId, items } = req.body;
+
+  console.log("📦 [PDF] Dados recebidos para finalizar compra:");
+  console.log("🏷️ Brand ID:", brandId, "Tipo:", typeof brandId);
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Nenhum item válido foi recebido." });
+  }
+
+  // ✅ VALIDAÇÃO DA MARCA
+  if (!brandId) {
+    return res.status(400).json({ error: "ID da marca é obrigatório." });
+  }
+
+  try {
+    const results = {
+      updated: 0,
+      created: 0,
+      newProducts: [],
+    };
+
+    // ✅ CONVERSÃO SEGURA DO BRAND ID
+    const brandIdInt = parseInt(brandId, 10);
+    if (isNaN(brandIdInt)) {
+      return res.status(400).json({
+        error: "ID da marca inválido.",
+        details: `Não foi possível converter '${brandId}' para número`,
+      });
+    }
+
+    console.log(
+      `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`
+    );
+
+    // ✅ BUSCA A MARCA NO BANCO - SEM COMENTÁRIOS SQL
+    const brandResult = await sql`
+      SELECT id, name FROM brands WHERE id = ${brandIdInt}
+    `;
+
+    if (brandResult.length === 0) {
+      return res.status(400).json({
+        error: "Marca não encontrada.",
+        details: `ID: ${brandIdInt}`,
+      });
+    }
+
+    const brandName = brandResult[0].name;
+    console.log(`🏷️ [PDF] Usando marca: ${brandName} (ID: ${brandIdInt})`);
+
+    // ✅ IMPLEMENTAÇÃO PARA PDF COM VALIDAÇÕES
+    for (const item of items) {
+      console.log("🔍 [PDF] Processando item:", item);
+
+      // Validações básicas
+      if (!item.quantity || item.unitPrice == null) {
+        console.error("❌ Item sem quantidade ou preço:", item);
+        throw new Error(
+          `Item inválido - quantidade ou preço faltando: ${JSON.stringify(
+            item
+          )}`
+        );
+      }
+
+      const quantity = parseInt(item.quantity, 10);
+      const price = parseFloat(item.unitPrice);
+
+      if (isNaN(quantity) || quantity <= 0) {
+        console.error("❌ Quantidade inválida:", item.quantity);
+        throw new Error(`Quantidade inválida: ${item.quantity}`);
+      }
+
+      if (isNaN(price) || price < 0) {
+        console.error("❌ Preço inválido:", item.unitPrice);
+        throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
+      }
+
+      // ✅ ATUALIZAR PRODUTO EXISTENTE (quando usuário mapeou)
+      if (item.mappedProductId && item.mappedProductId !== "") {
+        const productId = parseInt(item.mappedProductId, 10);
+
+        if (isNaN(productId)) {
+          console.error("❌ ID do produto inválido:", item.mappedProductId);
+          throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+        }
+
+        // Verifica se o produto existe antes de atualizar - SEM COMENTÁRIOS SQL
+        const existingProduct = await sql`
+          SELECT id FROM products WHERE id = ${productId}
+        `;
+
+        if (existingProduct.length === 0) {
+          throw new Error(`Produto não encontrado com ID: ${productId}`);
+        }
+
+        // Atualiza produto existente - SEM COMENTÁRIOS SQL
+        await sql`
+          UPDATE products 
+          SET stock = stock + ${quantity}, price = ${price}
+          WHERE id = ${productId}
+        `;
+
+        console.log(`✅ [PDF] Produto existente atualizado: ID ${productId}`);
+        results.updated++;
+      }
+      // ✅ CRIAR NOVO PRODUTO A PARTIR DO PDF
+      else if (item.productCode && item.description) {
+        console.log(
+          `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`
+        );
+
+        // Verifica se já existe um produto com esse código - SEM COMENTÁRIOS SQL
+        const existingWithCode = await sql`
+          SELECT id FROM products WHERE productcode = ${item.productCode}
+        `;
+
+        if (existingWithCode.length > 0) {
+          // Se já existe, atualiza em vez de criar - SEM COMENTÁRIOS SQL
+          await sql`
+            UPDATE products 
+            SET stock = stock + ${quantity}, price = ${price}
+            WHERE productcode = ${item.productCode}
+          `;
+          console.log(
+            `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`
+          );
+          results.updated++;
+        } else {
+          // ✅ CRIA NOVO PRODUTO COM A MARCA SELECIONADA - SEM COMENTÁRIOS SQL
+          const newProduct = await sql`
+            INSERT INTO products (
+              name, 
+              productcode, 
+              price, 
+              stock, 
+              brand,
+              minstock,
+              createdat
+            ) VALUES (
+              ${item.description},
+              ${item.productCode},
+              ${price},
+              ${quantity},
+              ${brandName},
+              0,
+              NOW()
+            )
+            RETURNING id, name, productcode, brand
+          `;
+
+          console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
+          results.created++;
+          results.newProducts.push({
+            id: newProduct[0].id,
+            name: newProduct[0].name,
+            productcode: newProduct[0].productcode,
+            brand: newProduct[0].brand,
+          });
+        }
+      } else {
+        console.error("❌ Item sem dados suficientes:", item);
+        throw new Error(`Item sem dados suficientes: ${JSON.stringify(item)}`);
+      }
+    }
+
+    console.log(
+      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados`
+    );
+
+    res.status(200).json({
+      message: `Compra processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados na marca ${brandName}.`,
+      type: "success",
+      results: results,
+      brandUsed: brandName,
+    });
+  } catch (error) {
+    console.error("💥 [PDF] ERRO ao finalizar compra:", error.message);
+    console.error("Stack trace:", error.stack);
+
+    res.status(500).json({
+      error: "Falha ao processar compra do PDF.",
+      details: error.message,
+      suggestion:
+        "Verifique se todos os campos estão preenchidos corretamente.",
+    });
+  }
+};
+
+// ✅ MANTENHA O FINALIZE ORIGINAL PARA CSV (se necessário)
+exports.finalizePurchase = async (req, res) => {
+  // ✅ ESTE É PARA CSV - mantém a lógica original se precisar
+  const { items } = req.body;
+
+  console.log("📦 [CSV] Dados recebidos para finalizar compra:");
+  // ... (mantenha a lógica original do CSV aqui)
 };
 
 // ✅ EXPORTAR OS MODELOS DISPONÍVEIS
