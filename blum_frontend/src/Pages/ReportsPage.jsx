@@ -56,22 +56,25 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
           return acc;
         }, {});
 
-        const commissionsByRepList = Object.keys(commissionsMap).map((repId) => ({
-          userId: repId,
-          totalCommission: commissionsMap[repId],
-          totalSales: salesMap[repId] || 0,
-          commissionRate: commissionsMap[repId] > 0 ? 
-            ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2) : '0.00'
-        }));
+        const commissionsByRepList = Object.keys(commissionsMap).map(
+          (repId) => ({
+            userId: repId,
+            totalCommission: commissionsMap[repId],
+            totalSales: salesMap[repId] || 0,
+            commissionRate:
+              commissionsMap[repId] > 0
+                ? ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2)
+                : "0.00",
+          })
+        );
         setCommissionsByRep(commissionsByRepList);
-
       } catch (error) {
         console.error("Erro ao buscar relatórios:", error);
       } finally {
         setLoading(false);
       }
     };
-    
+
     if (userId && userRole) {
       fetchOrders();
     }
@@ -189,9 +192,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
           <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center gap-4">
             <span>Total de Pedidos</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px]">
-              shopping_cart
-            </span>
           </h2>
           <p className="text-4xl font-bold text-blue-600">
             {ordersToDisplay.length}
@@ -200,9 +200,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
           <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center gap-4">
             <span>Valor Total de Vendas</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px]">
-              attach_money
-            </span>
           </h2>
           <p className="text-4xl font-bold text-blue-600">
             {formatCurrency(totalSales)}
@@ -211,15 +208,15 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
           <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center gap-4">
             <span>Total de Comissões</span>
-            <span className="material-symbols-outlined text-green-500 text-[22px]">
-              paid
-            </span>
           </h2>
           <p className="text-4xl font-bold text-green-600">
             {formatCurrency(totalCommissions)}
           </p>
           <p className="text-sm text-gray-500 mt-1">
-            {totalSales > 0 ? ((totalCommissions / totalSales) * 100).toFixed(2) : '0.00'}% das vendas
+            {totalSales > 0
+              ? ((totalCommissions / totalSales) * 100).toFixed(2)
+              : "0.00"}
+            % das vendas
           </p>
         </div>
       </div>
@@ -294,7 +291,8 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         Comissões por Representante
       </h2>
       <p className="text-gray-600 mb-4">
-        Este relatório mostra as comissões reais calculadas por marca dos produtos vendidos.
+        Este relatório mostra as comissões reais calculadas por marca dos
+        produtos vendidos.
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">

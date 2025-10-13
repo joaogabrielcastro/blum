@@ -1,180 +1,337 @@
 import { useState, useEffect } from "react";
 import apiService from "../services/apiService";
-
-// Adiciona o link da fonte de ícones diretamente no componente
-const iconFontLink = document.createElement("link");
-iconFontLink.rel = "stylesheet";
-iconFontLink.href =
-  "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined";
-document.head.appendChild(iconFontLink);
+import SalesChart from "../components/SalesChart";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 const Dashboard = ({ onNavigate }) => {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ clients: 0, products: 0, orders: 0 });
+  const [stats, setStats] = useState({
+    clients: 0,
+    products: 0,
+    orders: 0,
+    purchases: 0,
+    revenue: 0,
+  });
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [salesData, setSalesData] = useState([]);
   const [currentDate, setCurrentDate] = useState("");
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const statusResponse = await apiService.getStatus();
-        setStats(statusResponse.database.stats);
-      } catch (error) {
-        console.error("Erro ao buscar estatísticas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+useEffect(() => {
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
 
-    const formatDate = () => {
-      const today = new Date();
-      const day = String(today.getDate()).padStart(2, "0");
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const year = today.getFullYear();
-      setCurrentDate(`${day}/${month}/${year}`);
-    };
+      // Busca dados em paralelo com a função correta
+      const [statusResponse, ordersResponse, salesResponse] =
+        await Promise.all([
+          apiService.getStatus(),
+          apiService.getOrders({ limit: 5, sort: 'createdAt', order: 'desc' }), // Sugestão: ordenar para pegar os mais recentes
+          apiService.getReportStats({}), // AQUI ESTÁ A CORREÇÃO
+        ]);
 
-    fetchStats();
-    formatDate();
-  }, []);
+      // Assumindo que getReportStats retorna um objeto com `totalRevenue` e `monthlyData`
+      setStats({
+        ...statusResponse.database.stats,
+        revenue: salesResponse?.totalRevenue || 0,
+      });
+
+      // A API getOrders já deve retornar os mais recentes se o backend suportar a ordenação
+      setRecentOrders(ordersResponse); 
+      setSalesData(salesResponse?.monthlyData || []);
+
+    } catch (error) {
+      console.error("Erro ao buscar dados do dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = () => {
+    const today = new Date();
+    const options = {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    };
+    setCurrentDate(today.toLocaleDateString("pt-BR", options));
+  };
+
+  fetchDashboardData();
+  formatDate();
+}, []);
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value || 0);
+  };
+
+  const getOrderStatus = (status) => {
+    const statusMap = {
+      pending: { color: "bg-yellow-100 text-yellow-800", text: "Pendente" },
+      processing: { color: "bg-blue-100 text-blue-800", text: "Processando" },
+      completed: { color: "bg-green-100 text-green-800", text: "Concluído" },
+      cancelled: { color: "bg-red-100 text-red-800", text: "Cancelado" },
+    };
+    return (
+      statusMap[status] || { color: "bg-gray-100 text-gray-800", text: status }
+    );
+  };
 
   if (loading) {
-    return (
-      <div className="p-8 text-center text-gray-500">Carregando dados...</div>
-    );
+    return <LoadingSpinner message="Carregando dashboard..." />;
   }
 
   return (
-    <div className="p-8">
-      {/* Cabeçalho com data */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-2xl shadow-md mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">
-              Bem-vindo(a) ao Painel Blum
-            </h1>
-            <p className="text-lg opacity-90">
-              Gerencie suas operações com eficiência e clareza.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-white text-blue-700 px-3 py-1 rounded-full shadow-sm">
-            <span className="material-symbols-outlined text-[20px]">
-              calendar_today
-            </span>
-            <span className="text-sm font-medium">{currentDate}</span>
+    <div className="h-screen bg-gray-50 flex flex-col">
+      {/* Header Fixo */}
+      <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold mb-1">
+                Bem-vindo(a) ao Painel Blum
+              </h1>
+              <p className="text-blue-100 text-sm">
+                Gerencie suas operações com eficiência e clareza
+              </p>
+            </div>
+            <div className="flex items-center gap-2 bg-white text-blue-700 px-3 py-1 rounded-full shadow-sm">
+              <span className="text-sm font-medium">{currentDate}</span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Estatísticas principais */}
-      <p className="text-lg text-gray-600 mb-8">
-        Selecione uma opção abaixo para começar a gerenciar.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <span>
+        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto">
+          {/* Conteúdo Principal */}
+        </div>
+      </span>
+      {/* Grid de Estatísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Clientes */}
         <div
-          className="bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-blue-300 group"
           onClick={() => onNavigate("clients")}
         >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Total de Clientes</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px]">
-              group
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+              <svg
+                className="w-6 h-6 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold text-blue-600">
+              {stats.clients}
             </span>
-          </h2>
-          <p className="text-4xl font-bold text-blue-600">{stats.clients}</p>
+          </div>
+          <h3 className="font-semibold text-gray-800 mb-1">Clientes</h3>
+          <p className="text-sm text-gray-600">Total cadastrado</p>
         </div>
 
         {/* Produtos */}
         <div
-          className="bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-green-300 group"
           onClick={() => onNavigate("products")}
         >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Total de Produtos</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px]">
-              inventory_2
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors">
+              <svg
+                className="w-6 h-6 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold text-green-600">
+              {stats.products}
             </span>
-          </h2>
-          <p className="text-4xl font-bold text-blue-600">{stats.products}</p>
+          </div>
+          <h3 className="font-semibold text-gray-800 mb-1">Produtos</h3>
+          <p className="text-sm text-gray-600">Em estoque</p>
         </div>
 
         {/* Pedidos */}
         <div
-          className="bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-purple-300 group"
           onClick={() => onNavigate("orders")}
         >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Total de Pedidos</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px]">
-              shopping_cart
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
+              <svg
+                className="w-6 h-6 text-purple-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold text-purple-600">
+              {stats.orders}
             </span>
-          </h2>
-          <p className="text-4xl font-bold text-blue-600">{stats.orders}</p>
+          </div>
+          <h3 className="font-semibold text-gray-800 mb-1">Pedidos</h3>
+          <p className="text-sm text-gray-600">Realizados</p>
+        </div>
+
+        {/* Receita */}
+        <div
+          className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-orange-300 group"
+          onClick={() => onNavigate("reports")}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-orange-50 rounded-lg group-hover:bg-orange-100 transition-colors">
+              <svg
+                className="w-6 h-6 text-orange-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                />
+              </svg>
+            </div>
+            <span className="text-2xl font-bold text-orange-600">
+              {formatCurrency(stats.revenue)}
+            </span>
+          </div>
+          <h3 className="font-semibold text-gray-800 mb-1">Receita</h3>
+          <p className="text-sm text-gray-600">Total acumulado</p>
         </div>
       </div>
 
-      {/* Ações adicionais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Catálogo de Produtos */}
-        <div
-          onClick={() => onNavigate("products")}
-          className="group bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
-        >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Catálogo de Produtos</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px] group-hover:scale-110 transition-transform">
-              inventory_2
-            </span>
-          </h2>
-          <p className="text-gray-600">Gerencie produtos, estoque e preços.</p>
+      {/* Gráfico e Pedidos Recentes */}
+      <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+        {/* Gráfico de Vendas */}
+        <div className="xl:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Desempenho de Vendas
+            </h2>
+            <button
+              onClick={() => onNavigate("reports")}
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+            >
+              Ver detalhes
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1">
+            <SalesChart data={salesData} />
+          </div>
         </div>
 
-        {/* Gestão de Clientes */}
-        <div
-          onClick={() => onNavigate("clients")}
-          className="group bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
-        >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Gestão de Clientes</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px] group-hover:scale-110 transition-transform">
-              group
-            </span>
-          </h2>
-          <p className="text-gray-600">
-            Acesse a carteira de clientes e dados de contato.
-          </p>
-        </div>
-
-        {/* Gerenciamento de Pedidos */}
-        <div
-          onClick={() => onNavigate("orders")}
-          className="group bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
-        >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Gerenciamento de Pedidos</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px] group-hover:scale-110 transition-transform">
-              shopping_cart
-            </span>
-          </h2>
-          <p className="text-gray-600">
-            Acompanhe o fluxo de orçamentos e pedidos.
-          </p>
-        </div>
-
-        {/* Relatórios */}
-        <div
-          onClick={() => onNavigate("reports")}
-          className="group bg-white p-6 rounded-2xl shadow-md cursor-pointer hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1"
-        >
-          <h2 className="text-xl font-semibold text-gray-800 mb-2 flex justify-between items-center">
-            <span>Relatórios</span>
-            <span className="material-symbols-outlined text-blue-500 text-[22px] group-hover:scale-110 transition-transform">
-              bar_chart
-            </span>
-          </h2>
-          <p className="text-gray-600">Monitore o desempenho de vendas.</p>
+        {/* Pedidos Recentes */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-800">
+              Pedidos Recentes
+            </h2>
+            <button
+              onClick={() => onNavigate("orders")}
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+            >
+              Ver todos
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-4">
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Pedido #{order.id}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(order.createdAt).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        getOrderStatus(order.status).color
+                      }`}
+                    >
+                      {getOrderStatus(order.status).text}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <svg
+                    className="w-12 h-12 mx-auto text-gray-400 mb-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
+                  </svg>
+                  <p>Nenhum pedido recente</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

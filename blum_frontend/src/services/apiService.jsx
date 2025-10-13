@@ -119,6 +119,27 @@ const apiService = {
     return response.json();
   },
 
+  deleteClient: async (clientId) => {
+    try {
+      const response = await fetch(`${API_URL}/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao deletar cliente');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao deletar cliente:', error);
+      throw error;
+    }
+  },
+
   createOrder: async (newOrderData) => {
     const response = await fetch(`${API_URL}/orders`, {
       method: "POST",
