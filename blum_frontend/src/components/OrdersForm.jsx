@@ -315,19 +315,19 @@ const OrdersForm = ({
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                         Produto
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                         Qtd.
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                         Preço Unit.
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                         Subtotal
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
                         Ações
                       </th>
                     </tr>
@@ -335,15 +335,23 @@ const OrdersForm = ({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {items.map((item, index) => (
                       <tr key={item.productId || index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.productName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {item.brand}
+                        <td className="px-4 py-4">
+                          <div className="max-w-[300px]">
+                            <div
+                              className="text-sm font-medium text-gray-900 truncate"
+                              title={item.productName}
+                            >
+                              {item.productName}
+                            </div>
+                            <div
+                              className="text-sm text-gray-500 truncate"
+                              title={item.brand}
+                            >
+                              {item.brand}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap w-24">
+                        <td className="px-3 py-4 whitespace-nowrap">
                           <input
                             type="number"
                             min="1"
@@ -355,24 +363,24 @@ const OrdersForm = ({
                                 parseInt(e.target.value)
                               )
                             }
-                            className="w-full p-1 border border-gray-300 rounded-md text-center"
+                            className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm text-gray-700">
                             R$ {safeToFixed(item.price)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm font-semibold text-gray-900">
                             R$ {safeToFixed(item.price * item.quantity)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
                           <button
                             type="button"
                             onClick={() => removeItem(index)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 hover:text-red-900 transition-colors"
                             title="Remover Item"
                           >
                             <svg
@@ -396,7 +404,6 @@ const OrdersForm = ({
               </div>
             </div>
           )}
-
           {/* --- Total --- */}
           <div className="mt-6 bg-gray-50 p-6 rounded-lg border">
             <div className="space-y-3">

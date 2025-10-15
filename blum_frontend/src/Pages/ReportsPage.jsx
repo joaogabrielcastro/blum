@@ -62,7 +62,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
             totalCommission: commissionsMap[repId],
             totalSales: salesMap[repId] || 0,
             commissionRate:
-              commissionsMap[repId] > 0
+              salesMap[repId] > 0
                 ? ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2)
                 : "0.00",
           })
@@ -79,32 +79,6 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
       fetchOrders();
     }
   }, [userRole, userId]);
-
-  useEffect(() => {
-    const prepareChartData = () => {
-      const currentMonthOrders = allOrders
-        .filter((order) => {
-          const orderDate = new Date(order.finishedat);
-          const today = new Date();
-          return (
-            orderDate.getMonth() === today.getMonth() &&
-            orderDate.getFullYear() === today.getFullYear()
-          );
-        })
-        .sort((a, b) => new Date(a.finishedat) - new Date(b.finishedat));
-
-      let cumulativeSales = 0;
-      const data = currentMonthOrders.map((order) => {
-        cumulativeSales += parseFloat(order.totalprice || 0);
-        return {
-          date: new Date(order.finishedat).toLocaleDateString("pt-BR"),
-          "Vendas Acumuladas": cumulativeSales,
-        };
-      });
-      setChartData(data);
-    };
-    prepareChartData();
-  }, [allOrders]);
 
   const getFilteredOrders = (days) => {
     const today = new Date();
@@ -124,6 +98,52 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
       : filterPeriod === "monthly"
       ? monthlyOrders
       : allOrders;
+
+  // CORREÇÃO: Gráfico por data para evitar poluição visual
+  useEffect(() => {
+    const prepareChartData = () => {
+      if (ordersToDisplay.length === 0) {
+        setChartData([]);
+        return;
+      }
+
+      // Agrupar vendas por data para gráfico mais limpo
+      const salesByDate = {};
+      
+      ordersToDisplay.forEach(order => {
+        if (!order.finishedat) return;
+        
+        const date = new Date(order.finishedat).toLocaleDateString("pt-BR");
+        const total = parseFloat(order.totalprice) || 0;
+        
+        if (salesByDate[date]) {
+          salesByDate[date] += total;
+        } else {
+          salesByDate[date] = total;
+        }
+      });
+
+      // Ordenar datas cronologicamente
+      const sortedDates = Object.keys(salesByDate).sort((a, b) => {
+        return new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'));
+      });
+
+      // Calcular vendas acumuladas
+      let cumulativeSales = 0;
+      const data = sortedDates.map(date => {
+        cumulativeSales += salesByDate[date];
+        return {
+          date: date,
+          "Vendas Acumuladas": cumulativeSales,
+          "Vendas do Dia": salesByDate[date]
+        };
+      });
+
+      setChartData(data);
+    };
+
+    prepareChartData();
+  }, [ordersToDisplay, filterPeriod]);
 
   const totalSales = ordersToDisplay.reduce(
     (acc, order) => acc + (parseFloat(order.totalprice) || 0),
@@ -223,9 +243,17 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
 
       <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Progresso de Vendas (Mês Atual)
+          Evolução das Vendas
+          {filterPeriod === "weekly" && " (Última Semana)"}
+          {filterPeriod === "monthly" && " (Último Mês)"}
+          {filterPeriod === "all" && " (Todos os Períodos)"}
         </h2>
-        <SalesChart data={chartData} monthlyTarget={monthlyTarget} />
+        <SalesChart 
+          data={chartData} 
+          monthlyTarget={monthlyTarget}
+          filterPeriod={filterPeriod}
+          totalSales={totalSales}
+        />
       </div>
 
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -291,8 +319,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         Comissões por Representante
       </h2>
       <p className="text-gray-600 mb-4">
-        Este relatório mostra as comissões reais calculadas por marca dos
-        produtos vendidos.
+        Este relatório mostra as comissões reais calculadas por marca dos produtos vendidos.
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">

@@ -366,6 +366,14 @@ importCsv: async (formData) => {
     }
   },
 
+  getOrdersBySeller: async (userId, params = {}) => {
+  const queryString = new URLSearchParams(params).toString();
+  const url = `${API_URL}/orders/seller/${userId}?${queryString}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Erro ao buscar pedidos do vendedor.");
+  return response.json();
+},
+
   getClientOrders: async (clientId) => {
     try {
       const response = await fetch(`${API_URL}/orders?clientid=${clientId}`);

@@ -44,15 +44,16 @@ const App = () => {
   };
 
   const fetchBrands = async () => {
-  try {
-    const brandsData = await apiService.getBrands();
-    setBrands(brandsData);
-  } catch (error) {
-    console.error("Erro ao carregar marcas:", error);
-  }
- };
+    try {
+      const brandsData = await apiService.getBrands();
+      setBrands(brandsData);
+    } catch (error) {
+      console.error("Erro ao carregar marcas:", error);
+    }
+  };
 
   const handleLogin = (role, user) => {
+    console.log("Login realizado:", { role, user });
     setIsLoggedIn(true);
     setUserRole(role);
     setUsername(user);
@@ -108,7 +109,15 @@ const App = () => {
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
-        return <Dashboard onNavigate={setCurrentPage} username={username} />;
+        console.log("Passando para Dashboard:", { username, userId });
+        return (
+          <Dashboard
+            onNavigate={setCurrentPage}
+            username={username}
+            userId={username} 
+            userRole={userRole}
+          />
+        );
       case "orders":
         return (
           <OrdersPage
@@ -118,9 +127,8 @@ const App = () => {
             reps={reps}
           />
         );
-        
-      case "purchases":
 
+      case "purchases":
         if (userRole !== "admin") {
           return <Dashboard onNavigate={setCurrentPage} username={username} />;
         }

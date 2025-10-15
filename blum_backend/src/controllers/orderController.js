@@ -86,24 +86,51 @@ exports.create = async (req, res) => {
       });
     }
 
-    // Calcular comissões
+    // CORREÇÃO: Calcular subtotal e comissões considerando o desconto
+    let subtotal = 0;
     const itemsWithCommission = await Promise.all(
       items.map(async (item) => {
+        const price = parseFloat(item.price) || 0;
+        const quantity = parseInt(item.quantity) || 1;
+        const itemTotal = price * quantity;
+        subtotal += itemTotal;
+
+        // Buscar taxa de comissão da marca
         const commissionRate = await getBrandCommissionRate(item.brand);
-        const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
-        const commissionAmount = (itemTotal * commissionRate) / 100;
+
+        // CORREÇÃO: Aplicar desconto proporcional no cálculo da comissão
+        const discountFactor = 1 - parseFloat(discount) / 100;
+        const itemTotalAfterDiscount = itemTotal * discountFactor;
+        const commissionAmount =
+          (itemTotalAfterDiscount * commissionRate) / 100;
 
         return {
           ...item,
+          price: price,
+          quantity: quantity,
           commission_rate: commissionRate,
-          commission_amount: commissionAmount,
+          commission_amount: parseFloat(commissionAmount.toFixed(2)),
         };
       })
     );
 
+    // Recalcular totais
+    const discountAmount = subtotal * (parseFloat(discount) / 100);
+    const finalTotal = subtotal - discountAmount;
     const totalCommission = itemsWithCommission.reduce(
       (total, item) => total + (item.commission_amount || 0),
       0
+    );
+
+    console.log("=== DEBUG COMISSÃO ===");
+    console.log("Subtotal:", subtotal);
+    console.log("Desconto:", discount + "%");
+    console.log("Valor Desconto:", discountAmount);
+    console.log("Total Líquido:", finalTotal);
+    console.log("Comissão Total:", totalCommission);
+    console.log(
+      "Porcentagem Real:",
+      ((totalCommission / finalTotal) * 100).toFixed(2) + "%"
     );
 
     const result = await sql`
@@ -112,7 +139,7 @@ exports.create = async (req, res) => {
       VALUES 
         (${clientid}, ${userid}, ${description || ""}, 
          ${JSON.stringify(itemsWithCommission)}, 
-         ${discount || 0}, ${totalprice}, ${totalCommission}, 
+         ${discount || 0}, ${finalTotal}, ${totalCommission}, 
          'Em aberto', NOW())
       RETURNING *
     `;
@@ -180,6 +207,7 @@ exports.finalize = async (req, res) => {
 };
 
 // UPDATE - Atualizar um pedido
+// UPDATE - Atualizar um pedido (VERSÃO CORRIGIDA)
 exports.update = async (req, res) => {
   try {
     const { id } = req.params;
@@ -193,21 +221,35 @@ exports.update = async (req, res) => {
       });
     }
 
-    // Recalcular comissões
+    // CORREÇÃO: Recalcular tudo considerando desconto
+    let subtotal = 0;
     const itemsWithCommission = await Promise.all(
       items.map(async (item) => {
+        const price = parseFloat(item.price) || 0;
+        const quantity = parseInt(item.quantity) || 1;
+        const itemTotal = price * quantity;
+        subtotal += itemTotal;
+
         const commissionRate = await getBrandCommissionRate(item.brand);
-        const itemTotal = parseFloat(item.price) * parseInt(item.quantity);
-        const commissionAmount = (itemTotal * commissionRate) / 100;
+
+        // CORREÇÃO: Aplicar desconto proporcional
+        const discountFactor = 1 - parseFloat(discount) / 100;
+        const itemTotalAfterDiscount = itemTotal * discountFactor;
+        const commissionAmount =
+          (itemTotalAfterDiscount * commissionRate) / 100;
 
         return {
           ...item,
+          price: price,
+          quantity: quantity,
           commission_rate: commissionRate,
-          commission_amount: commissionAmount,
+          commission_amount: parseFloat(commissionAmount.toFixed(2)),
         };
       })
     );
 
+    const discountAmount = subtotal * (parseFloat(discount) / 100);
+    const finalTotal = subtotal - discountAmount;
     const totalCommission = itemsWithCommission.reduce(
       (total, item) => total + (item.commission_amount || 0),
       0
@@ -220,7 +262,7 @@ exports.update = async (req, res) => {
           description = ${description || ""},
           items = ${JSON.stringify(itemsWithCommission)},
           discount = ${discount || 0},
-          totalprice = ${totalprice},
+          totalprice = ${finalTotal},
           total_commission = ${totalCommission}
       WHERE id = ${id}
       RETURNING *

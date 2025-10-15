@@ -3,7 +3,7 @@ import apiService from "../services/apiService";
 import SalesChart from "../components/SalesChart";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-const Dashboard = ({ onNavigate }) => {
+const Dashboard = ({ nNavigate, userId, username, userRole }) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     clients: 0,
@@ -16,50 +16,129 @@ const Dashboard = ({ onNavigate }) => {
   const [salesData, setSalesData] = useState([]);
   const [currentDate, setCurrentDate] = useState("");
 
-useEffect(() => {
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
 
-      // Busca dados em paralelo com a função correta
-      const [statusResponse, ordersResponse, salesResponse] =
-        await Promise.all([
-          apiService.getStatus(),
-          apiService.getOrders({ limit: 5, sort: 'createdAt', order: 'desc' }), // Sugestão: ordenar para pegar os mais recentes
-          apiService.getReportStats({}), // AQUI ESTÁ A CORREÇÃO
-        ]);
+        const currentUserId = userId || username;
 
-      // Assumindo que getReportStats retorna um objeto com `totalRevenue` e `monthlyData`
-      setStats({
-        ...statusResponse.database.stats,
-        revenue: salesResponse?.totalRevenue || 0,
-      });
+        if (!currentUserId) {
+          console.error("UserId não disponível");
+          return;
+        }
 
-      // A API getOrders já deve retornar os mais recentes se o backend suportar a ordenação
-      setRecentOrders(ordersResponse); 
-      setSalesData(salesResponse?.monthlyData || []);
+        console.log("Buscando dados para:", { currentUserId, userRole });
 
-    } catch (error) {
-      console.error("Erro ao buscar dados do dashboard:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Prepara os parâmetros base - DIFERENTES para admin vs vendedor
+        let ordersParams = {
+          limit: 50, // Aumentei para pegar mais pedidos para o gráfico
+          sort: "createdAt",
+          order: "desc",
+        };
 
-  const formatDate = () => {
-    const today = new Date();
-    const options = {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+        let reportParams = {};
+
+        // SE FOR VENDEDOR: aplica filtro por usuário
+        if (userRole === "salesperson") {
+          ordersParams.userId = currentUserId;
+          ordersParams.userRole = "salesperson";
+          reportParams.userId = currentUserId;
+          reportParams.userRole = "salesperson";
+          console.log(
+            "🔍 Vendedor - Aplicando filtro por usuário:",
+            currentUserId
+          );
+        }
+        // SE FOR ADMIN: NÃO aplica filtro (vê tudo)
+        else if (userRole === "admin") {
+          ordersParams.userRole = "admin";
+          console.log("👑 Admin - Sem filtro (vendo tudo)");
+        }
+
+        const [statusResponse, ordersResponse, salesResponse] =
+          await Promise.all([
+            apiService.getStatus(),
+            apiService.getOrders(ordersParams),
+            apiService.getReportStats(reportParams),
+          ]);
+
+        console.log("Status Response:", statusResponse);
+        console.log("Orders Response:", ordersResponse);
+        console.log("Sales Response:", salesResponse);
+
+        // CORREÇÃO: Usar os dados filtrados para os cards
+        setStats({
+          clients: statusResponse.database.stats.clients,
+          products: statusResponse.database.stats.products,
+          orders: salesResponse?.totalOrders || 0,
+          revenue: salesResponse?.totalSales || 0,
+        });
+
+        setRecentOrders(ordersResponse?.slice(0, 5) || []); // Apenas os 5 mais recentes
+
+        // PREPARAR DADOS PARA O GRÁFICO (igual ao ReportsPage)
+        const finishedOrders = ordersResponse.filter(
+          (order) => order.status === "Entregue"
+        );
+
+        // Agrupar vendas por data para gráfico
+        const salesByDate = {};
+
+        finishedOrders.forEach((order) => {
+          if (!order.finishedat) return;
+
+          const date = new Date(order.finishedat).toLocaleDateString("pt-BR");
+          const total = parseFloat(order.totalprice) || 0;
+
+          if (salesByDate[date]) {
+            salesByDate[date] += total;
+          } else {
+            salesByDate[date] = total;
+          }
+        });
+
+        // Ordenar datas cronologicamente
+        const sortedDates = Object.keys(salesByDate).sort((a, b) => {
+          return (
+            new Date(a.split("/").reverse().join("-")) -
+            new Date(b.split("/").reverse().join("-"))
+          );
+        });
+
+        // Calcular vendas acumuladas
+        let cumulativeSales = 0;
+        const chartData = sortedDates.map((date) => {
+          cumulativeSales += salesByDate[date];
+          return {
+            date: date,
+            "Vendas Acumuladas": cumulativeSales,
+            "Vendas do Dia": salesByDate[date],
+          };
+        });
+
+        setSalesData(chartData);
+      } catch (error) {
+        console.error("Erro ao buscar dados do dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-    setCurrentDate(today.toLocaleDateString("pt-BR", options));
-  };
 
-  fetchDashboardData();
-  formatDate();
-}, []);
+    const formatDate = () => {
+      const today = new Date();
+      const options = {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      };
+      setCurrentDate(today.toLocaleDateString("pt-BR", options));
+    };
+
+    fetchDashboardData();
+    formatDate();
+  }, [userId, username, userRole]);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -257,7 +336,10 @@ useEffect(() => {
             </button>
           </div>
           <div className="flex-1">
-            <SalesChart data={salesData} />
+            <SalesChart
+              data={salesData}
+              simplified={true} // ← Adicione esta prop
+            />
           </div>
         </div>
 
@@ -300,7 +382,7 @@ useEffect(() => {
                         Pedido #{order.id}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {new Date(order.createdAt).toLocaleDateString("pt-BR")}
+                        {new Date(order.createdat).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                     <span
