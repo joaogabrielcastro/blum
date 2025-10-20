@@ -48,14 +48,35 @@ const SalesChart = ({
     return null;
   };
 
-  // CORREÇÃO: Formatar eixo Y de forma inteligente
+  // CORREÇÃO: Formatar eixo Y com valores COMPLETOS
   const formatYAxis = (value) => {
-    if (value >= 1000000) {
-      return `R$ ${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `R$ ${(value / 1000).toFixed(0)}k`;
+    // Usar a mesma formatação do formatCurrency para consistência
+    return formatCurrency(value);
+  };
+
+  // CORREÇÃO: Formatação mais detalhada para valores específicos
+  const getYTicks = () => {
+    if (data.length === 0) return [0, 500, 1000];
+    
+    const maxValue = Math.max(...data.map((item) => item["Vendas Acumuladas"]));
+    
+    // Gerar ticks baseados no valor máximo
+    if (maxValue <= 1000) {
+      return [0, 250, 500, 750, 1000];
+    } else if (maxValue <= 5000) {
+      return [0, 1000, 2000, 3000, 4000, 5000];
+    } else if (maxValue <= 10000) {
+      return [0, 2000, 4000, 6000, 8000, 10000];
+    } else if (maxValue <= 50000) {
+      return [0, 10000, 20000, 30000, 40000, 50000];
     } else {
-      return `R$ ${value}`;
+      // Para valores maiores, gerar ticks dinamicamente
+      const step = Math.ceil(maxValue / 5 / 1000) * 1000;
+      const ticks = [];
+      for (let i = 0; i <= 5; i++) {
+        ticks.push(i * step);
+      }
+      return ticks;
     }
   };
 
@@ -128,30 +149,32 @@ const SalesChart = ({
 
   // VERSÃO COMPLETA para ReportsPage
   return (
-    <div className="w-full h-80">
+    <div className="w-full h-[600px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
           margin={{
-            top: 5,
+            top: 20,
             right: 30,
             left: 20,
-            bottom: data.length > 10 ? 40 : 20,
+            bottom: data.length > 10 ? 50 : 30,
           }}
         >
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 12 }}
             interval={getXAxisInterval()}
             angle={data.length > 7 ? -45 : 0}
             textAnchor={data.length > 7 ? "end" : "middle"}
-            height={data.length > 7 ? 60 : 40}
+            height={data.length > 7 ? 70 : 50}
           />
           <YAxis
             tickFormatter={formatYAxis}
             tick={{ fontSize: 12 }}
             domain={calculateYDomain()}
+            width={80} // CORREÇÃO: Mais espaço para labels completas
+            tickCount={6} // CORREÇÃO: Número fixo de ticks
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend />
@@ -169,12 +192,14 @@ const SalesChart = ({
             <ReferenceLine
               y={monthlyTarget}
               stroke="#ef4444"
-              strokeDasharray="3 3"
+              strokeDasharray="5 5"
+              strokeWidth={2}
               label={{
                 value: `Meta: ${formatCurrency(monthlyTarget)}`,
-                position: "right",
+                position: "insideTopRight",
                 fill: "#ef4444",
-                fontSize: 10,
+                fontSize: 12,
+                fontWeight: "bold"
               }}
             />
           )}
@@ -183,12 +208,14 @@ const SalesChart = ({
             <ReferenceLine
               y={totalSales}
               stroke="#10b981"
-              strokeDasharray="3 3"
+              strokeDasharray="5 5"
+              strokeWidth={2}
               label={{
                 value: `Total: ${formatCurrency(totalSales)}`,
-                position: "right",
+                position: "insideTopLeft",
                 fill: "#10b981",
-                fontSize: 10,
+                fontSize: 12,
+                fontWeight: "bold"
               }}
             />
           )}
@@ -212,7 +239,8 @@ const SalesChart = ({
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
               />
             </svg>
-            <p>Nenhum dado de vendas disponível para o período selecionado</p>
+            <p className="text-lg font-semibold mb-2">Nenhum dado disponível</p>
+            <p className="text-sm">Não há vendas finalizadas para o período selecionado</p>
           </div>
         </div>
       )}

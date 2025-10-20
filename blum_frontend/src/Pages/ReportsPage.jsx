@@ -6,7 +6,7 @@ import SalesChart from "../components/SalesChart";
 const ReportsPage = ({ userRole, userId, reps = {} }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterPeriod, setFilterPeriod] = useState("monthly");
+  const [filterPeriod, setFilterPeriod] = useState("all");
   const [salesByRep, setSalesByRep] = useState([]);
   const [commissionsByRep, setCommissionsByRep] = useState([]);
   const [clients, setClients] = useState({});

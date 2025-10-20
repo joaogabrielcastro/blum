@@ -22,22 +22,26 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log("Buscando dados para clientId:", clientId);
-      
+
       // Buscar dados do cliente
-      const clientResponse = await fetch(`http://localhost:3000/api/v1/clients/${clientId}`);
-      
+      const clientResponse = await fetch(
+        `http://localhost:3000/api/v1/clients/${clientId}`
+      );
+
       if (!clientResponse.ok) {
-        throw new Error('Cliente não encontrado');
+        throw new Error("Cliente não encontrado");
       }
-      
+
       const clientData = await clientResponse.json();
       console.log("Dados do cliente recebidos:", clientData);
-      
+
       // Buscar pedidos do cliente
-      const ordersResponse = await fetch(`http://localhost:3000/api/v1/orders?clientid=${clientId}`);
-      
+      const ordersResponse = await fetch(
+        `http://localhost:3000/api/v1/orders?clientid=${clientId}`
+      );
+
       let ordersData = [];
       if (ordersResponse.ok) {
         ordersData = await ordersResponse.json();
@@ -45,10 +49,9 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
       } else {
         console.warn("Erro ao buscar pedidos, status:", ordersResponse.status);
       }
-      
+
       setClient(clientData);
       setOrders(ordersData);
-      
     } catch (err) {
       console.error("Erro ao carregar dados do cliente:", err);
       setError(err.message || "Erro ao carregar histórico de pedidos.");
@@ -58,31 +61,39 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
   };
 
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(value || 0);
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'Data não informada';
+    if (!dateString) return "Data não informada";
     try {
-      return new Date(dateString).toLocaleDateString('pt-BR');
+      return new Date(dateString).toLocaleDateString("pt-BR");
     } catch {
-      return 'Data inválida';
+      return "Data inválida";
     }
   };
 
   const getOrderStatus = (status) => {
     const statusMap = {
-      'Em aberto': { text: 'Em aberto', color: 'bg-yellow-100 text-yellow-800' },
-      'Entregue': { text: 'Entregue', color: 'bg-green-100 text-green-800' },
-      'pending': { text: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
-      'processing': { text: 'Processando', color: 'bg-blue-100 text-blue-800' },
-      'completed': { text: 'Concluído', color: 'bg-green-100 text-green-800' },
-      'cancelled': { text: 'Cancelado', color: 'bg-red-100 text-red-800' }
+      "Em aberto": {
+        text: "Em aberto",
+        color: "bg-yellow-100 text-yellow-800",
+      },
+      Entregue: { text: "Entregue", color: "bg-green-100 text-green-800" },
+      pending: { text: "Pendente", color: "bg-yellow-100 text-yellow-800" },
+      processing: { text: "Processando", color: "bg-blue-100 text-blue-800" },
+      completed: { text: "Concluído", color: "bg-green-100 text-green-800" },
+      cancelled: { text: "Cancelado", color: "bg-red-100 text-red-800" },
     };
-    return statusMap[status] || { text: status || 'Desconhecido', color: 'bg-gray-100 text-gray-800' };
+    return (
+      statusMap[status] || {
+        text: status || "Desconhecido",
+        color: "bg-gray-100 text-gray-800",
+      }
+    );
   };
 
   const getSellerName = (sellerId) => {
@@ -91,12 +102,12 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
 
   const parseOrderItems = (order) => {
     if (!order.items) return [];
-    
+
     if (Array.isArray(order.items)) {
       return order.items;
     }
-    
-    if (typeof order.items === 'string') {
+
+    if (typeof order.items === "string") {
       try {
         return JSON.parse(order.items);
       } catch (error) {
@@ -104,7 +115,7 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
         return [];
       }
     }
-    
+
     return [];
   };
 
@@ -126,8 +137,18 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
               onClick={onBack}
               className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
               </svg>
               Voltar para clientes
             </button>
@@ -140,14 +161,25 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
                 className="text-gray-400 hover:text-gray-600"
                 title="Atualizar dados"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
               </button>
             </div>
             {client && (
               <p className="text-gray-600 mt-2">
-                Cliente: <span className="font-semibold">{client.companyName}</span>
+                Cliente:{" "}
+                <span className="font-semibold">{client.companyName}</span>
                 {client.contactPerson && ` - ${client.contactPerson}`}
               </p>
             )}
@@ -158,34 +190,6 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
           <ErrorMessage message={error} onClose={() => setError(null)} />
         )}
 
-        {/* Resumo */}
-        {orders.length > 0 && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Resumo</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">{orders.length}</p>
-                <p className="text-gray-600">Total de Pedidos</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <p className="text-2xl font-bold text-green-600">
-                  {formatCurrency(orders.reduce((total, order) => total + (order.totalprice || 0), 0))}
-                </p>
-                <p className="text-gray-600">Valor Total</p>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">
-                  {formatCurrency(
-                    orders.reduce((total, order) => total + (order.totalprice || 0), 0) / 
-                    (orders.length || 1)
-                  )}
-                </p>
-                <p className="text-gray-600">Ticket Médio</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Lista de Pedidos */}
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
           {orders.length === 0 ? (
@@ -194,7 +198,9 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
               <h3 className="text-xl font-semibold text-gray-800 mb-2">
                 Nenhum pedido encontrado
               </h3>
-              <p className="text-gray-600">Este cliente ainda não realizou nenhum pedido.</p>
+              <p className="text-gray-600">
+                Este cliente ainda não realizou nenhum pedido.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -224,9 +230,12 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
                 <tbody className="divide-y divide-gray-200">
                   {orders.map((order) => {
                     const items = parseOrderItems(order);
-                    
+
                     return (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={order.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-mono text-sm text-gray-900">
                             #{order.id}
@@ -242,9 +251,11 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
                           {formatCurrency(order.totalprice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            getOrderStatus(order.status).color
-                          }`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              getOrderStatus(order.status).color
+                            }`}
+                          >
                             {getOrderStatus(order.status).text}
                           </span>
                         </td>
@@ -253,9 +264,24 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
                             onClick={() => setSelectedOrder(order)}
                             className="text-blue-600 hover:text-blue-900 font-medium flex items-center gap-1 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
                           >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
                             </svg>
                             Detalhes
                           </button>
@@ -271,8 +297,8 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
 
         {/* Modal de Detalhes do Pedido */}
         {selectedOrder && (
-          <OrderDetailsModal 
-            order={selectedOrder} 
+          <OrderDetailsModal
+            order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
@@ -285,16 +311,23 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
   );
 };
 // Componente do Modal de Detalhes
-const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrderStatus, getSellerName }) => {
+const OrderDetailsModal = ({
+  order,
+  onClose,
+  formatCurrency,
+  formatDate,
+  getOrderStatus,
+  getSellerName,
+}) => {
   // Parse dos items se for string JSON
   const parseItems = () => {
     if (!order.items) return [];
-    
+
     if (Array.isArray(order.items)) {
       return order.items;
     }
-    
-    if (typeof order.items === 'string') {
+
+    if (typeof order.items === "string") {
       try {
         return JSON.parse(order.items);
       } catch (error) {
@@ -302,7 +335,7 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
         return [];
       }
     }
-    
+
     return [];
   };
 
@@ -326,14 +359,25 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <h3 className="font-semibold text-gray-700 mb-2">Informações do Pedido</h3>
+            <h3 className="font-semibold text-gray-700 mb-2">
+              Informações do Pedido
+            </h3>
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Data:</span> {formatDate(order.createdat)}</p>
-              <p><span className="font-medium">Vendedor:</span> {getSellerName(order.userid)}</p>
-              <p><span className="font-medium">Status:</span> 
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                  getOrderStatus(order.status).color
-                }`}>
+              <p>
+                <span className="font-medium">Data:</span>{" "}
+                {formatDate(order.createdat)}
+              </p>
+              <p>
+                <span className="font-medium">Vendedor:</span>{" "}
+                {getSellerName(order.userid)}
+              </p>
+              <p>
+                <span className="font-medium">Status:</span>
+                <span
+                  className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                    getOrderStatus(order.status).color
+                  }`}
+                >
                   {getOrderStatus(order.status).text}
                 </span>
               </p>
@@ -341,26 +385,45 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
           </div>
 
           <div>
-            <h3 className="font-semibold text-gray-700 mb-2">Informações Financeiras</h3>
+            <h3 className="font-semibold text-gray-700 mb-2">
+              Informações Financeiras
+            </h3>
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Valor Total:</span> {formatCurrency(order.totalprice)}</p>
-              <p><span className="font-medium">Desconto:</span> {formatCurrency(order.discount || 0)}</p>
-              <p><span className="font-medium">Valor Líquido:</span> {formatCurrency(netValue)}</p>
+              <p>
+                <span className="font-medium">Valor Total:</span>{" "}
+                {formatCurrency(order.totalprice)}
+              </p>
+              <p>
+                <span className="font-medium">Desconto:</span>{" "}
+                {formatCurrency(order.discount || 0)}
+              </p>
+              <p>
+                <span className="font-medium">Valor Líquido:</span>{" "}
+                {formatCurrency(netValue)}
+              </p>
             </div>
           </div>
         </div>
 
         <h3 className="font-semibold text-gray-700 mb-4">Itens do Pedido</h3>
-        
+
         {items.length > 0 ? (
           <div className="border rounded-lg overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Produto
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Quantidade
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Preço Unit.
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Subtotal
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -369,20 +432,30 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
                   const unitPrice = item.price || item.unitPrice || 0;
                   const quantity = item.quantity || 1;
                   const subtotal = unitPrice * quantity;
-                  
+
                   return (
                     <tr key={index}>
                       <td className="px-4 py-3">
                         <div>
-                          <div className="font-medium">{item.productName || item.name || "Produto não especificado"}</div>
+                          <div className="font-medium">
+                            {item.productName ||
+                              item.name ||
+                              "Produto não especificado"}
+                          </div>
                           {item.productCode && (
-                            <div className="text-sm text-gray-600">Código: {item.productCode}</div>
+                            <div className="text-sm text-gray-600">
+                              Código: {item.productCode}
+                            </div>
                           )}
                           {item.productId && (
-                            <div className="text-sm text-gray-600">ID: {item.productId}</div>
+                            <div className="text-sm text-gray-600">
+                              ID: {item.productId}
+                            </div>
                           )}
                           {item.brand && (
-                            <div className="text-sm text-gray-600">Marca: {item.brand}</div>
+                            <div className="text-sm text-gray-600">
+                              Marca: {item.brand}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -397,17 +470,36 @@ const OrderDetailsModal = ({ order, onClose, formatCurrency, formatDate, getOrde
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan="3" className="px-4 py-3 text-right font-semibold">Total:</td>
-                  <td className="px-4 py-3 font-semibold">{formatCurrency(order.totalprice)}</td>
+                  <td
+                    colSpan="3"
+                    className="px-4 py-3 text-right font-semibold"
+                  >
+                    Total:
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    {formatCurrency(order.totalprice)}
+                  </td>
                 </tr>
                 {order.discount > 0 && (
                   <tr>
-                    <td colSpan="3" className="px-4 py-3 text-right font-semibold">Desconto:</td>
-                    <td className="px-4 py-3 font-semibold text-red-600">-{formatCurrency(order.discount)}</td>
+                    <td
+                      colSpan="3"
+                      className="px-4 py-3 text-right font-semibold"
+                    >
+                      Desconto:
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-red-600">
+                      -{formatCurrency(order.discount)}
+                    </td>
                   </tr>
                 )}
                 <tr>
-                  <td colSpan="3" className="px-4 py-3 text-right font-semibold">Valor Líquido:</td>
+                  <td
+                    colSpan="3"
+                    className="px-4 py-3 text-right font-semibold"
+                  >
+                    Valor Líquido:
+                  </td>
                   <td className="px-4 py-3 font-semibold text-green-600">
                     {formatCurrency(netValue)}
                   </td>
