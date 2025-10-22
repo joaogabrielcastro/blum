@@ -3,7 +3,7 @@ import apiService from "../services/apiService";
 import SalesChart from "../components/SalesChart";
 import LoadingSpinner from "../components/LoadingSpinner";
 
-const Dashboard = ({ nNavigate, userId, username, userRole }) => {
+const Dashboard = ({ onNavigate, userId, username, userRole }) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     clients: 0,
