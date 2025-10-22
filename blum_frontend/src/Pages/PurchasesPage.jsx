@@ -469,7 +469,7 @@ const PurchasesPage = () => {
         <button
           onClick={handleUpload}
           disabled={!selectedFile || !selectedBrandId || isLoading}
-          className="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md disabled:opacity-50"
+          className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
         >
           {isLoading ? "Processando..." : "Processar PDF"}
         </button>
@@ -530,7 +530,7 @@ const PurchasesPage = () => {
     };
 
     return (
-      <div className="bg-white p-6 rounded-xl shadow-md border mb-6">
+      <div className="bg-white p-8 rounded-xl shadow-md border max-w-2xl mx-auto text-center">
         <h3 className="text-xl font-bold text-gray-800 mb-4">
           📥 Importar Produtos do CSV
         </h3>
