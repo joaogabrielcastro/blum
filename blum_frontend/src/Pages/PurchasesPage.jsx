@@ -11,6 +11,7 @@ const PurchasesPage = () => {
   const [showNewProducts, setShowNewProducts] = useState(false);
   const [brands, setBrands] = useState([]);
   const [selectedBrandId, setSelectedBrandId] = useState("");
+  const [activeTab, setActiveTab] = useState("pdf"); // "pdf" ou "csv"
 
   const handleItemChange = (index, field, value) => {
     setParsedItems((prevItems) => {
@@ -77,6 +78,7 @@ const PurchasesPage = () => {
     };
     fetchUserData();
   }, []);
+
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
@@ -247,24 +249,32 @@ const PurchasesPage = () => {
     if (newProducts.length === 0) return null;
 
     return (
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center mb-2">
-          <span className="text-yellow-600 font-bold text-lg">
-            🆕 Novos Produtos Detectados
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 mb-6 shadow-sm">
+        <div className="flex items-center mb-3">
+          <span className="text-blue-600 font-bold text-lg flex items-center">
+            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            Novos Produtos Detectados
           </span>
         </div>
-        <p className="text-yellow-700 mb-3">
+        <p className="text-blue-700 mb-3">
           {newProducts.length} produtos não existem no seu catálogo e serão
           criados automaticamente na Representada{" "}
-          <strong>{selectedBrand?.name || "Não selecionada"}</strong>:
+          <strong className="text-blue-800">{selectedBrand?.name || "Não selecionada"}</strong>:
         </p>
-        <div className="max-h-40 overflow-y-auto">
+        <div className="max-h-40 overflow-y-auto bg-white rounded-lg p-3 border border-blue-100">
           {newProducts.map((item, index) => (
             <div
               key={index}
-              className="text-sm text-yellow-600 py-1 border-b border-yellow-100"
+              className="text-sm text-blue-600 py-2 border-b border-blue-50 last:border-b-0 flex items-start"
             >
-              <strong>{item.productCode}</strong> - {item.description}
+              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded mr-2 mt-0.5 flex-shrink-0">
+                {index + 1}
+              </span>
+              <div>
+                <strong className="text-blue-800">{item.productCode}</strong> - {item.description}
+              </div>
             </div>
           ))}
         </div>
@@ -274,48 +284,60 @@ const PurchasesPage = () => {
 
   // ✅ RENDERIZAÇÃO DA TABELA ATUALIZADA
   const renderVerificationTable = () => (
-    <div>
-      <h2 className="text-3xl font-bold text-gray-800 mb-2">
-        Verifique os Itens Extraídos
-      </h2>
-      <p className="text-gray-600 mb-6">
-        Mapeie os itens para produtos existentes ou deixe em "Selecione um
-        produto..." para criar novos produtos automaticamente.
-      </p>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center">
+          <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Verifique os Itens Extraídos
+        </h2>
+        <p className="text-gray-600">
+          Mapeie os itens para produtos existentes ou deixe em "Selecione um
+          produto..." para criar novos produtos automaticamente.
+        </p>
+      </div>
 
       {/* RESUMO DE NOVOS PRODUTOS */}
       {renderNewProductsSummary()}
 
-      <div className="overflow-x-auto bg-white rounded-lg shadow border">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">
                 Descrição (Extraído do PDF)
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">
+              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-2/5">
                 Mapear Para Produto Existente
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Qtd.*
               </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Preço Unit.*
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider w-20">
                 Status
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {parsedItems.map((item, index) => (
-              <tr key={index} className={item.isNewProduct ? "bg-blue-50" : ""}>
+              <tr 
+                key={index} 
+                className={`transition-colors duration-150 ${
+                  item.isNewProduct 
+                    ? "bg-blue-50 hover:bg-blue-100" 
+                    : "hover:bg-gray-50"
+                }`}
+              >
                 <td className="px-6 py-4 whitespace-normal align-top">
                   <p className="text-sm font-medium text-gray-900">
                     {item.description}
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Código: {item.productCode}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Código: <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{item.productCode}</span>
                   </p>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap align-top">
@@ -324,13 +346,13 @@ const PurchasesPage = () => {
                     onChange={(e) =>
                       handleItemChange(index, "mappedProductId", e.target.value)
                     }
-                    className={`w-full p-2 border rounded-md text-sm ${
+                    className={`w-full p-2.5 border rounded-lg text-sm transition-colors focus:ring-2 focus:outline-none ${
                       item.isNewProduct
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-300"
+                        ? "border-blue-300 bg-blue-50 focus:ring-blue-200 focus:border-blue-400"
+                        : "border-gray-300 focus:ring-blue-200 focus:border-blue-400"
                     }`}
                   >
-                    <option value="">🆕 Criar novo produto...</option>
+                    <option value="" className="text-blue-600 font-medium">🆕 Criar novo produto...</option>
                     {userProducts.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name} ({p.productcode})
@@ -338,8 +360,11 @@ const PurchasesPage = () => {
                     ))}
                   </select>
                   {item.isNewProduct && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      ✅ Será criado como novo produto
+                    <p className="text-xs text-blue-600 mt-2 flex items-center">
+                      <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Será criado como novo produto
                     </p>
                   )}
                 </td>
@@ -355,32 +380,41 @@ const PurchasesPage = () => {
                         parseInt(e.target.value)
                       )
                     }
-                    className="w-24 p-1 border border-gray-300 rounded-md text-center"
+                    className="w-20 p-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-blue-200 focus:border-blue-400 focus:outline-none transition-colors"
                   />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right align-top">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.unitPrice}
-                    onChange={(e) =>
-                      handleItemChange(
-                        index,
-                        "unitPrice",
-                        parseFloat(e.target.value)
-                      )
-                    }
-                    className="w-28 p-1 border border-gray-300 rounded-md text-right"
-                  />
+                  <div className="flex items-center justify-end">
+                    <span className="text-gray-500 mr-2">R$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unitPrice}
+                      onChange={(e) =>
+                        handleItemChange(
+                          index,
+                          "unitPrice",
+                          parseFloat(e.target.value)
+                        )
+                      }
+                      className="w-28 p-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-blue-200 focus:border-blue-400 focus:outline-none transition-colors"
+                    />
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center align-top">
                   {item.isNewProduct ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                      </svg>
                       Novo
                     </span>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
                       Existente
                     </span>
                   )}
@@ -391,44 +425,74 @@ const PurchasesPage = () => {
         </table>
       </div>
 
-      <div className="flex justify-end gap-4 mt-8">
-        <button
-          onClick={() => setParsedItems([])}
-          className="px-6 py-2 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition"
-        >
-          Cancelar Importação
-        </button>
-        <button
-          onClick={handleConfirmPurchase}
-          disabled={isLoading}
-          className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-        >
-          {isLoading ? "Processando..." : "Confirmar e Atualizar Estoque"}
-        </button>
+      <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+        <div className="text-sm text-gray-500">
+          * Campos obrigatórios para todos os itens
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setParsedItems([])}
+            className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-200"
+          >
+            Cancelar Importação
+          </button>
+          <button
+            onClick={handleConfirmPurchase}
+            disabled={isLoading}
+            className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white font-medium rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-200 shadow-sm flex items-center"
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processando...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Confirmar e Atualizar Estoque
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
 
   // ✅ SEÇÃO DE UPLOAD (que estava faltando)
   const renderUploadSection = () => (
-    <div className="bg-white p-8 rounded-xl shadow-md border max-w-2xl mx-auto text-center">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        Importar Nova Compra
-      </h2>
-      <p className="text-gray-600 mb-6">
-        Envie o arquivo PDF do seu fornecedor para extrair os itens da compra
-        automaticamente.
-      </p>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Importar Nova Compra
+        </h2>
+        <p className="text-gray-600">
+          Envie o arquivo PDF do seu fornecedor para extrair os itens da compra
+          automaticamente.
+        </p>
+      </div>
 
       {/* ✅ CORRIGIDO: Seletor de Representada usa ID numérico */}
-      <div className="mb-4 text-left">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          📋 Representada dos Produtos:
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center">
+          <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+          Representada dos Produtos:
         </label>
         <select
           value={selectedBrandId}
           onChange={(e) => setSelectedBrandId(e.target.value)}
-          className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+          className="w-full p-3.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 focus:outline-none transition-colors"
         >
           <option value="">Selecione uma Representada...</option>
           {brands.map((brand) => {
@@ -454,29 +518,89 @@ const PurchasesPage = () => {
             );
           })}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-gray-500 mt-2">
           Todos os novos produtos criados serão associados a esta Representada
         </p>
       </div>
 
-      <div className="flex flex-col items-center gap-4">
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={handleFileChange}
-          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-        />
+      <div className="flex flex-col items-center gap-5">
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Arquivo PDF da Compra:
+          </label>
+          <div className="flex items-center justify-center w-full">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <svg className="w-8 h-8 mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="mb-2 text-sm text-gray-500">
+                  <span className="font-semibold">Clique para enviar</span> ou arraste o arquivo
+                </p>
+                <p className="text-xs text-gray-500">PDF (MAX. 10MB)</p>
+              </div>
+              <input 
+                type="file" 
+                accept=".pdf" 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+          {selectedFile && (
+            <div className="mt-3 flex items-center justify-between bg-blue-50 text-blue-700 px-4 py-2 rounded-lg">
+              <span className="text-sm font-medium truncate flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                {selectedFile.name}
+              </span>
+              <button 
+                onClick={() => setSelectedFile(null)}
+                className="text-blue-500 hover:text-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+        
         <button
           onClick={handleUpload}
           disabled={!selectedFile || !selectedBrandId || isLoading}
-          className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium py-3 px-6 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm flex items-center justify-center"
         >
-          {isLoading ? "Processando..." : "Processar PDF"}
+          {isLoading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processando PDF...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Processar PDF
+            </>
+          )}
         </button>
       </div>
-      {error && <p className="text-red-500 mt-4">{error}</p>}
+      {error && (
+        <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-start">
+          <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {error}
+        </div>
+      )}
     </div>
   );
+
   const CsvImportSection = () => {
     const [csvFile, setCsvFile] = useState(null);
     const [isImporting, setIsImporting] = useState(false);
@@ -530,21 +654,34 @@ const PurchasesPage = () => {
     };
 
     return (
-      <div className="bg-white p-8 rounded-xl shadow-md border max-w-2xl mx-auto text-center">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">
-          📥 Importar Produtos do CSV
-        </h3>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto">
+        <div className="text-center mb-6">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">
+            Importar Produtos do CSV
+          </h3>
+          <p className="text-gray-600">
+            Importe produtos em lote através de um arquivo CSV
+          </p>
+        </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* ✅ SELETOR DE Representada PARA CSV */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              📋 Representada dos Produtos:
+            <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center">
+              <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              Representada dos Produtos:
             </label>
             <select
               value={selectedCsvBrandId}
               onChange={(e) => setSelectedCsvBrandId(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm"
+              className="w-full p-3.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-200 focus:border-green-400 focus:outline-none transition-colors"
             >
               <option value="">Selecione uma Representada...</option>
               {brands.map((brand) => {
@@ -569,7 +706,7 @@ const PurchasesPage = () => {
                 );
               })}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-2">
               Todos os produtos do CSV serão associados a esta Representada
             </p>
           </div>
@@ -578,28 +715,74 @@ const PurchasesPage = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Arquivo CSV com produtos:
             </label>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => setCsvFile(e.target.files[0])}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-            />
+            <div className="flex items-center justify-center w-full">
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg className="w-8 h-8 mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <p className="mb-2 text-sm text-gray-500">
+                    <span className="font-semibold">Clique para enviar</span> ou arraste o arquivo
+                  </p>
+                  <p className="text-xs text-gray-500">CSV (MAX. 10MB)</p>
+                </div>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  onChange={(e) => setCsvFile(e.target.files[0])} 
+                  className="hidden" 
+                />
+              </label>
+            </div>
+            {csvFile && (
+              <div className="mt-3 flex items-center justify-between bg-green-50 text-green-700 px-4 py-2 rounded-lg">
+                <span className="text-sm font-medium truncate flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  {csvFile.name}
+                </span>
+                <button 
+                  onClick={() => setCsvFile(null)}
+                  className="text-green-500 hover:text-green-700"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
 
           <button
             onClick={handleCsvImport}
             disabled={!csvFile || !selectedCsvBrandId || isImporting}
-            className="bg-green-600 text-white font-semibold py-2 px-6 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-medium py-3 px-6 rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-200 shadow-sm flex items-center justify-center"
           >
-            {isImporting ? "Importando..." : "Importar CSV"}
+            {isImporting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Importando...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Importar CSV
+              </>
+            )}
           </button>
 
           {importResult && (
             <div
-              className={`p-4 rounded-lg ${
+              className={`p-4 rounded-lg border ${
                 importResult.error
-                  ? "bg-red-50 text-red-700"
-                  : "bg-green-50 text-green-700"
+                  ? "bg-red-50 text-red-700 border-red-200"
+                  : "bg-green-50 text-green-700 border-green-200"
               }`}
             >
               <pre className="text-sm whitespace-pre-wrap">
@@ -613,23 +796,67 @@ const PurchasesPage = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-4xl font-bold text-gray-800 mb-8">
-        Gestão de Compras
-      </h1>
-
-      <CsvImportSection />
-
-      {/* Suas seções existentes para PDF */}
-      {isLoading ? (
-        <div className="flex justify-center items-center py-12">
-          <LoadingSpinner />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center">
+            <svg className="w-8 h-8 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Gestão de Compras
+          </h1>
+          <p className="text-gray-600">Importe e gerencie suas compras de forma eficiente</p>
         </div>
-      ) : parsedItems.length === 0 ? (
-        renderUploadSection()
-      ) : (
-        renderVerificationTable()
-      )}
+
+        {/* Abas de Navegação */}
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab("pdf")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "pdf"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Importar PDF
+              </button>
+              <button
+                onClick={() => setActiveTab("csv")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "csv"
+                    ? "border-green-500 text-green-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Importar CSV
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <div className="text-center">
+              <LoadingSpinner />
+              <p className="mt-4 text-gray-600">Processando sua solicitação...</p>
+            </div>
+          </div>
+        ) : activeTab === "csv" ? (
+          <CsvImportSection />
+        ) : parsedItems.length === 0 ? (
+          renderUploadSection()
+        ) : (
+          renderVerificationTable()
+        )}
+      </div>
     </div>
   );
 };

@@ -7,14 +7,7 @@ require("dotenv").config();
 const sql = neon(process.env.DATABASE_URL);
 
 // ✅ MODELOS DISPONÍVEIS PARA TESTE
-const AVAILABLE_MODELS = [
-  "gemini-2.0-flash-exp",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro",
-  "gemini-1.5-pro-002",
-];
+const AVAILABLE_MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-flash"];
 
 // Função para converter o buffer de imagem para base64
 async function fileToGenerativePart(filePath, mimeType) {
@@ -803,14 +796,14 @@ async function importProductsToDatabase(products) {
     created: 0,
     updated: 0,
     errors: 0,
-    details: []
+    details: [],
   };
 
   console.log(`🔄 Iniciando importação de ${products.length} produtos...`);
 
   for (let i = 0; i < products.length; i++) {
     const product = products[i];
-    
+
     try {
       console.log(`\n📦 Processando produto ${i + 1}/${products.length}:`);
       console.log(`   Código: ${product.productCode}`);
@@ -823,12 +816,16 @@ async function importProductsToDatabase(products) {
         WHERE productcode = ${product.productCode}
       `;
 
-      console.log(`   🔍 Busca no BD: ${existing.length} produtos encontrados com código ${product.productCode}`);
+      console.log(
+        `   🔍 Busca no BD: ${existing.length} produtos encontrados com código ${product.productCode}`
+      );
 
       if (existing.length > 0) {
         // ✅ ATUALIZA produto existente - REMOVE updatedat
-        console.log(`   ⚡ Atualizando produto existente: ID ${existing[0].id}`);
-        
+        console.log(
+          `   ⚡ Atualizando produto existente: ID ${existing[0].id}`
+        );
+
         const updateResult = await sql`
           UPDATE products SET 
             name = ${product.name},
@@ -838,14 +835,19 @@ async function importProductsToDatabase(products) {
           WHERE productcode = ${product.productCode}
           RETURNING id, name, stock, price
         `;
-        
+
         console.log(`   ✅ Produto atualizado:`, updateResult[0]);
         results.updated++;
-        results.details.push(`✅ Atualizado: ${product.productCode} - ${product.name.substring(0, 30)}...`);
+        results.details.push(
+          `✅ Atualizado: ${product.productCode} - ${product.name.substring(
+            0,
+            30
+          )}...`
+        );
       } else {
         // ✅ CRIA novo produto (SEM category, ncm, ipi)
         console.log(`   🆕 Criando novo produto...`);
-        
+
         const newProduct = await sql`
           INSERT INTO products (
             name, productcode, price, stock, brand,
@@ -856,16 +858,25 @@ async function importProductsToDatabase(products) {
           )
           RETURNING id, name, productcode, brand
         `;
-        
+
         console.log(`   ✅ Novo produto criado: ID ${newProduct[0].id}`);
         results.created++;
-        results.details.push(`🆕 Criado: ${product.productCode} - ${product.name.substring(0, 30)}...`);
+        results.details.push(
+          `🆕 Criado: ${product.productCode} - ${product.name.substring(
+            0,
+            30
+          )}...`
+        );
       }
-
     } catch (error) {
-      console.error(`   ❌ ERRO no produto ${product.productCode}:`, error.message);
+      console.error(
+        `   ❌ ERRO no produto ${product.productCode}:`,
+        error.message
+      );
       results.errors++;
-      results.details.push(`❌ Erro: ${product.productCode} - ${error.message}`);
+      results.details.push(
+        `❌ Erro: ${product.productCode} - ${error.message}`
+      );
     }
   }
 
@@ -873,7 +884,11 @@ async function importProductsToDatabase(products) {
   console.log(`   ✅ Criados: ${results.created}`);
   console.log(`   🔄 Atualizados: ${results.updated}`);
   console.log(`   ❌ Erros: ${results.errors}`);
-  console.log(`   📋 Total processado: ${results.created + results.updated + results.errors}`);
+  console.log(
+    `   📋 Total processado: ${
+      results.created + results.updated + results.errors
+    }`
+  );
 
   return results;
 }
