@@ -4,6 +4,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
+    subcode: "", // ✅ NOVO CAMPO: subcode
     price: "",
     brand: "",
     stock: "",
@@ -20,6 +21,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
       setFormData({
         name: product.name || "",
         productcode: product.productcode || "",
+        subcode: product.subcode || "", // ✅ INICIALIZA O SUBCÓDIGO
         price: product.price?.toString() || "",
         brand: product.brand || "",
         stock: product.stock?.toString() || "",
@@ -34,6 +36,8 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!formData.productcode.trim())
       newErrors.productcode = "Código é obrigatório";
+    if (!formData.subcode.trim()) // ✅ VALIDAÇÃO DO SUBCÓDIGO
+      newErrors.subcode = "Subcódigo é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
@@ -57,6 +61,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
       const productData = {
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
+        subcode: formData.subcode.trim(), // ✅ INCLUI SUBCÓDIGO NO PAYLOAD
         price: parseFloat(formData.price),
         brand: formData.brand,
         stock: parseInt(formData.stock),
@@ -121,21 +126,44 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
           )}
         </div>
 
-        <div>
-          <label className="block text-gray-700 mb-2">Código do Produto:</label>
-          <input
-            type="text"
-            name="productcode"
-            value={formData.productcode}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.productcode ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Digite o código do produto"
-          />
-          {errors.productcode && (
-            <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
-          )}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 mb-2">Código do Produto:</label>
+            <input
+              type="text"
+              name="productcode"
+              value={formData.productcode}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.productcode ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="Código do fabricante"
+            />
+            {errors.productcode && (
+              <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-2">Subcódigo *</label>
+            <input
+              type="text"
+              name="subcode"
+              value={formData.subcode}
+              onChange={handleChange}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                errors.subcode ? "border-red-500" : "border-gray-300"
+              }`}
+              placeholder="Código interno"
+            />
+            {errors.subcode ? (
+              <p className="text-red-500 text-xs mt-1">{errors.subcode}</p>
+            ) : (
+              <p className="text-gray-500 text-xs mt-1">
+                Código único para identificação interna
+              </p>
+            )}
+          </div>
         </div>
 
         <div>
@@ -224,11 +252,27 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
           </div>
         </div>
 
+        {/* ✅ SEÇÃO DE INFORMAÇÕES IMPORTANTES */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <h4 className="text-sm font-medium text-blue-800">Informações sobre os códigos</h4>
+              <ul className="text-sm text-blue-700 mt-1 space-y-1">
+                <li>• <strong>Código do Produto:</strong> Código do fabricante/fornecedor</li>
+                <li>• <strong>Subcódigo:</strong> Código único interno do seu atacado (obrigatório)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             disabled={isSubmitting}
           >
             Cancelar
@@ -236,9 +280,21 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
           <button
             type="submit"
             disabled={isSubmitting || !brands || brands.length === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
           >
-            {isSubmitting ? "Salvando..." : product ? "Atualizar" : "Adicionar"}
+            {isSubmitting ? (
+              <div className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Salvando...
+              </div>
+            ) : product ? (
+              "Atualizar Produto"
+            ) : (
+              "Adicionar Produto"
+            )}
           </button>
         </div>
       </form>

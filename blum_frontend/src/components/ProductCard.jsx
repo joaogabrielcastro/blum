@@ -1,93 +1,140 @@
+import { useState } from 'react';
+import PriceHistoryModal from './PriceHistoryModal';
+
 const ProductCard = ({ 
   product, 
   onEdit, 
   onDelete, 
   confirmDelete, 
   deleteType, 
+  deleteId, 
   onConfirmDelete, 
   onCancelDelete,
-  userRole // ✅ NOVA PROP PARA PERMISSÕES
+  userRole 
 }) => {
-  const isLowStock = product.stock <= product.minstock;
-  
-  // ✅ VERIFICA SE É ADMIN
-  const isAdmin = userRole === "admin";
+  const [showPriceHistory, setShowPriceHistory] = useState(false);
+
+  // ... resto do código existente ...
 
   return (
-    <div className={`bg-white p-6 rounded-2xl shadow-md border ${isLowStock ? "border-red-500" : "border-gray-200"} flex flex-col h-full`}>
-      <div className="flex justify-between items-start">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2 line-clamp-2">
-          {product.name}
-        </h2>
-        
-        {/* ✅ BOTÕES DE AÇÃO - APENAS ADMIN PODE EDITAR/DELETAR */}
-        {isAdmin && (
-          <div className="flex space-x-2">
+    <>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-200">
+        {/* Cabeçalho do Card */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="font-semibold text-gray-800 truncate pr-2">{product.name}</h3>
+              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2 flex-shrink-0">
+                {product.subcode || 'Sem subcódigo'}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-gray-600 mb-3">
+              <span className="bg-gray-100 px-2 py-1 rounded">Código: {product.productcode}</span>
+              <span className="bg-purple-100 px-2 py-1 rounded">{product.brand}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Informações do Produto */}
+        <div className="space-y-3 mb-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Preço Atual:</span>
+            <span className="text-lg font-bold text-green-600">
+              R$ {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+            </span>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Estoque:</span>
+            <span className={`text-sm font-medium ${
+              product.stock <= (product.minstock || 0) 
+                ? 'text-red-600' 
+                : 'text-gray-700'
+            }`}>
+              {product.stock} unidades
+            </span>
+          </div>
+
+          {product.minstock > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Estoque Mínimo:</span>
+              <span className="text-sm text-orange-600">{product.minstock} unidades</span>
+            </div>
+          )}
+        </div>
+
+        {/* Botões de Ação */}
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+          {/* ✅ NOVO BOTÃO: Histórico de Preços */}
+          <button
+            onClick={() => setShowPriceHistory(true)}
+            className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Histórico
+          </button>
+
+          {/* Botões existentes de Editar e Excluir */}
+          <button
+            onClick={() => onEdit(product)}
+            className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Editar
+          </button>
+
+          {userRole === 'admin' && (
             <button
-              onClick={() => onEdit(product)}
-              className="text-sm text-blue-600 hover:text-blue-800"
-              title="Editar produto"
+              onClick={() => onDelete('product', product.id, product.name)}
+              className="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
             >
-              Editar
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Excluir
             </button>
-            <button
-              onClick={() => onDelete("product", product.id, product.name)}
-              className="text-sm text-red-600 hover:text-red-800"
-              title="Excluir produto"
-            >
-              {confirmDelete === product.name && deleteType === "product" ? "Confirmar" : "Excluir"}
-            </button>
+          )}
+        </div>
+
+        {/* Modal de Confirmação de Exclusão (existente) */}
+        {confirmDelete && deleteType === 'product' && deleteId === product.id && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+              <h3 className="text-lg font-bold text-gray-800 mb-2">Confirmar Exclusão</h3>
+              <p className="text-gray-600 mb-4">
+                Tem certeza que deseja excluir <strong>{confirmDelete}</strong>?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={onCancelDelete}
+                  className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => onConfirmDelete(product.id)}
+                  className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
-      
-      <p className="text-gray-500 text-sm mb-4">
-        Código: {product.productcode}
-      </p>
-      
-      <div className="flex justify-between items-center text-sm mt-auto">
-        <span className="text-blue-600 font-bold text-lg">
-          R$ {(parseFloat(product.price) || 0).toFixed(2)}
-        </span>
-        <span className={`flex items-center gap-2 font-semibold ${isLowStock ? "text-red-500" : "text-gray-600"}`}>
-          {isLowStock && (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          )}
-          Estoque: {product.stock || 0}
-        </span>
-      </div>
-      
-      <p className="text-sm text-gray-500 mt-2">
-        Representada: {product.brand}
-      </p>
-      
-      <p className="text-xs text-gray-400 mt-2">
-        Estoque Mínimo: {product.minstock}
-      </p>
 
-      {/* ✅ CONFIRMAÇÃO DE EXCLUSÃO - APENAS PARA ADMIN */}
-      {isAdmin && confirmDelete === product.name && deleteType === "product" && (
-        <div className="mt-3 p-2 bg-yellow-100 text-yellow-800 rounded-md text-xs">
-          <p>Clique em "Confirmar" para excluir "{product.name}"</p>
-          <div className="flex space-x-2 mt-2">
-            <button
-              onClick={() => onConfirmDelete(product.id)}
-              className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
-            >
-              Confirmar
-            </button>
-            <button
-              onClick={onCancelDelete}
-              className="bg-gray-500 text-white px-2 py-1 rounded text-xs hover:bg-gray-600"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
+      {/* ✅ MODAL DE HISTÓRICO DE PREÇOS */}
+      {showPriceHistory && (
+        <PriceHistoryModal 
+          product={product} 
+          onClose={() => setShowPriceHistory(false)} 
+        />
       )}
-    </div>
+    </>
   );
 };
 

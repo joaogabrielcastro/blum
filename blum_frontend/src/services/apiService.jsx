@@ -1,3 +1,5 @@
+// services/apiService.js
+
 const API_URL = "http://localhost:3000/api/v1";
 
 const apiService = {
@@ -26,7 +28,7 @@ const apiService = {
     if (!response.ok) throw new Error("Falha ao atualizar cliente.");
     return response.json();
   },
-  
+
   updateOrder: async (orderId, orderData) => {
     const response = await fetch(`${API_URL}/orders/${orderId}`, {
       method: "PUT",
@@ -64,12 +66,14 @@ const apiService = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productData),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.details || errorData.error || "Erro ao atualizar produto.");
+        throw new Error(
+          errorData.details || errorData.error || "Erro ao atualizar produto."
+        );
       }
-      
+
       return response.json();
     } catch (error) {
       console.error("Erro detalhado ao atualizar produto:", error);
@@ -79,24 +83,29 @@ const apiService = {
 
   queryCNPJ: async (cnpj) => {
     try {
-      const cleanCnpj = cnpj.replace(/\D/g, '');
-      
+      const cleanCnpj = cnpj.replace(/\D/g, "");
+
       const response = await fetch(`https://publica.cnpj.ws/cnpj/${cleanCnpj}`);
-      
+
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error("Limite de consultas excedido. Tente novamente mais tarde.");
+          throw new Error(
+            "Limite de consultas excedido. Tente novamente mais tarde."
+          );
         }
         throw new Error("CNPJ não encontrado");
       }
-      
+
       const data = await response.json();
-      
+
       return {
-        nome: data.razao_social || data.estabelecimento?.nome_fantasia || '',
-        telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || '',
-        uf: data.estabelecimento?.estado?.sigla || '',
-        email: data.estabelecimento?.email || '',
+        nome: data.razao_social || data.estabelecimento?.nome_fantasia || "",
+        telefone:
+          data.estabelecimento?.telefone1 ||
+          data.estabelecimento?.telefone2 ||
+          "",
+        uf: data.estabelecimento?.estado?.sigla || "",
+        email: data.estabelecimento?.email || "",
       };
     } catch (error) {
       console.error("Erro na consulta de CNPJ:", error);
@@ -122,20 +131,20 @@ const apiService = {
   deleteClient: async (clientId) => {
     try {
       const response = await fetch(`${API_URL}/clients/${clientId}`, {
-        method: 'DELETE',
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao deletar cliente');
+        throw new Error(errorData.error || "Erro ao deletar cliente");
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Erro ao deletar cliente:', error);
+      console.error("Erro ao deletar cliente:", error);
       throw error;
     }
   },
@@ -184,18 +193,100 @@ const apiService = {
     }
   },
 
+  // ✅ FUNÇÕES DE COMPRAS/IMPORTAÇÃO
   processPurchasePdf: async (formData) => {
     try {
       const response = await fetch(`${API_URL}/purchases/process-pdf`, {
-        method: 'POST',
+        method: "POST",
         body: formData,
       });
       if (!response.ok) {
-        throw new Error('A resposta da rede não foi OK');
+        throw new Error("A resposta da rede não foi OK");
       }
       return await response.json();
     } catch (error) {
-      console.error('Erro ao processar PDF:', error);
+      console.error("Erro ao processar PDF:", error);
+      throw error;
+    }
+  },
+
+  // ✅ NOVA FUNÇÃO: Processar CSV de compra
+  // ✅ CORREÇÃO: Processar CSV de compra
+  processPurchaseCsv: async (formData) => {
+  try {
+    console.log("📤 Enviando arquivo CSV para processamento...");
+    
+    const response = await fetch(`${API_URL}/purchases/process-csv`, {
+      method: "POST",
+      body: formData,
+    });
+
+    console.log("📥 Resposta do servidor:", response.status, response.statusText);
+
+    if (!response.ok) {
+      let errorMessage = `Erro ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        // Se não conseguir parsear JSON, usa a mensagem padrão
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log("✅ CSV processado com sucesso:", data);
+
+    // ✅ GARANTIR que retornamos um array
+    if (!data) {
+      throw new Error("Resposta vazia da API");
+    }
+
+    if (!Array.isArray(data)) {
+      console.error("❌ Resposta não é array:", typeof data, data);
+      throw new Error("Formato de resposta inválido da API");
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error("💥 Erro ao processar CSV:", error);
+    throw new Error(error.message || "Falha ao processar o CSV.");
+  }
+},
+
+
+  // ✅ FUNÇÃO PARA FINALIZAR COMPRA DO CSV
+  finalizePurchaseFromCsv: async (payload) => {
+    try {
+      console.log(
+        "📤 [CSV] Enviando dados para finalizar importação:",
+        payload
+      );
+
+      const response = await fetch(`${API_URL}/purchases/finalize-csv`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("📥 [CSV] Resposta do servidor:", response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("❌ [CSV] Erro da API:", errorData);
+        throw new Error(
+          errorData.error || `Erro ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+      console.log("✅ [CSV] Importação finalizada com sucesso:", data);
+      return data;
+    } catch (error) {
+      console.error("💥 [CSV] Erro ao finalizar importação:", error);
       throw error;
     }
   },
@@ -203,11 +294,11 @@ const apiService = {
   finalizePurchase: async (items) => {
     try {
       console.log("📤 Enviando dados para finalizar compra:", items);
-      
+
       const response = await fetch(`${API_URL}/purchases/finalize`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ items }),
       });
@@ -217,7 +308,9 @@ const apiService = {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("❌ Erro da API:", errorData);
-        throw new Error(errorData.error || `Erro ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.error || `Erro ${response.status}: ${response.statusText}`
+        );
       }
 
       const data = await response.json();
@@ -228,28 +321,52 @@ const apiService = {
       throw error;
     }
   },
-  
+
   finalizePurchaseFromPdf: async (payload) => {
     try {
       const response = await fetch(`${API_URL}/purchases/finalize-pdf`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Erro ${response.status}: ${response.statusText}`);
       }
-      
+
       return await response.json();
     } catch (error) {
-      console.error('Erro no apiService.finalizePurchaseFromPdf:', error);
+      console.error("Erro no apiService.finalizePurchaseFromPdf:", error);
       throw error;
     }
   },
 
+  // ✅ NOVA FUNÇÃO: Finalizar compra do CSV
+  finalizePurchaseFromCsv: async (payload) => {
+    try {
+      const response = await fetch(`${API_URL}/purchases/finalize-csv`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || `Erro ${response.status}: ${response.statusText}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Erro no apiService.finalizePurchaseFromCsv:", error);
+      throw error;
+    }
+  },
 
   getSalesByRep: async () => {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
@@ -299,27 +416,37 @@ const apiService = {
     return response.json();
   },
 
-  // ✅ FUNÇÃO IMPORT CSV CORRIGIDA - DENTRO DO OBJETO
-importCsv: async (formData) => {
+  // ✅ FUNÇÃO IMPORT CSV
+  importCsv: async (formData) => {
     try {
+      console.log("📤 Usando endpoint de importação CSV...");
+
       const response = await fetch(`${API_URL}/purchases/import-csv`, {
-        method: 'POST',
-        body: formData, // ✅ Já inclui brandId no formData
+        method: "POST",
+        body: formData,
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao importar CSV");
       }
-      
-      return await response.json();
+
+      const data = await response.json();
+      console.log("✅ CSV importado com sucesso:", data);
+
+      // ✅ Mesma lógica de normalização
+      if (Array.isArray(data)) return data;
+      if (data.items && Array.isArray(data.items)) return data.items;
+      if (data.data && Array.isArray(data.data)) return data.data;
+      if (typeof data === "object") return [data];
+
+      throw new Error("Formato de resposta inválido do endpoint de importação");
     } catch (error) {
-      console.error('Erro no apiService.importCsv:', error);
+      console.error("💥 Erro no apiService.importCsv:", error);
       throw error;
     }
   },
 
-
-  // ✅ ADICIONE AS OUTRAS FUNÇÕES COMO MÉTODOS DO OBJETO
   getClientById: async (clientId) => {
     try {
       const response = await fetch(`${API_URL}/clients/${clientId}`);
@@ -336,11 +463,14 @@ importCsv: async (formData) => {
 
   updateBrand: async (oldName, brandData) => {
     try {
-      const response = await fetch(`${API_URL}/brands/${encodeURIComponent(oldName)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(brandData),
-      });
+      const response = await fetch(
+        `${API_URL}/brands/${encodeURIComponent(oldName)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(brandData),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Erro ao atualizar marca");
@@ -366,13 +496,43 @@ importCsv: async (formData) => {
     }
   },
 
+  // ✅ HISTÓRICO DE PREÇOS
+  getPriceHistory: async (productId) => {
+    const response = await fetch(
+      `${API_URL}/purchases/price-history/${productId}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Erro ao buscar histórico de preços");
+    }
+
+    return response.json();
+  },
+
+  // ✅ ÚLTIMO PREÇO DE COMPRA
+  getLastPurchasePrice: async (productId) => {
+    const response = await fetch(
+      `${API_URL}/purchases/last-price/${productId}`
+    );
+
+    if (!response.ok) {
+      // Se não encontrar histórico, não é erro - retorna null
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error("Erro ao buscar último preço");
+    }
+
+    return response.json();
+  },
+
   getOrdersBySeller: async (userId, params = {}) => {
-  const queryString = new URLSearchParams(params).toString();
-  const url = `${API_URL}/orders/seller/${userId}?${queryString}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error("Erro ao buscar pedidos do vendedor.");
-  return response.json();
-},
+    const queryString = new URLSearchParams(params).toString();
+    const url = `${API_URL}/orders/seller/${userId}?${queryString}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Erro ao buscar pedidos do vendedor.");
+    return response.json();
+  },
 
   getClientOrders: async (clientId) => {
     try {
@@ -400,7 +560,7 @@ importCsv: async (formData) => {
       console.error("Erro ao buscar pedidos do cliente:", error);
       throw error;
     }
-  }
+  },
 };
 
 export default apiService;

@@ -404,16 +404,44 @@ Retorne APENAS o array JSON válido, sem markdown, sem texto adicional, sem expl
 };
 
 // ✅ CONTROLLER PARA FINALIZAR COMPRA
-exports.finalizePurchase = async (req, res) => {
-  const { items } = req.body;
+exports.finalizePurchaseFromCsv = async (req, res) => {
+  const { brandId, purchaseDate, items } = req.body;
 
-  console.log(
-    "📦 Dados recebidos para finalizar compra:",
-    JSON.stringify(items, null, 2)
-  );
+  console.log("📦 [CSV] Dados recebidos para finalizar compra:");
+  console.log("🏷️ Brand ID:", brandId);
+  console.log("📅 Data da compra:", purchaseDate);
+  console.log("📋 Items recebidos:", JSON.stringify(items, null, 2));
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Nenhum item válido foi recebido." });
+  }
+
+  // ✅ VALIDAÇÃO DA MARCA
+  if (!brandId) {
+    return res.status(400).json({ error: "ID da marca é obrigatório." });
+  }
+
+  // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
+  const missingSubcodes = items.filter(
+    (item) => !item.subcode || item.subcode.trim() === ""
+  );
+  if (missingSubcodes.length > 0) {
+    return res.status(400).json({
+      error: "Subcódigo é obrigatório para todos os produtos.",
+      details: `${missingSubcodes.length} itens sem subcódigo`,
+    });
+  }
+
+  // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
+  const subcodes = items.map((item) => item.subcode.trim());
+  const duplicateSubcodes = subcodes.filter(
+    (code, index) => subcodes.indexOf(code) !== index
+  );
+  if (duplicateSubcodes.length > 0) {
+    return res.status(400).json({
+      error: "Subcódigos duplicados encontrados.",
+      details: `Códigos repetidos: ${duplicateSubcodes.join(", ")}`,
+    });
   }
 
   try {
@@ -421,133 +449,231 @@ exports.finalizePurchase = async (req, res) => {
       updated: 0,
       created: 0,
       newProducts: [],
+      errors: [],
     };
 
-    // ✅ IMPLEMENTAÇÃO MANUAL DA TRANSAÇÃO
+    // ✅ CONVERSÃO SEGURA DO BRAND ID
+    const brandIdInt = parseInt(brandId, 10);
+    if (isNaN(brandIdInt)) {
+      return res.status(400).json({
+        error: "ID da marca inválido.",
+        details: `Não foi possível converter '${brandId}' para número`,
+      });
+    }
+
+    console.log(`🏷️ [CSV] Brand ID convertido: ${brandIdInt}`);
+
+    // ✅ BUSCA A MARCA NO BANCO
+    const brandResult = await sql`
+      SELECT id, name FROM brands WHERE id = ${brandIdInt}
+    `;
+
+    if (brandResult.length === 0) {
+      return res.status(400).json({
+        error: "Marca não encontrada.",
+        details: `ID: ${brandIdInt}`,
+      });
+    }
+
+    const brandName = brandResult[0].name;
+    console.log(`🏷️ [CSV] Usando marca: ${brandName}`);
+
+    // ✅ VERIFICAR SUBCÓDIGOS EXISTENTES ANTES DE PROCESSAR
     for (const item of items) {
-      console.log("🔍 Processando item:", item);
+      const subcode = item.subcode.trim();
 
-      // Validações básicas
-      if (!item.quantity || item.unitPrice == null) {
-        throw new Error(
-          `Item inválido - quantidade ou preço faltando: ${JSON.stringify(
-            item
-          )}`
-        );
+      // Verifica se o subcódigo já existe em outro produto
+      const existingSubcode = await sql`
+        SELECT id, name FROM products 
+        WHERE subcode = ${subcode} 
+        AND id != COALESCE(${item.mappedProductId || 0}, 0)
+      `;
+
+      if (existingSubcode.length > 0) {
+        return res.status(400).json({
+          error: `Subcódigo "${subcode}" já está em uso.`,
+          details: `Usado pelo produto: ${existingSubcode[0].name}`,
+        });
       }
+    }
 
-      const quantity = parseInt(item.quantity, 10);
-      const price = parseFloat(item.unitPrice);
+    // ✅ PROCESSAR CADA ITEM
+    for (const item of items) {
+      console.log("🔍 [CSV] Processando item:", item);
 
-      if (isNaN(quantity) || isNaN(price)) {
-        throw new Error(`Dados numéricos inválidos: ${JSON.stringify(item)}`);
-      }
-
-      // ✅ ATUALIZAR PRODUTO EXISTENTE
-      if (item.mappedProductId && item.mappedProductId !== "") {
-        const productId = parseInt(item.mappedProductId, 10);
-
-        if (isNaN(productId)) {
-          throw new Error(`ID do produto inválido: ${JSON.stringify(item)}`);
+      try {
+        // Validações básicas
+        if (!item.quantity || item.unitPrice == null) {
+          throw new Error("Item sem quantidade ou preço");
         }
 
-        // Verifica se o produto existe antes de atualizar
-        const existingProduct = await sql`
-          SELECT id FROM products WHERE id = ${productId}
-        `;
+        const quantity = parseInt(item.quantity, 10);
+        const price = parseFloat(item.unitPrice);
+        const subcode = item.subcode.trim();
 
-        if (existingProduct.length === 0) {
-          throw new Error(`Produto não encontrado com ID: ${productId}`);
+        if (isNaN(quantity) || quantity <= 0) {
+          throw new Error(`Quantidade inválida: ${item.quantity}`);
         }
 
-        await sql`
-          UPDATE products 
-          SET stock = stock + ${quantity}, price = ${price}
-          WHERE id = ${productId}
-        `;
+        if (isNaN(price) || price < 0) {
+          throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
+        }
 
-        console.log(`✅ Produto existente atualizado: ID ${productId}`);
-        results.updated++;
-      }
-      // ✅ CRIAR NOVO PRODUTO
-      else if (item.productCode && item.description) {
-        console.log(
-          `🆕 Criando novo produto: ${item.productCode} - ${item.description}`
-        );
+        // ✅ ATUALIZAR PRODUTO EXISTENTE (quando usuário mapeou)
+        if (item.mappedProductId && item.mappedProductId !== "") {
+          const productId = parseInt(item.mappedProductId, 10);
 
-        // Extrai a marca da descrição
-        const brand = extractBrandFromDescription(item.description);
+          if (isNaN(productId)) {
+            throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+          }
 
-        // Verifica se já existe um produto com esse código
-        const existingWithCode = await sql`
-          SELECT id FROM products WHERE productcode = ${item.productCode}
-        `;
+          // Verifica se o produto existe antes de atualizar
+          const existingProduct = await sql`
+            SELECT id, name, price as current_price FROM products WHERE id = ${productId}
+          `;
 
-        if (existingWithCode.length > 0) {
-          // Se já existe, atualiza em vez de criar
+          if (existingProduct.length === 0) {
+            throw new Error(`Produto não encontrado com ID: ${productId}`);
+          }
+
+          const currentPrice = existingProduct[0].current_price;
+
+          // Atualiza produto existente com NOVO subcódigo
           await sql`
             UPDATE products 
-            SET stock = stock + ${quantity}, price = ${price}
-            WHERE productcode = ${item.productCode}
-          `;
-          console.log(
-            `✅ Produto existente atualizado pelo código: ${item.productCode}`
-          );
-          results.updated++;
-        } else {
-          // Cria novo produto
-          const newProduct = await sql`
-            INSERT INTO products (
-              name, 
-              productcode, 
-              price, 
-              stock, 
-              brand,
-              minstock,
-              createdat
-            ) VALUES (
-              ${item.description},
-              ${item.productCode},
-              ${price},
-              ${quantity},
-              ${brand},
-              0,
-              NOW()
-            )
-            RETURNING id, name, productcode, brand
+            SET stock = stock + ${quantity}, 
+                price = ${price},
+                subcode = ${subcode}
+            WHERE id = ${productId}
           `;
 
-          console.log(`✅ Novo produto criado: ID ${newProduct[0].id}`);
-          results.created++;
-          results.newProducts.push({
-            id: newProduct[0].id,
-            name: newProduct[0].name,
-            productcode: newProduct[0].productcode,
-            brand: newProduct[0].brand,
-          });
+          // ✅ REGISTRA NO HISTÓRICO DE PREÇOS (só se o preço mudou)
+          if (currentPrice !== price) {
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${productId}, ${price}, ${quantity}, ${
+              purchaseDate || new Date().toISOString()
+            })
+            `;
+            console.log(
+              `📊 Histórico de preço atualizado para produto ID ${productId}`
+            );
+          }
+
+          console.log(`✅ [CSV] Produto existente atualizado: ID ${productId}`);
+          results.updated++;
         }
-      } else {
-        throw new Error(`Item sem dados suficientes: ${JSON.stringify(item)}`);
+        // ✅ CRIAR NOVO PRODUTO A PARTIR DO CSV
+        else if (item.productCode && item.description) {
+          console.log(
+            `🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`
+          );
+
+          // Verifica se já existe um produto com esse código
+          const existingWithCode = await sql`
+            SELECT id FROM products WHERE productcode = ${item.productCode}
+          `;
+
+          if (existingWithCode.length > 0) {
+            // Se já existe, atualiza em vez de criar
+            await sql`
+              UPDATE products 
+              SET stock = stock + ${quantity}, 
+                  price = ${price},
+                  subcode = ${subcode}
+              WHERE productcode = ${item.productCode}
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${existingWithCode[0].id}, ${price}, ${quantity}, ${
+              purchaseDate || new Date().toISOString()
+            })
+            `;
+
+            console.log(
+              `✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`
+            );
+            results.updated++;
+          } else {
+            // ✅ CRIA NOVO PRODUTO COM A MARCA SELECIONADA E SUBCODE
+            const newProduct = await sql`
+              INSERT INTO products (
+                name, 
+                productcode, 
+                subcode,
+                price, 
+                stock, 
+                brand,
+                minstock,
+                createdat
+              ) VALUES (
+                ${item.description},
+                ${item.productCode},
+                ${subcode},
+                ${price},
+                ${quantity},
+                ${brandName},
+                0,
+                NOW()
+              )
+              RETURNING id, name, productcode, brand, subcode
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
+              purchaseDate || new Date().toISOString()
+            })
+            `;
+
+            console.log(`✅ [CSV] Novo produto criado: ID ${newProduct[0].id}`);
+            results.created++;
+            results.newProducts.push({
+              id: newProduct[0].id,
+              name: newProduct[0].name,
+              productcode: newProduct[0].productcode,
+              brand: newProduct[0].brand,
+              subcode: newProduct[0].subcode,
+            });
+          }
+        } else {
+          throw new Error("Item sem código de produto ou descrição");
+        }
+      } catch (error) {
+        console.error(
+          `❌ [CSV] Erro no item ${item.productCode}:`,
+          error.message
+        );
+        results.errors.push({
+          productCode: item.productCode,
+          description: item.description,
+          error: error.message,
+        });
       }
     }
 
     console.log(
-      `📊 Resultado final: ${results.updated} atualizados, ${results.created} criados`
+      `📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
     );
 
     res.status(200).json({
-      message: `Compra processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados.`,
+      message: `Importação CSV processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados na marca ${brandName}.`,
       type: "success",
       results: results,
+      brandUsed: brandName,
     });
   } catch (error) {
-    console.error("💥 ERRO ao finalizar compra:", error.message);
+    console.error("💥 [CSV] ERRO ao finalizar compra:", error.message);
     console.error("Stack trace:", error.stack);
 
     res.status(500).json({
-      error: "Falha ao processar compra.",
+      error: "Falha ao processar importação do CSV.",
       details: error.message,
-      suggestion: "Verifique os logs do servidor para mais detalhes.",
+      suggestion:
+        "Verifique se todos os campos estão preenchidos corretamente.",
     });
   }
 };
@@ -807,7 +933,15 @@ async function importProductsToDatabase(products) {
     try {
       console.log(`\n📦 Processando produto ${i + 1}/${products.length}:`);
       console.log(`   Código: ${product.productCode}`);
+      console.log(`   Subcódigo: ${product.subcode || "Não informado"}`);
       console.log(`   Nome: ${product.name.substring(0, 50)}...`);
+
+      // ✅ GERAR SUBCÓDIGO AUTOMÁTICO SE NÃO INFORMADO
+      let subcode = product.subcode;
+      if (!subcode) {
+        subcode = `CSV-${product.productCode}-${Date.now().toString(36)}`;
+        console.log(`   🆔 Subcódigo auto-gerado: ${subcode}`);
+      }
 
       // Verifica se produto já existe
       const existing = await sql`
@@ -816,24 +950,17 @@ async function importProductsToDatabase(products) {
         WHERE productcode = ${product.productCode}
       `;
 
-      console.log(
-        `   🔍 Busca no BD: ${existing.length} produtos encontrados com código ${product.productCode}`
-      );
-
       if (existing.length > 0) {
-        // ✅ ATUALIZA produto existente - REMOVE updatedat
-        console.log(
-          `   ⚡ Atualizando produto existente: ID ${existing[0].id}`
-        );
-
+        // ✅ ATUALIZA produto existente COM SUBCODE
         const updateResult = await sql`
           UPDATE products SET 
             name = ${product.name},
             price = ${product.price},
             stock = stock + ${product.stock},
-            brand = ${product.brand}
+            brand = ${product.brand},
+            subcode = ${subcode}
           WHERE productcode = ${product.productCode}
-          RETURNING id, name, stock, price
+          RETURNING id, name, stock, price, subcode
         `;
 
         console.log(`   ✅ Produto atualizado:`, updateResult[0]);
@@ -845,18 +972,16 @@ async function importProductsToDatabase(products) {
           )}...`
         );
       } else {
-        // ✅ CRIA novo produto (SEM category, ncm, ipi)
-        console.log(`   🆕 Criando novo produto...`);
-
+        // ✅ CRIA novo produto COM SUBCODE
         const newProduct = await sql`
           INSERT INTO products (
-            name, productcode, price, stock, brand,
+            name, productcode, subcode, price, stock, brand,
             minstock, createdat
           ) VALUES (
-            ${product.name}, ${product.productCode}, ${product.price}, 
+            ${product.name}, ${product.productCode}, ${subcode}, ${product.price}, 
             ${product.stock}, ${product.brand}, 0, NOW()
           )
-          RETURNING id, name, productcode, brand
+          RETURNING id, name, productcode, brand, subcode
         `;
 
         console.log(`   ✅ Novo produto criado: ID ${newProduct[0].id}`);
@@ -884,11 +1009,6 @@ async function importProductsToDatabase(products) {
   console.log(`   ✅ Criados: ${results.created}`);
   console.log(`   🔄 Atualizados: ${results.updated}`);
   console.log(`   ❌ Erros: ${results.errors}`);
-  console.log(
-    `   📋 Total processado: ${
-      results.created + results.updated + results.errors
-    }`
-  );
 
   return results;
 }
@@ -898,6 +1018,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
 
   console.log("📦 [PDF] Dados recebidos para finalizar compra:");
   console.log("🏷️ Brand ID:", brandId, "Tipo:", typeof brandId);
+  console.log("📋 Items recebidos:", JSON.stringify(items, null, 2));
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Nenhum item válido foi recebido." });
@@ -908,11 +1029,35 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     return res.status(400).json({ error: "ID da marca é obrigatório." });
   }
 
+  // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
+  const missingSubcodes = items.filter(
+    (item) => !item.subcode || item.subcode.trim() === ""
+  );
+  if (missingSubcodes.length > 0) {
+    return res.status(400).json({
+      error: "Subcódigo é obrigatório para todos os produtos.",
+      details: `${missingSubcodes.length} itens sem subcódigo`,
+    });
+  }
+
+  // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
+  const subcodes = items.map((item) => item.subcode.trim());
+  const duplicateSubcodes = subcodes.filter(
+    (code, index) => subcodes.indexOf(code) !== index
+  );
+  if (duplicateSubcodes.length > 0) {
+    return res.status(400).json({
+      error: "Subcódigos duplicados encontrados.",
+      details: `Códigos repetidos: ${duplicateSubcodes.join(", ")}`,
+    });
+  }
+
   try {
     const results = {
       updated: 0,
       created: 0,
       newProducts: [],
+      errors: [],
     };
 
     // ✅ CONVERSÃO SEGURA DO BRAND ID
@@ -928,7 +1073,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
       `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`
     );
 
-    // ✅ BUSCA A MARCA NO BANCO - SEM COMENTÁRIOS SQL
+    // ✅ BUSCA A MARCA NO BANCO
     const brandResult = await sql`
       SELECT id, name FROM brands WHERE id = ${brandIdInt}
     `;
@@ -943,123 +1088,179 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     const brandName = brandResult[0].name;
     console.log(`🏷️ [PDF] Usando marca: ${brandName} (ID: ${brandIdInt})`);
 
-    // ✅ IMPLEMENTAÇÃO PARA PDF COM VALIDAÇÕES
+    // ✅ VERIFICAR SUBCÓDIGOS EXISTENTES ANTES DE PROCESSAR
+    for (const item of items) {
+      const subcode = item.subcode.trim();
+
+      // Verifica se o subcódigo já existe em outro produto
+      const existingSubcode = await sql`
+        SELECT id, name FROM products 
+        WHERE subcode = ${subcode} 
+        AND id != COALESCE(${item.mappedProductId || 0}, 0)
+      `;
+
+      if (existingSubcode.length > 0) {
+        return res.status(400).json({
+          error: `Subcódigo "${subcode}" já está em uso.`,
+          details: `Usado pelo produto: ${existingSubcode[0].name}`,
+        });
+      }
+    }
+
+    // ✅ PROCESSAR CADA ITEM
     for (const item of items) {
       console.log("🔍 [PDF] Processando item:", item);
 
-      // Validações básicas
-      if (!item.quantity || item.unitPrice == null) {
-        console.error("❌ Item sem quantidade ou preço:", item);
-        throw new Error(
-          `Item inválido - quantidade ou preço faltando: ${JSON.stringify(
-            item
-          )}`
-        );
-      }
-
-      const quantity = parseInt(item.quantity, 10);
-      const price = parseFloat(item.unitPrice);
-
-      if (isNaN(quantity) || quantity <= 0) {
-        console.error("❌ Quantidade inválida:", item.quantity);
-        throw new Error(`Quantidade inválida: ${item.quantity}`);
-      }
-
-      if (isNaN(price) || price < 0) {
-        console.error("❌ Preço inválido:", item.unitPrice);
-        throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
-      }
-
-      // ✅ ATUALIZAR PRODUTO EXISTENTE (quando usuário mapeou)
-      if (item.mappedProductId && item.mappedProductId !== "") {
-        const productId = parseInt(item.mappedProductId, 10);
-
-        if (isNaN(productId)) {
-          console.error("❌ ID do produto inválido:", item.mappedProductId);
-          throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+      try {
+        // Validações básicas
+        if (!item.quantity || item.unitPrice == null) {
+          throw new Error("Item sem quantidade ou preço");
         }
 
-        // Verifica se o produto existe antes de atualizar - SEM COMENTÁRIOS SQL
-        const existingProduct = await sql`
-          SELECT id FROM products WHERE id = ${productId}
-        `;
+        const quantity = parseInt(item.quantity, 10);
+        const price = parseFloat(item.unitPrice);
+        const subcode = item.subcode.trim();
 
-        if (existingProduct.length === 0) {
-          throw new Error(`Produto não encontrado com ID: ${productId}`);
+        if (isNaN(quantity) || quantity <= 0) {
+          throw new Error(`Quantidade inválida: ${item.quantity}`);
         }
 
-        // Atualiza produto existente - SEM COMENTÁRIOS SQL
-        await sql`
-          UPDATE products 
-          SET stock = stock + ${quantity}, price = ${price}
-          WHERE id = ${productId}
-        `;
+        if (isNaN(price) || price < 0) {
+          throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
+        }
 
-        console.log(`✅ [PDF] Produto existente atualizado: ID ${productId}`);
-        results.updated++;
-      }
-      // ✅ CRIAR NOVO PRODUTO A PARTIR DO PDF
-      else if (item.productCode && item.description) {
-        console.log(
-          `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`
-        );
+        // ✅ ATUALIZAR PRODUTO EXISTENTE (quando usuário mapeou)
+        if (item.mappedProductId && item.mappedProductId !== "") {
+          const productId = parseInt(item.mappedProductId, 10);
 
-        // Verifica se já existe um produto com esse código - SEM COMENTÁRIOS SQL
-        const existingWithCode = await sql`
-          SELECT id FROM products WHERE productcode = ${item.productCode}
-        `;
+          if (isNaN(productId)) {
+            throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+          }
 
-        if (existingWithCode.length > 0) {
-          // Se já existe, atualiza em vez de criar - SEM COMENTÁRIOS SQL
+          // Verifica se o produto existe antes de atualizar
+          const existingProduct = await sql`
+            SELECT id, name, price as current_price FROM products WHERE id = ${productId}
+          `;
+
+          if (existingProduct.length === 0) {
+            throw new Error(`Produto não encontrado com ID: ${productId}`);
+          }
+
+          const currentPrice = existingProduct[0].current_price;
+
+          // Atualiza produto existente com NOVO subcódigo
           await sql`
             UPDATE products 
-            SET stock = stock + ${quantity}, price = ${price}
-            WHERE productcode = ${item.productCode}
-          `;
-          console.log(
-            `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`
-          );
-          results.updated++;
-        } else {
-          // ✅ CRIA NOVO PRODUTO COM A MARCA SELECIONADA - SEM COMENTÁRIOS SQL
-          const newProduct = await sql`
-            INSERT INTO products (
-              name, 
-              productcode, 
-              price, 
-              stock, 
-              brand,
-              minstock,
-              createdat
-            ) VALUES (
-              ${item.description},
-              ${item.productCode},
-              ${price},
-              ${quantity},
-              ${brandName},
-              0,
-              NOW()
-            )
-            RETURNING id, name, productcode, brand
+            SET stock = stock + ${quantity}, 
+                price = ${price},
+                subcode = ${subcode}
+            WHERE id = ${productId}
           `;
 
-          console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
-          results.created++;
-          results.newProducts.push({
-            id: newProduct[0].id,
-            name: newProduct[0].name,
-            productcode: newProduct[0].productcode,
-            brand: newProduct[0].brand,
-          });
+          // ✅ REGISTRA NO HISTÓRICO DE PREÇOS (só se o preço mudou)
+          if (currentPrice !== price) {
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity)
+              VALUES (${productId}, ${price}, ${quantity})
+            `;
+            console.log(
+              `📊 Histórico de preço atualizado para produto ID ${productId}`
+            );
+          }
+
+          console.log(`✅ [PDF] Produto existente atualizado: ID ${productId}`);
+          results.updated++;
         }
-      } else {
-        console.error("❌ Item sem dados suficientes:", item);
-        throw new Error(`Item sem dados suficientes: ${JSON.stringify(item)}`);
+        // ✅ CRIAR NOVO PRODUTO A PARTIR DO PDF
+        else if (item.productCode && item.description) {
+          console.log(
+            `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`
+          );
+
+          // Verifica se já existe um produto com esse código
+          const existingWithCode = await sql`
+            SELECT id FROM products WHERE productcode = ${item.productCode}
+          `;
+
+          if (existingWithCode.length > 0) {
+            // Se já existe, atualiza em vez de criar
+            await sql`
+              UPDATE products 
+              SET stock = stock + ${quantity}, 
+                  price = ${price},
+                  subcode = ${subcode}
+              WHERE productcode = ${item.productCode}
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity)
+              VALUES (${existingWithCode[0].id}, ${price}, ${quantity})
+            `;
+
+            console.log(
+              `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`
+            );
+            results.updated++;
+          } else {
+            // ✅ CRIA NOVO PRODUTO COM A MARCA SELECIONADA E SUBCODE
+            const newProduct = await sql`
+              INSERT INTO products (
+                name, 
+                productcode, 
+                subcode,
+                price, 
+                stock, 
+                brand,
+                minstock,
+                createdat
+              ) VALUES (
+                ${item.description},
+                ${item.productCode},
+                ${subcode},
+                ${price},
+                ${quantity},
+                ${brandName},
+                0,
+                NOW()
+              )
+              RETURNING id, name, productcode, brand, subcode
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity)
+              VALUES (${newProduct[0].id}, ${price}, ${quantity})
+            `;
+
+            console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
+            results.created++;
+            results.newProducts.push({
+              id: newProduct[0].id,
+              name: newProduct[0].name,
+              productcode: newProduct[0].productcode,
+              brand: newProduct[0].brand,
+              subcode: newProduct[0].subcode,
+            });
+          }
+        } else {
+          throw new Error("Item sem código de produto ou descrição");
+        }
+      } catch (error) {
+        console.error(
+          `❌ [PDF] Erro no item ${item.productCode}:`,
+          error.message
+        );
+        results.errors.push({
+          productCode: item.productCode,
+          description: item.description,
+          error: error.message,
+        });
       }
     }
 
     console.log(
-      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados`
+      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
     );
 
     res.status(200).json({
@@ -1080,7 +1281,394 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     });
   }
 };
+// ✅ NOVO ENDPOINT: PROCESSAR CSV E RETORNAR ITENS (NÃO IMPORTA AINDA)
+exports.processCsv = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo CSV enviado." });
+    }
 
+    // Converte buffer para string
+    const csvText = req.file.buffer.toString("utf8");
+
+    // Tenta extrair produtos do CSV (não realiza importação)
+    const products = await processCsvData(csvText, "");
+
+    // Normaliza para o formato esperado pelo frontend (productCode, description, quantity, unitPrice, subcode)
+    const parsed = products.map((p) => ({
+      productCode: p.productCode || "",
+      description: p.name || "",
+      quantity: Number(p.stock || 0),
+      unitPrice: Number(p.price || 0),
+      subcode: p.subcode || "",
+    }));
+
+    return res.status(200).json(parsed);
+  } catch (error) {
+    console.error("💥 ERRO ao processar CSV (preview):", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+exports.getPriceHistory = async (req, res) => {
+  const { productId } = req.params;
+
+  try {
+    console.log(
+      `📊 Buscando histórico de preços para produto ID: ${productId}`
+    );
+
+    const history = await sql`
+      SELECT 
+        ph.id,
+        ph.purchase_price,
+        ph.quantity,
+        ph.purchase_date,
+        ph.created_at,
+        p.name as product_name,
+        p.productcode,
+        p.subcode
+      FROM price_history ph
+      JOIN products p ON ph.product_id = p.id
+      WHERE ph.product_id = ${parseInt(productId, 10)}
+      ORDER BY ph.purchase_date DESC
+    `;
+
+    console.log(`✅ Histórico encontrado: ${history.length} registros`);
+
+    res.status(200).json(history);
+  } catch (error) {
+    console.error("💥 ERRO ao buscar histórico de preços:", error.message);
+    res.status(500).json({
+      error: "Erro ao buscar histórico de preços.",
+      details: error.message,
+    });
+  }
+};
+
+// ✅ CONTROLLER PARA OBTER ÚLTIMO PREÇO DE COMPRA
+exports.getLastPurchasePrice = async (req, res) => {
+  const { productId } = req.params;
+
+  try {
+    console.log(
+      `💰 Buscando último preço de compra para produto ID: ${productId}`
+    );
+
+    const lastPurchase = await sql`
+      SELECT 
+        purchase_price,
+        purchase_date,
+        quantity
+      FROM price_history 
+      WHERE product_id = ${parseInt(productId, 10)}
+      ORDER BY purchase_date DESC 
+      LIMIT 1
+    `;
+
+    if (lastPurchase.length === 0) {
+      return res.status(404).json({
+        message: "Nenhum histórico de compra encontrado para este produto.",
+      });
+    }
+
+    console.log(`✅ Último preço: R$ ${lastPurchase[0].purchase_price}`);
+
+    res.status(200).json(lastPurchase[0]);
+  } catch (error) {
+    console.error("💥 ERRO ao buscar último preço:", error.message);
+    res.status(500).json({
+      error: "Erro ao buscar último preço de compra.",
+      details: error.message,
+    });
+  }
+};
+
+// ✅ CONTROLLER PARA FINALIZAR COMPRA DE CSV - NOVO
+exports.finalizePurchaseFromCsv = async (req, res) => {
+  const { brandId, purchaseDate, items } = req.body;
+
+  console.log("📦 [CSV] Dados recebidos para finalizar compra:");
+  console.log("🏷️ Brand ID:", brandId);
+  console.log("📅 Data da compra:", purchaseDate);
+  console.log("📋 Items recebidos:", JSON.stringify(items, null, 2));
+
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Nenhum item válido foi recebido." });
+  }
+
+  // ✅ VALIDAÇÃO DA MARCA
+  if (!brandId) {
+    return res.status(400).json({ error: "ID da marca é obrigatório." });
+  }
+
+  // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
+  const missingSubcodes = items.filter(item => !item.subcode || item.subcode.trim() === '');
+  if (missingSubcodes.length > 0) {
+    return res.status(400).json({ 
+      error: "Subcódigo é obrigatório para todos os produtos.",
+      details: `${missingSubcodes.length} itens sem subcódigo`
+    });
+  }
+
+  // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
+  const subcodes = items.map(item => item.subcode.trim());
+  const duplicateSubcodes = subcodes.filter((code, index) => subcodes.indexOf(code) !== index);
+  if (duplicateSubcodes.length > 0) {
+    return res.status(400).json({ 
+      error: "Subcódigos duplicados encontrados.",
+      details: `Códigos repetidos: ${duplicateSubcodes.join(', ')}`
+    });
+  }
+
+  try {
+    const results = {
+      updated: 0,
+      created: 0,
+      newProducts: [],
+      errors: []
+    };
+
+    // ✅ CONVERSÃO SEGURA DO BRAND ID
+    const brandIdInt = parseInt(brandId, 10);
+    if (isNaN(brandIdInt)) {
+      return res.status(400).json({
+        error: "ID da marca inválido.",
+        details: `Não foi possível converter '${brandId}' para número`,
+      });
+    }
+
+    console.log(`🏷️ [CSV] Brand ID convertido: ${brandIdInt}`);
+
+    // ✅ BUSCA A MARCA NO BANCO
+    const brandResult = await sql`
+      SELECT id, name FROM brands WHERE id = ${brandIdInt}
+    `;
+
+    if (brandResult.length === 0) {
+      return res.status(400).json({
+        error: "Marca não encontrada.",
+        details: `ID: ${brandIdInt}`,
+      });
+    }
+
+    const brandName = brandResult[0].name;
+    console.log(`🏷️ [CSV] Usando marca: ${brandName}`);
+
+    // ✅ VERIFICAR SUBCÓDIGOS EXISTENTES ANTES DE PROCESSAR
+    for (const item of items) {
+      const subcode = item.subcode.trim();
+      
+      // Verifica se o subcódigo já existe em outro produto
+      const existingSubcode = await sql`
+        SELECT id, name FROM products 
+        WHERE subcode = ${subcode} 
+        AND id != COALESCE(${item.mappedProductId || 0}, 0)
+      `;
+
+      if (existingSubcode.length > 0) {
+        return res.status(400).json({ 
+          error: `Subcódigo "${subcode}" já está em uso.`,
+          details: `Usado pelo produto: ${existingSubcode[0].name}`
+        });
+      }
+    }
+
+    // ✅ PROCESSAR CADA ITEM
+    for (const item of items) {
+      console.log("🔍 [CSV] Processando item:", item);
+
+      try {
+        // Validações básicas
+        if (!item.quantity || item.unitPrice == null) {
+          throw new Error("Item sem quantidade ou preço");
+        }
+
+        const quantity = parseInt(item.quantity, 10);
+        const price = parseFloat(item.unitPrice);
+        const subcode = item.subcode.trim();
+
+        if (isNaN(quantity) || quantity <= 0) {
+          throw new Error(`Quantidade inválida: ${item.quantity}`);
+        }
+
+        if (isNaN(price) || price < 0) {
+          throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
+        }
+
+        // ✅ ATUALIZAR PRODUTO EXISTENTE (quando usuário mapeou)
+        if (item.mappedProductId && item.mappedProductId !== "") {
+          const productId = parseInt(item.mappedProductId, 10);
+
+          if (isNaN(productId)) {
+            throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+          }
+
+          // Verifica se o produto existe antes de atualizar
+          const existingProduct = await sql`
+            SELECT id, name, price as current_price FROM products WHERE id = ${productId}
+          `;
+
+          if (existingProduct.length === 0) {
+            throw new Error(`Produto não encontrado com ID: ${productId}`);
+          }
+
+          const currentPrice = existingProduct[0].current_price;
+
+          // Atualiza produto existente com NOVO subcódigo
+          await sql`
+            UPDATE products 
+            SET stock = stock + ${quantity}, 
+                price = ${price},
+                subcode = ${subcode}
+            WHERE id = ${productId}
+          `;
+
+          // ✅ REGISTRA NO HISTÓRICO DE PREÇOS (só se o preço mudou)
+          if (currentPrice !== price) {
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${productId}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
+            `;
+            console.log(`📊 Histórico de preço atualizado para produto ID ${productId}`);
+          }
+
+          console.log(`✅ [CSV] Produto existente atualizado: ID ${productId}`);
+          results.updated++;
+        }
+        // ✅ CRIAR NOVO PRODUTO A PARTIR DO CSV
+        else if (item.productCode && item.description) {
+          console.log(`🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`);
+
+          // Verifica se já existe um produto com esse código
+          const existingWithCode = await sql`
+            SELECT id FROM products WHERE productcode = ${item.productCode}
+          `;
+
+          if (existingWithCode.length > 0) {
+            // Se já existe, atualiza em vez de criar
+            await sql`
+              UPDATE products 
+              SET stock = stock + ${quantity}, 
+                  price = ${price},
+                  subcode = ${subcode}
+              WHERE productcode = ${item.productCode}
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${existingWithCode[0].id}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
+            `;
+
+            console.log(`✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`);
+            results.updated++;
+          } else {
+            // ✅ CRIA NOVO PRODUTO COM A MARCA SELECIONADA E SUBCODE
+            const newProduct = await sql`
+              INSERT INTO products (
+                name, 
+                productcode, 
+                subcode,
+                price, 
+                stock, 
+                brand,
+                minstock,
+                createdat
+              ) VALUES (
+                ${item.description},
+                ${item.productCode},
+                ${subcode},
+                ${price},
+                ${quantity},
+                ${brandName},
+                0,
+                NOW()
+              )
+              RETURNING id, name, productcode, brand, subcode
+            `;
+
+            // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
+            await sql`
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
+              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
+            `;
+
+            console.log(`✅ [CSV] Novo produto criado: ID ${newProduct[0].id}`);
+            results.created++;
+            results.newProducts.push({
+              id: newProduct[0].id,
+              name: newProduct[0].name,
+              productcode: newProduct[0].productcode,
+              brand: newProduct[0].brand,
+              subcode: newProduct[0].subcode
+            });
+          }
+        } else {
+          throw new Error("Item sem código de produto ou descrição");
+        }
+      } catch (error) {
+        console.error(`❌ [CSV] Erro no item ${item.productCode}:`, error.message);
+        results.errors.push({
+          productCode: item.productCode,
+          description: item.description,
+          error: error.message
+        });
+      }
+    }
+
+    console.log(`📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`);
+
+    res.status(200).json({
+      message: `Importação CSV processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados na marca ${brandName}.`,
+      type: "success",
+      results: results,
+      brandUsed: brandName,
+    });
+  } catch (error) {
+    console.error("💥 [CSV] ERRO ao finalizar compra:", error.message);
+    console.error("Stack trace:", error.stack);
+
+    res.status(500).json({
+      error: "Falha ao processar importação do CSV.",
+      details: error.message,
+      suggestion: "Verifique se todos os campos estão preenchidos corretamente.",
+    });
+  }
+};
+
+// ✅ FUNÇÃO AUXILIAR PARA MAPEAR COLUNAS (já existe no seu código)
+function getValueByHeader(headers, values, possibleHeaders) {
+  for (const header of possibleHeaders) {
+    const index = headers.indexOf(header);
+    if (index !== -1 && values[index]) {
+      return values[index].trim();
+    }
+  }
+  return "";
+}
+
+// ✅ PARSER DE LINHA CSV (já existe no seu código)
+function parseCsvLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
+  return result.map((val) => val.replace(/^"|"$/g, "").trim());
+}
 // ✅ MANTENHA O FINALIZE ORIGINAL PARA CSV (se necessário)
 exports.finalizePurchase = async (req, res) => {
   // ✅ ESTE É PARA CSV - mantém a lógica original se precisar
