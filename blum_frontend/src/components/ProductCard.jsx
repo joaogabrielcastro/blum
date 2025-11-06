@@ -14,7 +14,6 @@ const ProductCard = ({
 }) => {
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
-  // ... resto do código existente ...
 
   return (
     <>
@@ -39,9 +38,9 @@ const ProductCard = ({
         <div className="space-y-3 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Preço Atual:</span>
-            <span className="text-lg font-bold text-green-600">
-              R$ {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
-            </span>
+<span className="text-lg font-bold text-green-600">
+  R$ {product.price != null && !isNaN(product.price) ? Number(product.price).toFixed(2) : '0.00'}
+</span>
           </div>
           
           <div className="flex justify-between items-center">

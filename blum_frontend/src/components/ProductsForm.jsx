@@ -62,7 +62,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
         subcode: formData.subcode.trim(), // ✅ INCLUI SUBCÓDIGO NO PAYLOAD
-        price: parseFloat(formData.price),
+        price: parseFloat(formData.price.replace(',', '.')) || 0,
         brand: formData.brand,
         stock: parseInt(formData.stock),
         minstock: parseInt(formData.minstock),
