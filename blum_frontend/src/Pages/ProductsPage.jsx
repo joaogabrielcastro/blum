@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../services/apiService";
-import ProductCard from "../components/ProductCard";
+import ProductRow from "../components/ProductRow";
 import ProductsForm from "../components/ProductsForm";
 import BrandForm from "../components/BrandForm";
 import FilterBar from "../components/FilterBar";
@@ -95,6 +95,7 @@ const ProductsPage = ({ userRole }) => {
           product.name.toLowerCase().includes(term) ||
           (product.productcode &&
             product.productcode.toLowerCase().includes(term)) ||
+          (product.subcode && product.subcode.toLowerCase().includes(term)) ||
           product.brand.toLowerCase().includes(term)
       );
     }
@@ -238,7 +239,7 @@ const ProductsPage = ({ userRole }) => {
             Gerencie seu inventário de produtos e Representadas
           </p>
         </div>
-        
+
         {/* ✅ BOTÕES CONDICIONAIS BASEADOS NA ROLE */}
         <div className="flex flex-wrap gap-2">
           {/* Botão Adicionar Representada - APENAS ADMIN */}
@@ -251,7 +252,7 @@ const ProductsPage = ({ userRole }) => {
               <span>Adicionar Representada</span>
             </button>
           )}
-          
+
           {/* Botão Adicionar Produto - TODOS OS USUÁRIOS */}
           <button
             onClick={() => {
@@ -290,50 +291,63 @@ const ProductsPage = ({ userRole }) => {
           setDeleteType(null);
           setDeleteId(null);
         }}
-        userRole={userRole} // ✅ PASSA A ROLE
+        userRole={userRole} 
       />
 
-      {/* Resumo de resultados */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex justify-between items-center">
-          <p className="text-gray-600">
-            {filteredProducts.length} produto(s) encontrado(s)
-            {selectedBrand !== "all" && ` para a Representada "${selectedBrand}"`}
-            {searchTerm && ` contendo "${searchTerm}"`}
-          </p>
-          <div className="text-sm text-gray-500">
-            Total de Representadas: {brands.length}
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Produtos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 flex-grow">
+      {/* ✅ LISTA DE PRODUTOS EM TABELA */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow">
         {filteredProducts.length > 0 ? (
-          filteredProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onEdit={handleEditProduct}
-              onDelete={confirmDeleteAction}
-              confirmDelete={confirmDelete}
-              deleteType={deleteType}
-              deleteId={deleteId}
-              onConfirmDelete={handleDeleteProduct}
-              onCancelDelete={() => {
-                setConfirmDelete(null);
-                setDeleteType(null);
-                setDeleteId(null);
-              }}
-              userRole={userRole} // ✅ PASSA A ROLE
-            />
-          ))
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                    Produto
+                  </th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                    Marca
+                  </th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                    Preço
+                  </th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                    Estoque
+                  </th>
+                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => (
+                  <ProductRow
+                    key={product.id}
+                    product={product}
+                    onEdit={handleEditProduct}
+                    onDelete={confirmDeleteAction}
+                    confirmDelete={confirmDelete}
+                    deleteType={deleteType}
+                    deleteId={deleteId}
+                    onConfirmDelete={handleDeleteProduct}
+                    onCancelDelete={() => {
+                      setConfirmDelete(null);
+                      setDeleteType(null);
+                      setDeleteId(null);
+                    }}
+                    userRole={userRole}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
-          <EmptyState
-            brandsCount={brands.length}
-            hasSearchTerm={!!searchTerm}
-            selectedBrand={selectedBrand}
-          />
+          <div className="p-8">
+            <EmptyState
+              brandsCount={brands.length}
+              hasSearchTerm={!!searchTerm}
+              selectedBrand={selectedBrand}
+            />
+          </div>
         )}
       </div>
 
@@ -367,11 +381,6 @@ const ProductsPage = ({ userRole }) => {
           </div>
         </div>
       )}
-
-      {/* Rodapé */}
-      <footer className="mt-8 pt-4 border-t border-gray-200 text-center text-gray-500 text-sm">
-        Sistema de Gerenciamento de Produtos • {new Date().getFullYear()}
-      </footer>
     </div>
   );
 };

@@ -149,7 +149,7 @@ const FilterBar = ({
               id="search"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Buscar por nome, código ou Representada..."
+              placeholder="Buscar por nome, código, subcódigo ou Representada..."
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {searchTerm && (
@@ -172,6 +172,9 @@ const FilterBar = ({
               </button>
             )}
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            🔍 Busca por: nome, código principal, subcódigo e Representada
+          </p>
         </div>
 
         <div className="flex-1">
