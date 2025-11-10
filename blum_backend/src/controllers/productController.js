@@ -6,9 +6,7 @@ exports.getAll = async (req, res) => {
     const { brand } = req.query;
     let products;
     if (brand && brand !== "all") {
-      // CORREÇÃO: Usa 'createdat' em minúsculas
-      products =
-        await sql`SELECT * FROM products WHERE brand = ${brand} ORDER BY createdat DESC`;
+      products = await sql`SELECT * FROM products WHERE brand = ${brand} ORDER BY createdat DESC`;
     } else {
       products = await sql`SELECT * FROM products ORDER BY createdat DESC`;
     }
@@ -20,7 +18,8 @@ exports.getAll = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-  const { name, productcode, price, stock, brand, minstock } = req.body;
+  // ✅ CORREÇÃO: Adicionar subcode
+  const { name, productcode, subcode, price, stock, brand, minstock } = req.body;
 
   if (!name || price === undefined || stock === undefined) {
     return res
@@ -29,11 +28,12 @@ exports.create = async (req, res) => {
   }
 
   try {
+    // ✅ CORREÇÃO: Incluir subcode no INSERT
     const result = await sql(
-      `INSERT INTO products (name, productcode, price, stock, brand, minstock, createdat)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `INSERT INTO products (name, productcode, subcode, price, stock, brand, minstock, createdat)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING *`,
-      [name, productcode, price, stock, brand, minstock || 0]
+      [name, productcode, subcode || '', price, stock, brand, minstock || 0]
     );
     res.status(201).json(result[0]);
   } catch (error) {
@@ -49,7 +49,7 @@ exports.delete = async (req, res) => {
     if (result.length === 0) {
       return res.status(404).json({ error: "Produto não encontrado." });
     }
-    res.status(204).end(); // Sucesso, sem conteúdo para retornar
+    res.status(204).end();
   } catch (error) {
     console.error(`Erro ao excluir produto ${id}:`, error);
     res.status(500).json({ error: "Erro ao excluir produto." });
@@ -58,7 +58,8 @@ exports.delete = async (req, res) => {
 
 exports.update = async (req, res) => {
   const { id } = req.params;
-  const { name, productcode, price, stock, brand, minstock } = req.body; // ← productcode em minúsculo
+  // ✅ CORREÇÃO: Adicionar subcode
+  const { name, productcode, subcode, price, stock, brand, minstock } = req.body;
 
   if (!name || price === undefined || stock === undefined) {
     return res
@@ -67,13 +68,13 @@ exports.update = async (req, res) => {
   }
 
   try {
-    // CORREÇÃO: Usar productcode (minúsculo) em vez de productCode
+    // ✅ CORREÇÃO: Incluir subcode no UPDATE
     const result = await sql(
       `UPDATE products 
-       SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6
-       WHERE id = $7
+       SET name = $1, productcode = $2, subcode = $3, price = $4, stock = $5, brand = $6, minstock = $7
+       WHERE id = $8
        RETURNING *`,
-      [name, productcode, price, stock, brand, minstock || 0, id]
+      [name, productcode, subcode || '', price, stock, brand, minstock || 0, id]
     );
 
     if (result.length === 0) {

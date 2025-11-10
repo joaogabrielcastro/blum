@@ -172,9 +172,6 @@ const FilterBar = ({
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            🔍 Busca por: nome, código principal, subcódigo e Representada
-          </p>
         </div>
 
         <div className="flex-1">

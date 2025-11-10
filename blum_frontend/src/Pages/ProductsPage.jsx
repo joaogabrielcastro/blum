@@ -25,16 +25,6 @@ const ProductsPage = ({ userRole }) => {
   // ✅ VERIFICA SE É ADMIN
   const isAdmin = userRole === "admin";
 
-  // Estado para o formulário de produto
-  const [productForm, setProductForm] = useState({
-    name: "",
-    productcode: "",
-    price: "",
-    brand: "",
-    stock: "",
-    minstock: "",
-  });
-
   // Carregar dados iniciais
   useEffect(() => {
     fetchData();
@@ -144,14 +134,6 @@ const ProductsPage = ({ userRole }) => {
 
   const handleEditProduct = (product) => {
     setEditingProduct(product);
-    setProductForm({
-      name: product.name,
-      productcode: product.productcode || "",
-      price: product.price.toString(),
-      brand: product.brand,
-      stock: product.stock.toString(),
-      minstock: product.minstock ? product.minstock.toString() : "0",
-    });
     setShowProductForm(true);
   };
 
@@ -213,14 +195,6 @@ const ProductsPage = ({ userRole }) => {
   };
 
   const resetForms = () => {
-    setProductForm({
-      name: "",
-      productcode: "",
-      price: "",
-      brand: "",
-      stock: "",
-      minstock: "",
-    });
     setEditingProduct(null);
   };
 
@@ -356,14 +330,12 @@ const ProductsPage = ({ userRole }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-lg p-6 w-full max-w-md my-8">
             <ProductsForm
-              product={editingProduct}
+              product={editingProduct} // ✅ AGORA PASSA O PRODUTO COMPLETO
               brands={brands}
-              initialData={productForm}
               onSubmit={handleSaveProduct}
               onCancel={() => {
                 setShowProductForm(false);
                 setEditingProduct(null);
-                resetForms();
               }}
             />
           </div>

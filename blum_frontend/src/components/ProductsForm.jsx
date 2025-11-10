@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
+const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
@@ -13,19 +13,29 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debug: verifique o que está recebendo
-  console.log("Brands no formulário:", brands);
-
+  // ✅ CORREÇÃO: Use useEffect para inicializar os dados quando o produto mudar
   useEffect(() => {
     if (product) {
+      // Modo edição - preenche com dados do produto
       setFormData({
         name: product.name || "",
         productcode: product.productcode || "",
-        subcode: product.subcode || "", // ✅ INICIALIZA O SUBCÓDIGO
+        subcode: product.subcode || "",
         price: product.price?.toString() || "",
         brand: product.brand || "",
         stock: product.stock?.toString() || "",
-        minstock: product.minstock?.toString() || "",
+        minstock: product.minstock?.toString() || "0",
+      });
+    } else {
+      // Modo adição - limpa o formulário
+      setFormData({
+        name: "",
+        productcode: "",
+        subcode: "",
+        price: "",
+        brand: "",
+        stock: "",
+        minstock: "",
       });
     }
   }, [product]);
@@ -36,7 +46,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!formData.productcode.trim())
       newErrors.productcode = "Código é obrigatório";
-    if (!formData.subcode.trim()) // ✅ VALIDAÇÃO DO SUBCÓDIGO
+    if (!formData.subcode.trim())
       newErrors.subcode = "Subcódigo é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
@@ -64,10 +74,11 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
         subcode: formData.subcode.trim(), // ✅ INCLUI SUBCÓDIGO NO PAYLOAD
         price: parseFloat(formData.price.replace(',', '.')) || 0,
         brand: formData.brand,
-        stock: parseInt(formData.stock),
-        minstock: parseInt(formData.minstock),
+        stock: parseInt(formData.stock) || 0,
+        minstock: parseInt(formData.minstock) || 0,
       };
 
+      console.log("Enviando dados do produto:", productData); // Para debug
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
@@ -302,4 +313,4 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
   );
 };
 
-export default ProductForm;
+export default ProductsForm;
