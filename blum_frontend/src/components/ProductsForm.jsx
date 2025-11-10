@@ -4,7 +4,7 @@ const ProductForm = ({ product, brands, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
-    subcode: "", // ✅ NOVO CAMPO: subcode
+    subcode: "", 
     price: "",
     brand: "",
     stock: "",
