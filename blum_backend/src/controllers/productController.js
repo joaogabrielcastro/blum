@@ -3,17 +3,74 @@ const sql = neon(process.env.DATABASE_URL);
 
 exports.getAll = async (req, res) => {
   try {
-    const { brand } = req.query;
+    const { brand, productcode, subcode, name } = req.query;
+    
     let products;
-    if (brand && brand !== "all") {
+    
+    // ✅ CORREÇÃO: Busca por SUBCODE (prioridade máxima)
+    if (subcode) {
+      console.log(`🔍 Buscando produto por subcódigo: ${subcode}`);
+      products = await sql`SELECT * FROM products WHERE subcode = ${subcode} ORDER BY createdat DESC`;
+    }
+    // Busca por PRODUCTCODE
+    else if (productcode) {
+      products = await sql`SELECT * FROM products WHERE productcode = ${productcode} ORDER BY createdat DESC`;
+    }
+    // Busca por NOME (aproximada)
+    else if (name) {
+      products = await sql`SELECT * FROM products WHERE name ILIKE ${'%' + name + '%'} ORDER BY createdat DESC`;
+    }
+    // Busca por BRAND
+    else if (brand && brand !== "all") {
       products = await sql`SELECT * FROM products WHERE brand = ${brand} ORDER BY createdat DESC`;
-    } else {
+    }
+    // Busca TODOS
+    else {
       products = await sql`SELECT * FROM products ORDER BY createdat DESC`;
     }
+    
     res.status(200).json(products);
   } catch (error) {
     console.error("Erro ao buscar produtos:", error);
     res.status(500).json({ error: "Erro ao buscar produtos." });
+  }
+};
+
+// ✅ ADICIONE esta função no productsController.js
+exports.search = async (req, res) => {
+  try {
+    const { q } = req.query;
+    
+    if (!q || q.trim() === '') {
+      return res.status(400).json({ error: 'Termo de busca é obrigatório' });
+    }
+
+    console.log(`🔍 Buscando produtos por: "${q}"`);
+
+    // ✅ BUSCA EM MÚLTIPLOS CAMPOS: nome, productcode, subcode
+    const products = await sql`
+      SELECT * FROM products 
+      WHERE 
+        name ILIKE ${'%' + q + '%'} OR
+        productcode ILIKE ${'%' + q + '%'} OR
+        subcode ILIKE ${'%' + q + '%'}
+      ORDER BY 
+        CASE 
+          WHEN name ILIKE ${q + '%'} THEN 1
+          WHEN productcode ILIKE ${q + '%'} THEN 2
+          WHEN subcode ILIKE ${q + '%'} THEN 3
+          ELSE 4
+        END,
+        name
+      LIMIT 20
+    `;
+
+    console.log(`✅ ${products.length} produtos encontrados`);
+    
+    res.status(200).json(products);
+  } catch (error) {
+    console.error('❌ Erro na busca de produtos:', error);
+    res.status(500).json({ error: 'Erro ao buscar produtos' });
   }
 };
 

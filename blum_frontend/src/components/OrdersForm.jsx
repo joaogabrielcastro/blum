@@ -18,6 +18,8 @@ const OrdersForm = ({
   const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState("");
   const [clientSearch, setClientSearch] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Função segura para toFixed
   const safeToFixed = (value, decimals = 2) => {
@@ -63,6 +65,64 @@ const OrdersForm = ({
     setTotalPrice(netTotal);
   }, [items, discount, netTotal]);
 
+  // ✅ NOVA FUNÇÃO: Busca avançada por nome, código ou subcódigo
+  useEffect(() => {
+    const searchProducts = async () => {
+      if (!productSearch || productSearch.trim().length < 2) {
+        setSearchResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        // ✅ BUSCA AVANÇADA: Por nome, código ou subcódigo
+        const searchTerm = productSearch.toLowerCase().trim();
+        
+        const filtered = products.filter(product => 
+          // Filtra primeiro pela marca selecionada
+          product.brand === selectedBrand && (
+            // Busca por NOME
+            product.name.toLowerCase().includes(searchTerm) ||
+            // Busca por CÓDIGO DO PRODUTO
+            (product.productcode && product.productcode.toLowerCase().includes(searchTerm)) ||
+            // ✅ BUSCA POR SUBCÓDIGO
+            (product.subcode && product.subcode.toLowerCase().includes(searchTerm))
+          )
+        );
+
+        // ✅ ORDENA POR RELEVÂNCIA
+        const sortedResults = filtered.sort((a, b) => {
+          const aNameMatch = a.name.toLowerCase().includes(searchTerm);
+          const bNameMatch = b.name.toLowerCase().includes(searchTerm);
+          const aCodeMatch = a.productcode && a.productcode.toLowerCase().includes(searchTerm);
+          const bCodeMatch = b.productcode && b.productcode.toLowerCase().includes(searchTerm);
+          const aSubcodeMatch = a.subcode && a.subcode.toLowerCase().includes(searchTerm);
+          const bSubcodeMatch = b.subcode && b.subcode.toLowerCase().includes(searchTerm);
+
+          // Prioridade: subcódigo > código > nome
+          if (aSubcodeMatch && !bSubcodeMatch) return -1;
+          if (!aSubcodeMatch && bSubcodeMatch) return 1;
+          if (aCodeMatch && !bCodeMatch) return -1;
+          if (!aCodeMatch && bCodeMatch) return 1;
+          if (aNameMatch && !bNameMatch) return -1;
+          if (!aNameMatch && bNameMatch) return 1;
+          
+          return a.name.localeCompare(b.name);
+        });
+
+        setSearchResults(sortedResults);
+      } catch (error) {
+        console.error("Erro na busca:", error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchProducts, 300); // Debounce de 300ms
+    return () => clearTimeout(timeoutId);
+  }, [productSearch, products, selectedBrand]);
+
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
     newItems[index][field] = value;
@@ -81,6 +141,8 @@ const OrdersForm = ({
           quantity: 1,
           price: product.price,
           productId: product.id,
+          productcode: product.productcode, // ✅ ADICIONA CÓDIGO
+          subcode: product.subcode, // ✅ ADICIONA SUBCÓDIGO
         };
         setItems((prevItems) => [...prevItems, newItem]);
       } else {
@@ -88,19 +150,18 @@ const OrdersForm = ({
       }
     }
     setProductSearch("");
+    setSearchResults([]);
   };
 
   const removeItem = (index) => {
     setItems((prevItems) => prevItems.filter((_, i) => i !== index));
   };
 
-  const filteredProducts = products
-    // 1. Filtra primeiro pela marca selecionada
-    .filter((product) => product.brand === selectedBrand)
-    // 2. Depois, filtra pelo texto de busca
-    .filter((product) =>
-      product.name.toLowerCase().includes(productSearch.toLowerCase())
-    );
+  // ✅ FUNÇÃO AUXILIAR: Limpar busca
+  const clearSearch = () => {
+    setProductSearch("");
+    setSearchResults([]);
+  };
 
   const filteredClients = Object.entries(clients).filter(([id, name]) =>
     name.toLowerCase().includes(clientSearch.toLowerCase())
@@ -144,7 +205,7 @@ const OrdersForm = ({
     try {
       const orderData = {
         clientid: parseInt(clientId),
-        userid: userId, // ← userid em minúsculo
+        userid: userId,
         description: description,
         items: items.map((item) => ({
           ...item,
@@ -152,7 +213,7 @@ const OrdersForm = ({
           quantity: parseInt(item.quantity) || 1,
         })),
         discount: parseFloat(discount) || 0,
-        totalprice: parseFloat(netTotal) || 0, // ← totalprice em minúsculo
+        totalprice: parseFloat(netTotal) || 0,
       };
 
       if (editingOrder) {
@@ -249,44 +310,81 @@ const OrdersForm = ({
             </div>
           </div>
 
-          {/* --- Seção de Produtos --- */}
+          {/* --- Seção de Produtos COM BUSCA AVANÇADA --- */}
           <div className="space-y-4">
             <h3 className="text-xl font-semibold text-gray-800">
               Adicionar Produtos
             </h3>
+            
+            {/* ✅ BUSCA AVANÇADA */}
             <div className="relative">
-              <label htmlFor="product-search" className="sr-only">
-                Buscar produto
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                🔍 Buscar Produto (nome, código ou subcódigo)
               </label>
-              <input
-                id="product-search"
-                type="text"
-                placeholder="Digite para buscar um produto..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                disabled={!selectedBrand}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                autoComplete="off"
-              />
-              {productSearch && filteredProducts.length > 0 && (
-                <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {filteredProducts.map((product) => (
-                    <li
+              
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Digite nome, código do produto ou subcódigo..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  disabled={!selectedBrand}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                  autoComplete="off"
+                />
+                
+                {/* ✅ INDICADOR DE CARREGAMENTO */}
+                {isSearching && (
+                  <div className="absolute right-3 top-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+                
+                {/* ✅ BOTÃO LIMPAR */}
+                {productSearch && !isSearching && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* ✅ RESULTS DA BUSCA AVANÇADA */}
+              {searchResults.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {searchResults.map((product) => (
+                    <div
                       key={product.id}
                       onClick={() => handleProductSelect(product)}
-                      className="p-3 cursor-pointer hover:bg-blue-50"
+                      className="p-3 cursor-pointer hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                     >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold">{product.name}</p>
-                          <p className="text-sm text-gray-500">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            {product.name}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {/* ✅ MOSTRA CÓDIGO E SUBCÓDIGO */}
+                            <span className="bg-gray-100 px-2 py-1 rounded mr-2">
+                              Código: {product.productcode}
+                            </span>
+                            {product.subcode && (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                Subcódigo: {product.subcode}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">
                             {product.brand}
-                          </p>
+                          </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-gray-700">
+                          <div className="font-medium text-green-600">
                             R$ {safeToFixed(product.price)}
-                          </p>
+                          </div>
                           <span
                             className={`text-xs px-2 py-0.5 rounded-full ${
                               product.stock > 0
@@ -298,9 +396,21 @@ const OrdersForm = ({
                           </span>
                         </div>
                       </div>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
+              )}
+
+              {/* ✅ MENSAGEM DE NENHUM RESULTADO */}
+              {productSearch && searchResults.length === 0 && !isSearching && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+                  <div className="text-center text-gray-500">
+                    Nenhum produto encontrado para "{productSearch}"
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2 text-center">
+                    Tente buscar por nome, código do produto ou subcódigo
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -318,7 +428,7 @@ const OrdersForm = ({
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
                         Produto
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                      <th className="px-8 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                         Qtd.
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
@@ -343,11 +453,21 @@ const OrdersForm = ({
                             >
                               {item.productName}
                             </div>
-                            <div
-                              className="text-sm text-gray-500 truncate"
-                              title={item.brand}
-                            >
-                              {item.brand}
+                            <div className="text-sm text-gray-500 space-y-1">
+                              {/* ✅ MOSTRA CÓDIGO E SUBCÓDIGO NA TABELA */}
+                              <div className="flex flex-wrap gap-1">
+                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                  Código: {item.productcode}
+                                </span>
+                                {item.subcode && (
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
+                                    Sub: {item.subcode}
+                                  </span>
+                                )}
+                              </div>
+                              <div title={item.brand}>
+                                {item.brand}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -404,6 +524,7 @@ const OrdersForm = ({
               </div>
             </div>
           )}
+
           {/* --- Total --- */}
           <div className="mt-6 bg-gray-50 p-6 rounded-lg border">
             <div className="space-y-3">

@@ -22,6 +22,12 @@ const Login = ({ onLogin }) => {
       role: "salesperson",
       name: "Eduardo",
     },
+    {
+      username: "vendedor",
+      password: "123",
+      role: "salesperson",
+      name: "Vendedor",
+    },
   ];
 
   // Validar formulário em tempo real
@@ -45,6 +51,8 @@ const Login = ({ onLogin }) => {
       onLogin("admin", "admin");
     } else if (username === "siane" && password === "123") {
       onLogin("salesperson", "siane");
+    } else if (username === "vendedor" && password === "123") {
+      onLogin("salesperson", "vendedor");
     } else if (username === "eduardo" && password === "123") {
       onLogin("salesperson", "eduardo");
     } else {

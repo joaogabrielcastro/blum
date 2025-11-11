@@ -829,13 +829,14 @@ async function processCsvData(csvText, selectedBrand) {
   for (let i = 1; i < lines.length; i++) {
     const values = parseCsvLine(lines[i]);
 
-    // Mapeia colunas baseado nos cabeçalhos
+    // ✅ CORREÇÃO: Incluir subcode no mapeamento
     const product = {
       productCode: getValueByHeader(headers, values, [
         "codigo",
         "sku",
         "productcode",
         "código",
+        "ean",
       ]),
       name: getValueByHeader(headers, values, [
         "nome",
@@ -843,6 +844,7 @@ async function processCsvData(csvText, selectedBrand) {
         "descrição",
         "name",
         "product",
+        "produto",
       ]),
       price:
         parseFloat(
@@ -851,6 +853,7 @@ async function processCsvData(csvText, selectedBrand) {
             "preço",
             "price",
             "valor",
+            "precounitario",
           ])
         ) || 0,
       stock:
@@ -860,24 +863,32 @@ async function processCsvData(csvText, selectedBrand) {
             "stock",
             "quantidade",
             "qtd",
+            "quantity",
           ])
         ) || 0,
-      brand: selectedBrand, // ✅ USA A MARCA SELECIONADA, NÃO DO CSV
+      // ✅ NOVO: Extrair subcode do CSV
+      subcode: getValueByHeader(headers, values, [
+        "subcode",
+        "subcodigo",
+        "subcódigo",
+        "codigointerno",
+        "interno",
+      ]),
+      brand: selectedBrand,
       category: getValueByHeader(headers, values, [
         "categoria",
         "category",
         "grupo",
       ]),
-      ncm: getValueByHeader(headers, values, ["ncm"]),
-      ipi: parseFloat(getValueByHeader(headers, values, ["ipi"])) || 0,
     };
 
-    // Só adiciona se tiver código e nome
-    if (product.productCode && product.name) {
+    // ✅ CORREÇÃO: Só adiciona se tiver código E nome
+    if (product.productCode && product.name && product.productCode.trim() !== "") {
       products.push(product);
     }
   }
 
+  console.log(`✅ ${products.length} produtos extraídos do CSV`);
   return products;
 }
 
@@ -1014,7 +1025,7 @@ async function importProductsToDatabase(products) {
 }
 // ✅ CONTROLLER PARA FINALIZAR COMPRA DE PDF - CORRIGIDO
 exports.finalizePurchaseFromPdf = async (req, res) => {
-  const { brandId, items } = req.body;
+  const { brandId, purchaseDate ,items } = req.body;
 
   console.log("📦 [PDF] Dados recebidos para finalizar compra:");
   console.log("🏷️ Brand ID:", brandId, "Tipo:", typeof brandId);
@@ -1161,7 +1172,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
           if (currentPrice !== price) {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity)
-              VALUES (${productId}, ${price}, ${quantity})
+              VALUES (${productId}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
             `;
             console.log(
               `📊 Histórico de preço atualizado para produto ID ${productId}`
@@ -1195,7 +1206,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity)
-              VALUES (${existingWithCode[0].id}, ${price}, ${quantity})
+              VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${purchaseDate || new Date().toISOString()})
             `;
 
             console.log(
@@ -1230,7 +1241,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity)
-              VALUES (${newProduct[0].id}, ${price}, ${quantity})
+              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
             `;
 
             console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
@@ -1282,6 +1293,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
   }
 };
 // ✅ NOVO ENDPOINT: PROCESSAR CSV E RETORNAR ITENS (NÃO IMPORTA AINDA)
+// ✅ CORREÇÃO: Atualize a função processCsv
 exports.processCsv = async (req, res) => {
   try {
     if (!req.file) {
@@ -1291,18 +1303,21 @@ exports.processCsv = async (req, res) => {
     // Converte buffer para string
     const csvText = req.file.buffer.toString("utf8");
 
-    // Tenta extrair produtos do CSV (não realiza importação)
+    // ✅ CORREÇÃO: Processa CSV sem marca específica
     const products = await processCsvData(csvText, "");
 
-    // Normaliza para o formato esperado pelo frontend (productCode, description, quantity, unitPrice, subcode)
-    const parsed = products.map((p) => ({
+    // ✅ CORREÇÃO: Normaliza para o formato esperado pelo frontend INCLUINDO SUBCODE
+    const parsed = products.map((p, index) => ({
       productCode: p.productCode || "",
-      description: p.name || "",
-      quantity: Number(p.stock || 0),
+      description: p.name || `Produto ${index + 1}`,
+      quantity: Number(p.stock || 1),
       unitPrice: Number(p.price || 0),
-      subcode: p.subcode || "",
+      // ✅ GARANTIR que o subcode seja incluído
+      subcode: p.subcode || p.productCode || `CSV-${index + 1}`,
     }));
 
+    console.log(`✅ CSV processado: ${parsed.length} itens com subcódigos`);
+    
     return res.status(200).json(parsed);
   } catch (error) {
     console.error("💥 ERRO ao processar CSV (preview):", error);

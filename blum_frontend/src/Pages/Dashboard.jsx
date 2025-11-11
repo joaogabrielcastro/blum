@@ -75,7 +75,7 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
           revenue: salesResponse?.totalSales || 0,
         });
 
-        setRecentOrders(ordersResponse?.slice(0, 5) || []); // Apenas os 5 mais recentes
+        setRecentOrders(ordersResponse?.slice(0, 3) || []); // Apenas os 5 mais recentes
 
         // PREPARAR DADOS PARA O GRÁFICO (igual ao ReportsPage)
         const finishedOrders = ordersResponse.filter(

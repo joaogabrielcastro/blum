@@ -89,7 +89,7 @@ const PriceHistoryModal = ({ product, onClose }) => {
               {/* Estatísticas Rápidas */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-600 font-medium">Primeira Compra</p>
+                  <p className="text-sm text-blue-600 font-medium">Última Compra</p>
                   <p className="text-lg font-bold text-blue-800">
                     {formatCurrency(priceHistory[priceHistory.length - 1]?.purchase_price)}
                   </p>
@@ -98,7 +98,7 @@ const PriceHistoryModal = ({ product, onClose }) => {
                   </p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <p className="text-sm text-green-600 font-medium">Última Compra</p>
+                  <p className="text-sm text-green-600 font-medium">Primeira Compra</p>
                   <p className="text-lg font-bold text-green-800">
                     {formatCurrency(priceHistory[0]?.purchase_price)}
                   </p>

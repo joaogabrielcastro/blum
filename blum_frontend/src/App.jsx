@@ -27,6 +27,7 @@ const App = () => {
   const reps = {
     admin_1: "Admin",
     siane_1: "Siane",
+    vendedor_1: "Vendedor",
     eduardo_1: "Eduardo",
   };
 

@@ -322,6 +322,33 @@ const apiService = {
     }
   },
 
+  // ✅ ADICIONE esta função no apiService.js
+findProductBySubcode: async (subcode) => {
+  try {
+    console.log('🔍 Buscando produto por subcódigo:', subcode);
+    
+    const response = await fetch(`${API_URL}/products?subcode=${encodeURIComponent(subcode)}`);
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const products = await response.json();
+    
+    if (products.length > 0) {
+      console.log('✅ Produto encontrado por subcódigo:', products[0]);
+      return products[0];
+    }
+    
+    console.log('❌ Produto não encontrado por subcódigo:', subcode);
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar produto por subcódigo:', error);
+    return null;
+  }
+},
+
   finalizePurchaseFromPdf: async (payload) => {
     try {
       const response = await fetch(`${API_URL}/purchases/finalize-pdf`, {
@@ -343,30 +370,6 @@ const apiService = {
     }
   },
 
-  // ✅ NOVA FUNÇÃO: Finalizar compra do CSV
-  finalizePurchaseFromCsv: async (payload) => {
-    try {
-      const response = await fetch(`${API_URL}/purchases/finalize-csv`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.error || `Erro ${response.status}: ${response.statusText}`
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Erro no apiService.finalizePurchaseFromCsv:", error);
-      throw error;
-    }
-  },
 
   getSalesByRep: async () => {
     const response = await fetch(`${API_URL}/reports/sales-by-rep`);
@@ -481,6 +484,31 @@ const apiService = {
       throw new Error(error.message);
     }
   },
+
+  // ✅ ADICIONE esta função no apiService.js
+searchProducts: async (searchTerm) => {
+  try {
+    console.log('🔍 Buscando produtos por:', searchTerm);
+    
+    if (!searchTerm || searchTerm.trim() === '') {
+      return [];
+    }
+
+    const response = await fetch(`${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`);
+    
+    if (!response.ok) {
+      throw new Error('Erro ao buscar produtos');
+    }
+
+    const products = await response.json();
+    console.log(`✅ ${products.length} produtos encontrados para: "${searchTerm}"`);
+    
+    return products;
+  } catch (error) {
+    console.error('❌ Erro na busca de produtos:', error);
+    return [];
+  }
+},
 
   getBrandsWithCommission: async () => {
     try {

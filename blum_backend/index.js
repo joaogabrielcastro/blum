@@ -38,6 +38,7 @@ const setupDatabase = async () => {
   id SERIAL PRIMARY KEY, 
   name VARCHAR(255) NOT NULL, 
   productcode VARCHAR(255),
+  subcode VARCHAR(255),
   price DECIMAL(10,2) NOT NULL, 
   stock INTEGER NOT NULL, 
   brand VARCHAR(255), 
@@ -47,7 +48,7 @@ const setupDatabase = async () => {
 
     await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, clientid INTEGER REFERENCES clients(id) ON DELETE CASCADE, userid VARCHAR(255) NOT NULL, items JSONB, totalprice DECIMAL(10,2) NOT NULL, status VARCHAR(50) DEFAULT 'Em aberto', description TEXT, createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, finishedat TIMESTAMP WITH TIME ZONE)`;
 
-    await sql`CREATE TABLE IF NOT EXISTS brands (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL)`;
+    await sql`CREATE TABLE IF NOT EXISTS brands (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, commission_rate DECIMAL(5,2) DEFAULT 0)`;
 
     // Adiciona a coluna 'discount' na tabela 'orders' se não existir
     const columnCheckOrders =
@@ -61,6 +62,22 @@ const setupDatabase = async () => {
       await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'minstock'`;
     if (columnCheckProducts.length === 0) {
       await sql`ALTER TABLE products ADD COLUMN minstock INTEGER DEFAULT 0`;
+    }
+
+    // ✅ Adiciona a coluna 'subcode' na tabela 'products' se não existir
+    const columnCheckSubcode =
+      await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'subcode'`;
+    if (columnCheckSubcode.length === 0) {
+      await sql`ALTER TABLE products ADD COLUMN subcode VARCHAR(255)`;
+      console.log("✅ Coluna 'subcode' adicionada à tabela products");
+    }
+
+    // ✅ Adiciona a coluna 'commission_rate' na tabela 'brands' se não existir
+    const columnCheckCommission =
+      await sql`SELECT 1 FROM information_schema.columns WHERE table_name = 'brands' AND column_name = 'commission_rate'`;
+    if (columnCheckCommission.length === 0) {
+      await sql`ALTER TABLE brands ADD COLUMN commission_rate DECIMAL(5,2) DEFAULT 0`;
+      console.log("✅ Coluna 'commission_rate' adicionada à tabela brands");
     }
 
     console.log("Tabelas verificadas e criadas com sucesso.");
