@@ -1,3 +1,4 @@
 blum_frontend/node_modules
 blum_backend/node_modules
 cache
+blum_backend/.env

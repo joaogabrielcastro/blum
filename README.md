@@ -139,7 +139,9 @@ const API_URL = "http://localhost:3000/api/v1";
 
 ## 🎮 Como Usar
 
-### Inicie o Backend
+### Opção 1: Executar Localmente (Desenvolvimento)
+
+#### Inicie o Backend
 
 ```bash
 cd blum_backend
@@ -147,6 +149,25 @@ npm start
 ```
 
 O servidor estará disponível em: `http://localhost:3000`
+
+### Opção 2: Executar com Docker (Recomendado para Produção)
+
+#### Build e Execute com Docker
+
+```bash
+cd blum_backend
+docker build -t blum-backend .
+docker run -p 3000:3000 -e DATABASE_URL="sua_url" -e GEMINI_API_KEY="sua_chave" blum-backend
+```
+
+#### Ou use Docker Compose
+
+```bash
+cd blum_backend
+docker-compose up
+```
+
+> 📖 **Mais detalhes**: Veja [DOCKER.md](blum_backend/DOCKER.md) para instruções completas de deploy
 
 ### Inicie o Frontend
 
