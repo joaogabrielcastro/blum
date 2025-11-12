@@ -1,7 +1,9 @@
 const { neon } = require("@neondatabase/serverless");
-const pdfPoppler = require("pdf-poppler");
+const { Poppler } = require("node-poppler");
 const path = require("path");
 const fs = require("fs").promises;
+const poppler = new Poppler();
+
 require("dotenv").config();
 
 const sql = neon(process.env.DATABASE_URL);
@@ -105,14 +107,16 @@ function extractBrandFromDescription(description) {
   return "BLUMENAU"; // Padrão
 }
 
-// ✅ FUNÇÃO DE FALLBACK PARA EXTRAÇÃO DE TEXTO
+// ✅ FUNÇÃO DE FALLBACK PARA EXTRAÇÃO DE TEXTO - CORRIGIDA
 async function fallbackTextExtraction(pdfBuffer) {
   try {
+    // ✅ CORREÇÃO: Importar pdf-parse corretamente
     const pdf = require("pdf-parse");
     const data = await pdf(pdfBuffer);
 
     console.log("🔄 Usando fallback de extração de texto...");
     const text = data.text;
+    console.log(`📝 Texto extraído (${text.length} caracteres):`, text.substring(0, 500) + "...");
 
     // Lógica de extração por regex baseada na estrutura do seu PDF
     const items = [];
@@ -171,7 +175,7 @@ async function fallbackTextExtraction(pdfBuffer) {
   }
 }
 
-// ✅ CONTROLLER PRINCIPAL ATUALIZADO
+// ✅ CONTROLLER PRINCIPAL ATUALIZADO - CORRIGIDO
 exports.processPdf = async (req, res) => {
   console.log("\n--- [PROCESSAMENTO DE PDF MULTIMODAL] ---");
   const tempDir = path.join(__dirname, "..", "temp");
@@ -181,66 +185,105 @@ exports.processPdf = async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo PDF enviado." });
     }
 
+    // ✅ VALIDAÇÃO DE TAMANHO DO ARQUIVO
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (req.file.size > MAX_FILE_SIZE) {
+      return res.status(400).json({ 
+        error: "Arquivo muito grande. Máximo: 10MB",
+        details: `Tamanho atual: ${(req.file.size / (1024 * 1024)).toFixed(2)}MB`
+      });
+    }
+
     console.log("📄 Arquivo recebido:", req.file.originalname);
+    console.log("📏 Tamanho do arquivo:", (req.file.size / 1024).toFixed(2), "KB");
 
     // Garante que a pasta temporária exista
     await fs.mkdir(tempDir, { recursive: true });
     const tempPdfPath = path.join(tempDir, req.file.originalname);
     await fs.writeFile(tempPdfPath, req.file.buffer);
+    
+    // ✅ CORREÇÃO: Definir variáveis corretamente
+    const fileBaseName = path.basename(tempPdfPath, path.extname(tempPdfPath));
+    const out_path_prefix = path.join(tempDir, fileBaseName);
 
-    // 1. Converte o PDF em imagens (uma por página)
-    console.log("🖼️ Convertendo PDF para imagens...");
-    let opts = {
-      format: "png",
-      out_dir: tempDir,
-      out_prefix: path.basename(tempPdfPath, path.extname(tempPdfPath)),
-      page: null, // Converte todas as páginas
-    };
+    console.log("🖼️ Convertendo PDF para imagens com 'node-poppler'...");
+    
+    let conversionSuccess = false;
+    let imageFiles = [];
 
     try {
-      await pdfPoppler.convert(tempPdfPath, opts);
+      // ✅ TENTATIVA 1: Conversão simples sem opções problemáticas
+      await poppler.pdfToCairo(tempPdfPath, out_path_prefix, {
+        pngFile: true,
+      });
       console.log("✅ PDF convertido para imagens com sucesso.");
+      conversionSuccess = true;
     } catch (conversionError) {
-      console.log(
-        "❌ Falha na conversão do PDF para imagens:",
-        conversionError.message
+      console.log("❌ Falha na conversão com pdfToCairo:", conversionError.message);
+    }
+
+    // ✅ VERIFICAR SE AS IMAGENS FORAM GERADAS
+    if (conversionSuccess) {
+      const files = await fs.readdir(tempDir);
+      
+      // ✅ CORREÇÃO: Buscar arquivos PNG de forma mais flexível
+      imageFiles = files.filter((f) => 
+        f.includes(fileBaseName) && f.endsWith(".png")
       );
-      console.log("🔄 Tentando extração direta por texto...");
+      
+      // ✅ Tentar também arquivos com numeração diferente
+      if (imageFiles.length === 0) {
+        imageFiles = files.filter((f) => f.endsWith(".png"));
+        console.log(`🔍 Procurando qualquer arquivo PNG: ${imageFiles.length} encontrados`);
+      }
+
+      console.log(`📸 Arquivos PNG encontrados:`, imageFiles);
+    }
+
+    // Se não gerou imagens, usar fallback
+    if (imageFiles.length === 0) {
+      console.log("❌ Nenhuma imagem foi gerada, usando fallback...");
       const fallbackData = await fallbackTextExtraction(req.file.buffer);
       return res.status(200).json(fallbackData);
     }
 
-    // 2. Prepara as imagens para enviar para a API
-    const imageParts = [];
-    const files = await fs.readdir(tempDir);
-    const imageFiles = files.filter(
-      (f) => f.startsWith(opts.out_prefix) && f.endsWith(".png")
-    );
-
-    // Ordena as imagens numericamente (page-1, page-2, etc.)
+    // Ordena as imagens numericamente
     imageFiles.sort((a, b) => {
-      const numA = parseInt(a.match(/(\d+)\.png$/)?.[1] || 0, 10);
-      const numB = parseInt(b.match(/(\d+)\.png$/)?.[1] || 0, 10);
+      const numA = parseInt(a.match(/(\d+)\.png$/)?.[1] || a.match(/-(\d+)\.png$/)?.[1] || 0, 10);
+      const numB = parseInt(b.match(/(\d+)\.png$/)?.[1] || b.match(/-(\d+)\.png$/)?.[1] || 0, 10);
       return numA - numB;
     });
 
+    console.log(`📸 ${imageFiles.length} imagens para processar:`, imageFiles);
+
+    const imageParts = [];
     for (const file of imageFiles) {
       try {
-        imageParts.push(
-          await fileToGenerativePart(path.join(tempDir, file), "image/png")
-        );
+        const imagePath = path.join(tempDir, file);
+        // ✅ VERIFICAR se o arquivo existe e tem tamanho > 0
+        const stats = await fs.stat(imagePath);
+        if (stats.size > 0) {
+          imageParts.push(
+            await fileToGenerativePart(imagePath, "image/png")
+          );
+          console.log(`✅ Imagem ${file} carregada: ${stats.size} bytes`);
+        } else {
+          console.log(`⚠️ Imagem ${file} está vazia, ignorando...`);
+        }
       } catch (imageError) {
         console.log(`⚠️ Erro ao processar imagem ${file}:`, imageError.message);
       }
     }
 
     if (imageParts.length === 0) {
-      throw new Error("Nenhuma imagem foi gerada do PDF");
+      console.log("❌ Nenhuma imagem válida foi carregada, usando fallback...");
+      const fallbackData = await fallbackTextExtraction(req.file.buffer);
+      return res.status(200).json(fallbackData);
     }
 
     console.log(`📦 ${imageParts.length} imagens preparadas para a API.`);
 
-    // 3. ✅ PROMPT CORRIGIDO - AGORA EXTRAI O PREÇO COM IPI
+    // ✅ PROMPT CORRIGIDO - AGORA EXTRAI O PREÇO COM IPI
     const prompt = `
 Você é um especialista em extrair dados de tabelas de orçamentos em PDF.
 
@@ -376,7 +419,7 @@ Retorne APENAS o array JSON válido, sem markdown, sem texto adicional, sem expl
         return res.status(200).json(fallbackData);
       }
     } catch (fallbackError) {
-      console.log("❌ Fallback também falhou");
+      console.log("❌ Fallback também falhou:", fallbackError.message);
     }
 
     res.status(500).json({
@@ -710,6 +753,7 @@ exports.debugPdf = async (req, res) => {
       return res.status(400).json({ error: "Nenhum arquivo PDF enviado." });
     }
 
+    // ✅ CORREÇÃO: Importar pdf-parse corretamente
     const pdf = require("pdf-parse");
     const data = await pdf(req.file.buffer);
 
@@ -734,6 +778,7 @@ exports.debugPdf = async (req, res) => {
     });
   }
 };
+
 // ✅ NOVO CONTROLLER PARA IMPORTAR CSV
 exports.importCsv = async (req, res) => {
   console.log("\n--- [IMPORTAÇÃO DE CSV] ---");
@@ -927,7 +972,6 @@ function parseCsvLine(line) {
 }
 
 // ✅ IMPORTAR PARA BANCO (reutiliza lógica similar à do PDF)
-// ✅ IMPORTAR PARA BANCO CORRIGIDO
 async function importProductsToDatabase(products) {
   const results = {
     created: 0,
@@ -1023,6 +1067,7 @@ async function importProductsToDatabase(products) {
 
   return results;
 }
+
 // ✅ CONTROLLER PARA FINALIZAR COMPRA DE PDF - CORRIGIDO
 exports.finalizePurchaseFromPdf = async (req, res) => {
   const { brandId, purchaseDate ,items } = req.body;
@@ -1165,14 +1210,13 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             SET stock = stock + ${quantity}, 
                 price = ${price},
                 subcode = ${subcode}
-                purchase_date = ${purchaseDate || new Date().toISOString()}
             WHERE id = ${productId}
           `;
 
           // ✅ REGISTRA NO HISTÓRICO DE PREÇOS (só se o preço mudou)
           if (currentPrice !== price) {
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity)
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${productId}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
             `;
             console.log(
@@ -1206,7 +1250,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
 
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity)
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${purchaseDate || new Date().toISOString()})
             `;
 
@@ -1241,7 +1285,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
 
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity)
+              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
             `;
 
@@ -1293,8 +1337,8 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     });
   }
 };
+
 // ✅ NOVO ENDPOINT: PROCESSAR CSV E RETORNAR ITENS (NÃO IMPORTA AINDA)
-// ✅ CORREÇÃO: Atualize a função processCsv
 exports.processCsv = async (req, res) => {
   try {
     if (!req.file) {
@@ -1325,6 +1369,7 @@ exports.processCsv = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
 exports.getPriceHistory = async (req, res) => {
   const { productId } = req.params;
 
@@ -1399,39 +1444,35 @@ exports.getLastPurchasePrice = async (req, res) => {
   }
 };
 
-// ✅ FUNÇÃO AUXILIAR PARA MAPEAR COLUNAS (já existe no seu código)
-function getValueByHeader(headers, values, possibleHeaders) {
-  for (const header of possibleHeaders) {
-    const index = headers.indexOf(header);
-    if (index !== -1 && values[index]) {
-      return values[index].trim();
-    }
+// ✅ ADICIONAR FUNÇÃO PARA LISTAR ARQUIVOS TEMPORÁRIOS (DEBUG)
+exports.listTempFiles = async (req, res) => {
+  try {
+    const tempDir = path.join(__dirname, "..", "temp");
+    const files = await fs.readdir(tempDir);
+    
+    const fileDetails = await Promise.all(
+      files.map(async (file) => {
+        const filePath = path.join(tempDir, file);
+        const stats = await fs.stat(filePath);
+        return {
+          name: file,
+          size: stats.size,
+          isFile: stats.isFile(),
+          created: stats.birthtime
+        };
+      })
+    );
+
+    res.status(200).json({
+      tempDir,
+      files: fileDetails
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
   }
-  return "";
-}
-
-// ✅ PARSER DE LINHA CSV (já existe no seu código)
-function parseCsvLine(line) {
-  const result = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === "," && !inQuotes) {
-      result.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  result.push(current);
-  return result.map((val) => val.replace(/^"|"$/g, "").trim());
-}
+};
 
 // ✅ EXPORTAR OS MODELOS DISPONÍVEIS
 exports.AVAILABLE_MODELS = AVAILABLE_MODELS;
