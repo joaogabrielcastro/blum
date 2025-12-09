@@ -23,7 +23,7 @@ router.put(
   brandController.updateBrand
 );
 router.delete(
-  "/:name",
+  "/:id",
   authenticate,
   authorize("admin"),
   brandController.deleteBrand

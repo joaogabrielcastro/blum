@@ -42,40 +42,58 @@ async function fallbackTextExtraction(pdfBuffer) {
     // Item | Marca | Produto (código 8 dígitos) | Descrição | NCM | Quantidade | Preço Lista | Preço Unit. | ...
     // Exemplo: "2 B 85406001 Painel LED Tech Slim 24W ... B4051 190 10 22,08 24,23"
 
-    console.log("🔍 Procurando por códigos de 8 dígitos...");
+    console.log("🔍 Procurando por códigos de produtos...");
 
-    // Busca todos os códigos de 8 dígitos no texto (produtos)
-    const codePattern = /(\d+)\s+([A-Z])\s+(\d{8})/g;
+    // ✅ BUSCA TODOS OS CÓDIGOS DE PRODUTOS (com ou sem pontos, 7-10 dígitos)
+    // Padrão: marca B seguida de código de produto
+    const productPattern = /B\s+(\d[\d.]{5,10})\s+/g;
+    const foundCodesSet = new Set();
     let match;
+
+    while ((match = productPattern.exec(fullText)) !== null) {
+      const code = match[1].trim();
+      // Remove espaços e normaliza
+      const cleanCode = code.replace(/\s+/g, '');
+      if (cleanCode.length >= 7) {
+        foundCodesSet.add(cleanCode);
+      }
+    }
+
+    console.log(`📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`);
+
+    // Agora processa cada código encontrado
     let foundCodes = 0;
-
-    while ((match = codePattern.exec(fullText)) !== null) {
+    for (const productCode of foundCodesSet) {
       foundCodes++;
-      const itemNum = match[1];
-      const marca = match[2];
-      const productCode = match[3];
 
-      // Pega contexto ao redor do código (300 caracteres após)
-      const startPos = match.index;
-      const contextText = fullText.substring(startPos, startPos + 400);
+      // Encontra a posição do código no texto
+      const codeIndex = fullText.indexOf(productCode);
+      if (codeIndex === -1) continue;
+
+      // Pega contexto ao redor do código (100 antes e 400 depois)
+      const startPos = Math.max(0, codeIndex - 100);
+      const contextText = fullText.substring(startPos, codeIndex + 500);
 
       // Extrai descrição (texto entre código e NCM)
       let description = "";
-      const descMatch = contextText.match(/\d{8}\s+(.+?)\s+\d{5}\s+\d+/);
+      const codePos = contextText.indexOf(productCode);
+      const descPattern = new RegExp(productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+");
+      const descMatch = contextText.match(descPattern);
+      
       if (descMatch) {
         description = descMatch[1].trim();
       } else {
         // Fallback: pega texto após o código até encontrar números grandes
-        const afterCode = contextText.substring(
-          contextText.indexOf(productCode) + 8
-        );
-        description = afterCode.substring(0, 100).trim();
+        const afterCode = contextText.substring(codePos + 8);
+        const textUntilNumbers = afterCode.match(/^([^0-9]{20,})/);
+        description = textUntilNumbers ? textUntilNumbers[1].trim() : afterCode.substring(0, 100).trim();
       }
 
       // Procura quantidade e preço após o NCM
       // Padrão observado: "94051 190   10   22,08   24,23"
       // NCM + número auxiliar + espaços múltiplos + quantidade + espaços + preços
-      const pricePattern = /\d{5}\s+\d+\s+(\d+)\s+([\d,]+)\s+([\d,]+)/;
+      // ✅ PADRÃO MAIS FLEXÍVEL: aceita variações de espaçamento
+      const pricePattern = /\d{4,5}\s+\d+\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)/;
       const priceMatch = contextText.match(pricePattern);
 
       if (priceMatch) {
@@ -125,7 +143,7 @@ async function fallbackTextExtraction(pdfBuffer) {
     // Converte Map para array
     items.push(...itemsMap.values());
 
-    console.log(`✅ Fallback extraiu ${items.length} itens`);
+    console.log(`✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`);
 
     if (items.length > 0) {
       console.log("📊 Primeiros itens extraídos:");

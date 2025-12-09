@@ -247,8 +247,8 @@ const apiService = {
     });
   },
 
-  deleteBrand: async (brandName) => {
-    return apiRequest(`${API_URL}/brands/${encodeURIComponent(brandName)}`, {
+  deleteBrand: async (brandId) => {
+    return apiRequest(`${API_URL}/brands/${brandId}`, {
       method: "DELETE",
     });
   },

@@ -564,7 +564,7 @@ const PurchasesPage = () => {
           ...item,
           mappedProductId: foundProduct ? foundProduct.id : "",
           isNewProduct: !foundProduct,
-          subcode: "",
+          subcode: foundProduct ? foundProduct.subcode || "" : "", // ✅ Pega o subcódigo do produto existente
         };
       });
 

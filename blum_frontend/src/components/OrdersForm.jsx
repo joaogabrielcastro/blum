@@ -51,12 +51,17 @@ const OrdersForm = ({
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const productsResponse = await apiService.getProducts();
+        // ✅ BUSCAR TODOS OS PRODUTOS (sem paginação limitada)
+        const productsResponse = await apiService.getProducts("all", 1, 10000);
         // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
         const productsData = productsResponse?.data || productsResponse;
-        setProducts(productsData);
+        
+        // ✅ GARANTIR QUE SEMPRE SEJA UM ARRAY
+        const safeProducts = Array.isArray(productsData) ? productsData : [];
+        setProducts(safeProducts);
       } catch (error) {
         console.error("Erro ao buscar produtos:", error);
+        setProducts([]); // ✅ Em caso de erro, define array vazio
       }
     };
     fetchProducts();
@@ -77,6 +82,13 @@ const OrdersForm = ({
 
       setIsSearching(true);
       try {
+        // ✅ GARANTIR QUE PRODUCTS É ARRAY
+        if (!Array.isArray(products)) {
+          setSearchResults([]);
+          setIsSearching(false);
+          return;
+        }
+
         // ✅ BUSCA AVANÇADA: Por nome, código ou subcódigo
         const searchTerm = productSearch.toLowerCase().trim();
 

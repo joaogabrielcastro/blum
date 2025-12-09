@@ -193,15 +193,19 @@ const ProductsPage = ({ userRole }) => {
     }
   };
 
-  const handleDeleteBrand = async (brandName) => {
+  const handleDeleteBrand = async (brandId) => {
     try {
       setError(null);
-      await apiService.deleteBrand(brandName);
+      await apiService.deleteBrand(brandId);
       setConfirmDelete(null);
+      setDeleteType(null);
+      setDeleteId(null);
+      
+      // Recarregar dados após deletar
       await fetchData();
 
       // Se a Representada selecionada foi deletada, voltar para "Todas"
-      if (selectedBrand === brandName) {
+      if (selectedBrand === brandId) {
         setSelectedBrand("all");
       }
     } catch (err) {

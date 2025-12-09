@@ -52,12 +52,23 @@ exports.updateBrand = async (req, res) => {
 
 // Função para deletar marca
 exports.deleteBrand = async (req, res) => {
-  const { name } = req.params;
+  const { id } = req.params;
 
   try {
-    // Primeiro verifique se existem produtos com esta marca
+    // Buscar o nome da marca pelo ID
+    const brand = await sql`
+      SELECT name FROM brands WHERE id = ${id}
+    `;
+
+    if (brand.length === 0) {
+      return res.status(404).json({ error: "Marca não encontrada." });
+    }
+
+    const brandName = brand[0].name;
+
+    // Verificar se existem produtos com esta marca
     const productsWithBrand = await sql`
-      SELECT COUNT(*) as count FROM products WHERE brand = ${name}
+      SELECT COUNT(*) as count FROM products WHERE brand = ${brandName}
     `;
 
     if (parseInt(productsWithBrand[0].count) > 0) {
@@ -67,10 +78,10 @@ exports.deleteBrand = async (req, res) => {
       });
     }
 
-    // Depois delete a marca
+    // Deletar a marca pelo ID
     const result = await sql`
       DELETE FROM brands 
-      WHERE name = ${name}
+      WHERE id = ${id}
       RETURNING *
     `;
 

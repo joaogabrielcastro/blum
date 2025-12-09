@@ -14,10 +14,6 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
   const [pdfOrder, setPdfOrder] = useState(null);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
 
-  // DEBUG: Verificar as brands recebidas
-  console.log("DEBUG - Brands received:", brands);
-  console.log("DEBUG - Brands type:", typeof brands);
-
   // Validar e transformar brands para garantir segurança
   const safeBrands = Array.isArray(brands)
     ? brands.map((brand) => ({
