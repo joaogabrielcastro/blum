@@ -19,13 +19,13 @@ class ClientService {
     if (!id || isNaN(parseInt(id))) {
       throw new Error("ID do cliente inválido");
     }
-    
+
     const clients = await sql`SELECT * FROM clients WHERE id = ${id}`;
-    
+
     if (clients.length === 0) {
       throw new Error("Cliente não encontrado");
     }
-    
+
     return clients[0];
   }
 
@@ -45,7 +45,8 @@ class ClientService {
    * @returns {Promise<Object>} Cliente criado
    */
   async create(clientData) {
-    const { companyName, contactPerson, phone, region, cnpj, email } = clientData;
+    const { companyName, contactPerson, phone, region, cnpj, email } =
+      clientData;
 
     if (!companyName || !cnpj) {
       throw new Error("Nome da empresa e CNPJ são obrigatórios");
@@ -63,7 +64,7 @@ class ClientService {
        RETURNING *`,
       [companyName, contactPerson, phone, region, cnpj, email]
     );
-    
+
     return result[0];
   }
 
@@ -90,7 +91,7 @@ class ClientService {
        RETURNING *`,
       [companyName, contactPerson, phone, region, cnpj, id]
     );
-    
+
     return result[0];
   }
 
@@ -103,9 +104,9 @@ class ClientService {
     if (!id || isNaN(parseInt(id))) {
       throw new Error("ID do cliente inválido");
     }
-    
+
     const result = await sql`DELETE FROM clients WHERE id = ${id} RETURNING *`;
-    
+
     if (result.length === 0) {
       throw new Error("Cliente não encontrado");
     }
@@ -126,16 +127,16 @@ class ClientService {
    * @returns {Promise<Array>} Lista de clientes
    */
   async search(searchTerm) {
-    if (!searchTerm || searchTerm.trim() === '') {
+    if (!searchTerm || searchTerm.trim() === "") {
       return await this.findAll();
     }
 
     return await sql`
       SELECT * FROM clients 
       WHERE 
-        "companyName" ILIKE ${'%' + searchTerm + '%'} OR
-        "contactPerson" ILIKE ${'%' + searchTerm + '%'} OR
-        cnpj ILIKE ${'%' + searchTerm + '%'}
+        "companyName" ILIKE ${"%" + searchTerm + "%"} OR
+        "contactPerson" ILIKE ${"%" + searchTerm + "%"} OR
+        cnpj ILIKE ${"%" + searchTerm + "%"}
       ORDER BY "companyName"
     `;
   }
@@ -146,7 +147,8 @@ class ClientService {
    * @returns {Promise<boolean>}
    */
   async hasOrders(clientId) {
-    const orders = await sql`SELECT COUNT(*) as count FROM orders WHERE clientid = ${clientId}`;
+    const orders =
+      await sql`SELECT COUNT(*) as count FROM orders WHERE clientid = ${clientId}`;
     return orders[0].count > 0;
   }
 }

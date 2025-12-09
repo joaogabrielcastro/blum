@@ -14,12 +14,14 @@ const sql = neon(process.env.DATABASE_URL);
 app.use(express.json());
 
 // CORS configurado adequadamente
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3001",
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 // Rotas
 const authRoutes = require("./src/routes/authRoutes");

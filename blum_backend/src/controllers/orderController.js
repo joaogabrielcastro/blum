@@ -1,4 +1,4 @@
-const orderService = require('../services/orderService');
+const orderService = require("../services/orderService");
 
 // GET ALL - Buscar todos os pedidos
 exports.getAll = async (req, res) => {

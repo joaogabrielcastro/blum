@@ -1,4 +1,4 @@
-const clientService = require('../services/clientService');
+const clientService = require("../services/clientService");
 
 exports.getAll = async (req, res) => {
   try {
@@ -17,7 +17,11 @@ exports.getClientById = async (req, res) => {
     res.status(200).json(client);
   } catch (error) {
     console.error("Erro ao buscar cliente:", error);
-    const status = error.message.includes('inválido') || error.message.includes('não encontrado') ? 404 : 500;
+    const status =
+      error.message.includes("inválido") ||
+      error.message.includes("não encontrado")
+        ? 404
+        : 500;
     res.status(status).json({ error: error.message });
   }
 };
@@ -39,7 +43,7 @@ exports.update = async (req, res) => {
     res.status(200).json(client);
   } catch (error) {
     console.error("Erro ao atualizar cliente:", error);
-    const status = error.message.includes('não encontrado') ? 404 : 400;
+    const status = error.message.includes("não encontrado") ? 404 : 400;
     res.status(status).json({ error: error.message });
   }
 };
@@ -51,7 +55,11 @@ exports.delete = async (req, res) => {
     res.status(200).json({ message: "Cliente deletado com sucesso." });
   } catch (error) {
     console.error("Erro ao deletar cliente:", error);
-    const status = error.message.includes('inválido') || error.message.includes('não encontrado') ? 404 : 500;
+    const status =
+      error.message.includes("inválido") ||
+      error.message.includes("não encontrado")
+        ? 404
+        : 500;
     res.status(status).json({ error: error.message });
   }
 };

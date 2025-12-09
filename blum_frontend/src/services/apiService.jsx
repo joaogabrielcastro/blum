@@ -4,18 +4,18 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api/v1";
 
 // ==================== HELPER FUNCTIONS ====================
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem("token");
   return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
 const handleAuthError = (status) => {
   if (status === 401 || status === 403) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.location.href = '/';
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
   }
 };
 
@@ -24,23 +24,29 @@ const apiRequest = async (url, options = {}) => {
     ...options,
     headers: {
       ...getAuthHeaders(),
-      ...options.headers
-    }
+      ...options.headers,
+    },
   });
 
   if (!response.ok) {
     handleAuthError(response.status);
-    const error = await response.json().catch(() => ({ message: 'Erro desconhecido' }));
-    
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Erro desconhecido" }));
+
     // Se houver detalhes de validação, formata a mensagem
     if (error.details && Array.isArray(error.details)) {
-      const errorMessages = error.details.map(err => err.msg || err.message).join(', ');
-      const customError = new Error(errorMessages || error.message || `Erro: ${response.status}`);
+      const errorMessages = error.details
+        .map((err) => err.msg || err.message)
+        .join(", ");
+      const customError = new Error(
+        errorMessages || error.message || `Erro: ${response.status}`
+      );
       customError.details = error.details;
       customError.status = response.status;
       throw customError;
     }
-    
+
     const customError = new Error(error.message || `Erro: ${response.status}`);
     customError.status = response.status;
     throw customError;
@@ -60,7 +66,9 @@ export const login = async (username, password) => {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Credenciais inválidas' }));
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Credenciais inválidas" }));
     throw new Error(error.message || "Credenciais inválidas");
   }
 
@@ -138,10 +146,10 @@ const apiService = {
     if (brand !== "all") params.append("brand", brand);
     params.append("page", page);
     params.append("limit", limit);
-    
+
     return apiRequest(`${API_URL}/products?${params.toString()}`);
   },
-  
+
   createProduct: async (newProductData) => {
     return apiRequest(`${API_URL}/products`, {
       method: "POST",
@@ -163,18 +171,22 @@ const apiService = {
   },
 
   searchProducts: async (searchTerm) => {
-    if (!searchTerm || searchTerm.trim() === '') {
+    if (!searchTerm || searchTerm.trim() === "") {
       return [];
     }
-    return apiRequest(`${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`);
+    return apiRequest(
+      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`
+    );
   },
 
   findProductBySubcode: async (subcode) => {
     try {
-      const products = await apiRequest(`${API_URL}/products?subcode=${encodeURIComponent(subcode)}`);
+      const products = await apiRequest(
+        `${API_URL}/products?subcode=${encodeURIComponent(subcode)}`
+      );
       return products.length > 0 ? products[0] : null;
     } catch (error) {
-      console.error('Erro ao buscar produto por subcódigo:', error);
+      console.error("Erro ao buscar produto por subcódigo:", error);
       return null;
     }
   },
@@ -247,11 +259,11 @@ const apiService = {
 
   // ==================== PURCHASES ====================
   processPurchasePdf: async (formData) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     const response = await fetch(`${API_URL}/purchases/process-pdf`, {
       method: "POST",
       headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: formData,
     });
@@ -265,11 +277,11 @@ const apiService = {
   },
 
   processPurchaseCsv: async (formData) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     const response = await fetch(`${API_URL}/purchases/process-csv`, {
       method: "POST",
       headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: formData,
     });
@@ -281,7 +293,7 @@ const apiService = {
     }
 
     const data = await response.json();
-    
+
     if (!Array.isArray(data)) {
       throw new Error("Formato de resposta inválido da API");
     }
@@ -311,11 +323,11 @@ const apiService = {
   },
 
   importCsv: async (formData) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     const response = await fetch(`${API_URL}/purchases/import-csv`, {
       method: "POST",
       headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: formData,
     });
@@ -344,7 +356,7 @@ const apiService = {
     try {
       return await apiRequest(`${API_URL}/purchases/last-price/${productId}`);
     } catch (error) {
-      if (error.message.includes('404')) {
+      if (error.message.includes("404")) {
         return null;
       }
       throw error;
@@ -368,7 +380,9 @@ const apiService = {
 
     if (!response.ok) {
       if (response.status === 429) {
-        throw new Error("Limite de consultas excedido. Tente novamente mais tarde.");
+        throw new Error(
+          "Limite de consultas excedido. Tente novamente mais tarde."
+        );
       }
       throw new Error("CNPJ não encontrado");
     }
@@ -377,7 +391,10 @@ const apiService = {
 
     return {
       nome: data.razao_social || data.estabelecimento?.nome_fantasia || "",
-      telefone: data.estabelecimento?.telefone1 || data.estabelecimento?.telefone2 || "",
+      telefone:
+        data.estabelecimento?.telefone1 ||
+        data.estabelecimento?.telefone2 ||
+        "",
       uf: data.estabelecimento?.estado?.sigla || "",
       email: data.estabelecimento?.email || "",
     };

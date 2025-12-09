@@ -79,27 +79,33 @@ const OrdersForm = ({
       try {
         // ✅ BUSCA AVANÇADA: Por nome, código ou subcódigo
         const searchTerm = productSearch.toLowerCase().trim();
-        
-        const filtered = products.filter(product => 
-          // Filtra primeiro pela marca selecionada
-          product.brand === selectedBrand && (
+
+        const filtered = products.filter(
+          (product) =>
+            // Filtra primeiro pela marca selecionada
+            product.brand === selectedBrand &&
             // Busca por NOME
-            product.name.toLowerCase().includes(searchTerm) ||
-            // Busca por CÓDIGO DO PRODUTO
-            (product.productcode && product.productcode.toLowerCase().includes(searchTerm)) ||
-            // ✅ BUSCA POR SUBCÓDIGO
-            (product.subcode && product.subcode.toLowerCase().includes(searchTerm))
-          )
+            (product.name.toLowerCase().includes(searchTerm) ||
+              // Busca por CÓDIGO DO PRODUTO
+              (product.productcode &&
+                product.productcode.toLowerCase().includes(searchTerm)) ||
+              // ✅ BUSCA POR SUBCÓDIGO
+              (product.subcode &&
+                product.subcode.toLowerCase().includes(searchTerm)))
         );
 
         // ✅ ORDENA POR RELEVÂNCIA
         const sortedResults = filtered.sort((a, b) => {
           const aNameMatch = a.name.toLowerCase().includes(searchTerm);
           const bNameMatch = b.name.toLowerCase().includes(searchTerm);
-          const aCodeMatch = a.productcode && a.productcode.toLowerCase().includes(searchTerm);
-          const bCodeMatch = b.productcode && b.productcode.toLowerCase().includes(searchTerm);
-          const aSubcodeMatch = a.subcode && a.subcode.toLowerCase().includes(searchTerm);
-          const bSubcodeMatch = b.subcode && b.subcode.toLowerCase().includes(searchTerm);
+          const aCodeMatch =
+            a.productcode && a.productcode.toLowerCase().includes(searchTerm);
+          const bCodeMatch =
+            b.productcode && b.productcode.toLowerCase().includes(searchTerm);
+          const aSubcodeMatch =
+            a.subcode && a.subcode.toLowerCase().includes(searchTerm);
+          const bSubcodeMatch =
+            b.subcode && b.subcode.toLowerCase().includes(searchTerm);
 
           // Prioridade: subcódigo > código > nome
           if (aSubcodeMatch && !bSubcodeMatch) return -1;
@@ -108,7 +114,7 @@ const OrdersForm = ({
           if (!aCodeMatch && bCodeMatch) return 1;
           if (aNameMatch && !bNameMatch) return -1;
           if (!aNameMatch && bNameMatch) return 1;
-          
+
           return a.name.localeCompare(b.name);
         });
 
@@ -127,7 +133,7 @@ const OrdersForm = ({
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
-    
+
     // Valida quantidade contra estoque disponível
     if (field === "quantity" && newItems[index].availableStock) {
       if (value > newItems[index].availableStock) {
@@ -141,7 +147,7 @@ const OrdersForm = ({
         return;
       }
     }
-    
+
     newItems[index][field] = value;
     setItems(newItems);
   };
@@ -157,7 +163,7 @@ const OrdersForm = ({
           alert(`Produto "${product.name}" sem estoque disponível!`);
           return;
         }
-        
+
         const newItem = {
           productName: product.name,
           brand: product.brand,
@@ -236,10 +242,12 @@ const OrdersForm = ({
         );
       }
     });
-    
+
     if (stockErrors.length > 0) {
       alert(
-        `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join('\n')}\n\nPor favor, ajuste as quantidades antes de continuar.`
+        `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join(
+          "\n"
+        )}\n\nPor favor, ajuste as quantidades antes de continuar.`
       );
       return;
     }
@@ -267,19 +275,24 @@ const OrdersForm = ({
       onOrderAdded();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-      
+
       // Mostra detalhes de validação se disponíveis
-      let errorMessage = `Falha ao ${editingOrder ? 'atualizar' : 'criar'} o pedido.`;
-      
+      let errorMessage = `Falha ao ${
+        editingOrder ? "atualizar" : "criar"
+      } o pedido.`;
+
       if (error.details && Array.isArray(error.details)) {
-        const fieldErrors = error.details.map(err => 
-          `${err.path || err.param || 'Campo'}: ${err.msg || err.message}`
-        ).join('\n');
+        const fieldErrors = error.details
+          .map(
+            (err) =>
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+          )
+          .join("\n");
         errorMessage += `\n\nErros de validação:\n${fieldErrors}`;
       } else if (error.message) {
         errorMessage += `\n${error.message}`;
       }
-      
+
       alert(errorMessage);
     }
   };
@@ -370,13 +383,13 @@ const OrdersForm = ({
             <h3 className="text-xl font-semibold text-gray-800">
               Adicionar Produtos
             </h3>
-            
+
             {/* ✅ BUSCA AVANÇADA */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🔍 Buscar Produto (nome, código ou subcódigo)
               </label>
-              
+
               <div className="relative">
                 <input
                   type="text"
@@ -387,14 +400,14 @@ const OrdersForm = ({
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                   autoComplete="off"
                 />
-                
+
                 {/* ✅ INDICADOR DE CARREGAMENTO */}
                 {isSearching && (
                   <div className="absolute right-3 top-3">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                   </div>
                 )}
-                
+
                 {/* ✅ BOTÃO LIMPAR */}
                 {productSearch && !isSearching && (
                   <button
@@ -520,9 +533,7 @@ const OrdersForm = ({
                                   </span>
                                 )}
                               </div>
-                              <div title={item.brand}>
-                                {item.brand}
-                              </div>
+                              <div title={item.brand}>{item.brand}</div>
                             </div>
                           </div>
                         </td>

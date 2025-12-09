@@ -31,7 +31,7 @@ const usePurchaseLogic = () => {
 
         // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
         const productsData = productsResponse?.data || productsResponse;
-        
+
         setUserProducts(productsData);
         setBrands(brandsData);
 
@@ -95,128 +95,143 @@ const CsvImportSection = ({ purchaseLogic }) => {
 
   // ✅ Função para processar CSV (DEFINIDA ANTES DE SER USADA)
   // ✅ CORREÇÃO: Atualize a função handleCsvProcess para buscar por subcódigo
-const handleCsvProcess = async () => {
-  console.log("🔄 [DEBUG] Iniciando processamento CSV...");
-  console.log("📁 [DEBUG] Arquivo selecionado:", csvFile);
-  console.log("🏷️ [DEBUG] Brand ID selecionado:", selectedCsvBrandId);
+  const handleCsvProcess = async () => {
+    console.log("🔄 [DEBUG] Iniciando processamento CSV...");
+    console.log("📁 [DEBUG] Arquivo selecionado:", csvFile);
+    console.log("🏷️ [DEBUG] Brand ID selecionado:", selectedCsvBrandId);
 
-  if (!csvFile) {
-    setError("Por favor, selecione um arquivo CSV.");
-    return;
-  }
-
-  if (!selectedCsvBrandId) {
-    setError("Por favor, selecione uma Representada para os produtos.");
-    return;
-  }
-
-  setIsCsvProcessing(true);
-  setError(null);
-
-  try {
-    const formData = new FormData();
-    formData.append("productsCsv", csvFile);
-
-    console.log("🔄 [DEBUG] Enviando para API...");
-
-    const itemsFromAI = await apiService.processPurchaseCsv(formData);
-
-    console.log("✅ [DEBUG] Resposta da API:", itemsFromAI);
-
-    // ✅ VALIDAÇÃO CRÍTICA
-    if (!itemsFromAI || !Array.isArray(itemsFromAI)) {
-      throw new Error("Nenhum dado válido retornado do servidor");
+    if (!csvFile) {
+      setError("Por favor, selecione um arquivo CSV.");
+      return;
     }
 
-    console.log(`✅ [DEBUG] ${itemsFromAI.length} itens para verificação`);
+    if (!selectedCsvBrandId) {
+      setError("Por favor, selecione uma Representada para os produtos.");
+      return;
+    }
 
-const preMappedItems = itemsFromAI.map((item, index) => {
-  // Garantir campos mínimos
-  const safeItem = {
-    productCode: item.productCode || item.codigo || `CODE_${index + 1}`,
-    description: item.description || item.nome || `Produto ${index + 1}`,
-    quantity: Number(item.quantity || item.estoque || item.stock || 1),
-    unitPrice: Number(item.unitPrice || item.preco || item.price || 0),
-    // ✅ INICIALMENTE: subcode vazio (será preenchido se produto existir)
-    subcode: "", // ← COMEÇA VAZIO
-    ...item,
+    setIsCsvProcessing(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("productsCsv", csvFile);
+
+      console.log("🔄 [DEBUG] Enviando para API...");
+
+      const itemsFromAI = await apiService.processPurchaseCsv(formData);
+
+      console.log("✅ [DEBUG] Resposta da API:", itemsFromAI);
+
+      // ✅ VALIDAÇÃO CRÍTICA
+      if (!itemsFromAI || !Array.isArray(itemsFromAI)) {
+        throw new Error("Nenhum dado válido retornado do servidor");
+      }
+
+      console.log(`✅ [DEBUG] ${itemsFromAI.length} itens para verificação`);
+
+      const preMappedItems = itemsFromAI.map((item, index) => {
+        // Garantir campos mínimos
+        const safeItem = {
+          productCode: item.productCode || item.codigo || `CODE_${index + 1}`,
+          description: item.description || item.nome || `Produto ${index + 1}`,
+          quantity: Number(item.quantity || item.estoque || item.stock || 1),
+          unitPrice: Number(item.unitPrice || item.preco || item.price || 0),
+          // ✅ INICIALMENTE: subcode vazio (será preenchido se produto existir)
+          subcode: "", // ← COMEÇA VAZIO
+          ...item,
+        };
+
+        // ✅ BUSCA INTELIGENTE
+        let foundProduct = null;
+        let matchType = "none";
+
+        // 1. Busca por PRODUCTCODE (mais confiável)
+        if (safeItem.productCode && safeItem.productCode.trim() !== "") {
+          foundProduct = userProducts.find(
+            (p) =>
+              p.productcode &&
+              p.productcode.trim() === safeItem.productCode.trim()
+          );
+          if (foundProduct) {
+            matchType = "productcode";
+            console.log(
+              `✅ ENCONTRADO por PRODUCTCODE: ${safeItem.productCode} -> ${foundProduct.name}`
+            );
+          }
+        }
+
+        // 2. Busca por NOME (backup)
+        if (!foundProduct && safeItem.description) {
+          const searchName = safeItem.description
+            .toLowerCase()
+            .substring(0, 25);
+          foundProduct = userProducts.find(
+            (p) => p.name && p.name.toLowerCase().includes(searchName)
+          );
+          if (foundProduct) {
+            matchType = "name";
+            console.log(
+              `✅ ENCONTRADO por NOME: ${searchName} -> ${foundProduct.name}`
+            );
+          }
+        }
+
+        // ✅ CORREÇÃO CRÍTICA: SE ENCONTROU PRODUTO, USA O SUBCÓDIGO DO BANCO
+        if (foundProduct) {
+          safeItem.subcode = foundProduct.subcode || ""; // ← PEGA O SUBCÓDIGO DO BANCO
+          console.log(
+            `🎯 SUBCÓDIGO DO BANCO: "${foundProduct.subcode}" para produto ${foundProduct.name}`
+          );
+        }
+
+        return {
+          ...safeItem,
+          id: index,
+          mappedProductId: foundProduct ? foundProduct.id : "",
+          isNewProduct: !foundProduct,
+          matchType: matchType,
+          foundProductInfo: foundProduct
+            ? {
+                id: foundProduct.id,
+                name: foundProduct.name,
+                productcode: foundProduct.productcode,
+                subcode: foundProduct.subcode,
+                price: foundProduct.price,
+              }
+            : null,
+        };
+      });
+      console.log("✅ [DEBUG] Todos os itens mapeados:", preMappedItems);
+
+      if (preMappedItems.length === 0) {
+        throw new Error("Nenhum item válido encontrado no CSV");
+      }
+
+      // ✅ DEBUG: Estatísticas de match
+      const matchStats = {
+        subcode: preMappedItems.filter((item) => item.matchType === "subcode")
+          .length,
+        productcode: preMappedItems.filter(
+          (item) => item.matchType === "productcode"
+        ).length,
+        name: preMappedItems.filter((item) => item.matchType === "name").length,
+        none: preMappedItems.filter((item) => item.matchType === "none").length,
+      };
+
+      console.log("📊 Estatísticas de match:", matchStats);
+
+      setParsedCsvItems(preMappedItems);
+    } catch (err) {
+      console.error("❌ Erro no processamento CSV:", err);
+      setError(
+        err.message ||
+          "Falha ao processar o CSV. Verifique o formato do arquivo e tente novamente."
+      );
+    } finally {
+      setIsCsvProcessing(false);
+    }
   };
-
-  // ✅ BUSCA INTELIGENTE
-  let foundProduct = null;
-  let matchType = 'none';
-  
-  // 1. Busca por PRODUCTCODE (mais confiável)
-  if (safeItem.productCode && safeItem.productCode.trim() !== '') {
-    foundProduct = userProducts.find(
-      (p) => p.productcode && p.productcode.trim() === safeItem.productCode.trim()
-    );
-    if (foundProduct) {
-      matchType = 'productcode';
-      console.log(`✅ ENCONTRADO por PRODUCTCODE: ${safeItem.productCode} -> ${foundProduct.name}`);
-    }
-  }
-  
-  // 2. Busca por NOME (backup)
-  if (!foundProduct && safeItem.description) {
-    const searchName = safeItem.description.toLowerCase().substring(0, 25);
-    foundProduct = userProducts.find(
-      (p) => p.name && p.name.toLowerCase().includes(searchName)
-    );
-    if (foundProduct) {
-      matchType = 'name';
-      console.log(`✅ ENCONTRADO por NOME: ${searchName} -> ${foundProduct.name}`);
-    }
-  }
-
-  // ✅ CORREÇÃO CRÍTICA: SE ENCONTROU PRODUTO, USA O SUBCÓDIGO DO BANCO
-  if (foundProduct) {
-    safeItem.subcode = foundProduct.subcode || ""; // ← PEGA O SUBCÓDIGO DO BANCO
-    console.log(`🎯 SUBCÓDIGO DO BANCO: "${foundProduct.subcode}" para produto ${foundProduct.name}`);
-  }
-
-  return {
-    ...safeItem,
-    id: index,
-    mappedProductId: foundProduct ? foundProduct.id : "",
-    isNewProduct: !foundProduct,
-    matchType: matchType,
-    foundProductInfo: foundProduct ? {
-      id: foundProduct.id,
-      name: foundProduct.name,
-      productcode: foundProduct.productcode,
-      subcode: foundProduct.subcode, 
-      price: foundProduct.price
-    } : null
-  };
-});
-    console.log("✅ [DEBUG] Todos os itens mapeados:", preMappedItems);
-
-    if (preMappedItems.length === 0) {
-      throw new Error("Nenhum item válido encontrado no CSV");
-    }
-
-    // ✅ DEBUG: Estatísticas de match
-    const matchStats = {
-      subcode: preMappedItems.filter(item => item.matchType === 'subcode').length,
-      productcode: preMappedItems.filter(item => item.matchType === 'productcode').length,
-      name: preMappedItems.filter(item => item.matchType === 'name').length,
-      none: preMappedItems.filter(item => item.matchType === 'none').length
-    };
-    
-    console.log("📊 Estatísticas de match:", matchStats);
-
-    setParsedCsvItems(preMappedItems);
-  } catch (err) {
-    console.error("❌ Erro no processamento CSV:", err);
-    setError(
-      err.message ||
-        "Falha ao processar o CSV. Verifique o formato do arquivo e tente novamente."
-    );
-  } finally {
-    setIsCsvProcessing(false);
-  }
-};
 
   // ✅ Função para atualizar itens (igual ao PDF)
   const handleCsvItemChange = (index, field, value) => {
@@ -719,7 +734,8 @@ const PurchasesPage = () => {
                 ✅ PDF Processado com Sucesso!
               </h3>
               <p className="text-green-700">
-                {parsedItems.length} itens encontrados. Verifique e confirme os dados abaixo.
+                {parsedItems.length} itens encontrados. Verifique e confirme os
+                dados abaixo.
               </p>
             </div>
 

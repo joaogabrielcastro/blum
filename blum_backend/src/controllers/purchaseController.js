@@ -12,81 +12,88 @@ const sql = neon(process.env.DATABASE_URL);
 async function fallbackTextExtraction(pdfBuffer) {
   try {
     console.log("🔄 Usando fallback de extração de texto...");
-    
+
     // Usar pdfjs-dist para extrair texto
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
     const data = new Uint8Array(pdfBuffer);
     const loadingTask = pdfjsLib.getDocument({ data });
     const pdfDocument = await loadingTask.promise;
-    
-    let fullText = '';
-    
+
+    let fullText = "";
+
     // Extrair texto de todas as páginas
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       const page = await pdfDocument.getPage(pageNum);
       const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\n';
+      const pageText = textContent.items.map((item) => item.str).join(" ");
+      fullText += pageText + "\n";
     }
-    
-    console.log(`📝 Texto extraído (${fullText.length} caracteres):`, fullText.substring(0, 500) + "...");
+
+    console.log(
+      `📝 Texto extraído (${fullText.length} caracteres):`,
+      fullText.substring(0, 500) + "..."
+    );
 
     // Extração baseada no formato REAL do PDF Blumenau Iluminação
     const items = [];
     const itemsMap = new Map(); // Evita duplicatas
-    
+
     // Formato da tabela (conforme imagem):
     // Item | Marca | Produto (código 8 dígitos) | Descrição | NCM | Quantidade | Preço Lista | Preço Unit. | ...
     // Exemplo: "2 B 85406001 Painel LED Tech Slim 24W ... B4051 190 10 22,08 24,23"
-    
+
     console.log("🔍 Procurando por códigos de 8 dígitos...");
-    
+
     // Busca todos os códigos de 8 dígitos no texto (produtos)
     const codePattern = /(\d+)\s+([A-Z])\s+(\d{8})/g;
     let match;
     let foundCodes = 0;
-    
+
     while ((match = codePattern.exec(fullText)) !== null) {
       foundCodes++;
       const itemNum = match[1];
       const marca = match[2];
       const productCode = match[3];
-      
+
       // Pega contexto ao redor do código (300 caracteres após)
       const startPos = match.index;
       const contextText = fullText.substring(startPos, startPos + 400);
-      
+
       // Extrai descrição (texto entre código e NCM)
-      let description = '';
+      let description = "";
       const descMatch = contextText.match(/\d{8}\s+(.+?)\s+\d{5}\s+\d+/);
       if (descMatch) {
         description = descMatch[1].trim();
       } else {
         // Fallback: pega texto após o código até encontrar números grandes
-        const afterCode = contextText.substring(contextText.indexOf(productCode) + 8);
+        const afterCode = contextText.substring(
+          contextText.indexOf(productCode) + 8
+        );
         description = afterCode.substring(0, 100).trim();
       }
-      
+
       // Procura quantidade e preço após o NCM
       // Padrão observado: "94051 190   10   22,08   24,23"
       // NCM + número auxiliar + espaços múltiplos + quantidade + espaços + preços
       const pricePattern = /\d{5}\s+\d+\s+(\d+)\s+([\d,]+)\s+([\d,]+)/;
       const priceMatch = contextText.match(pricePattern);
-      
+
       if (priceMatch) {
         const quantity = parseInt(priceMatch[1]) || 1;
-        const priceListStr = priceMatch[2].replace(/\./g, '').replace(',', '.');
-        const unitPriceStr = priceMatch[3].replace(/\./g, '').replace(',', '.');
-        
+        const priceListStr = priceMatch[2].replace(/\./g, "").replace(",", ".");
+        const unitPriceStr = priceMatch[3].replace(/\./g, "").replace(",", ".");
+
         const priceList = parseFloat(priceListStr) || 0;
         const unitPrice = parseFloat(unitPriceStr) || 0;
-        
+
         // Debug dos primeiros itens
         if (foundCodes <= 3) {
-          console.log(`   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`);
+          console.log(
+            `   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`
+          );
           console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
         }
-        
+
         // Valida se os valores fazem sentido
         if (unitPrice > 0 && quantity > 0 && quantity < 10000) {
           // Usa Map para evitar duplicatas do mesmo código
@@ -100,7 +107,9 @@ async function fallbackTextExtraction(pdfBuffer) {
           }
         } else {
           if (foundCodes <= 3) {
-            console.log(`   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`);
+            console.log(
+              `   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`
+            );
           }
         }
       } else {
@@ -110,22 +119,29 @@ async function fallbackTextExtraction(pdfBuffer) {
         }
       }
     }
-    
+
     console.log(`🔍 ${foundCodes} códigos de produto encontrados no texto`);
-    
+
     // Converte Map para array
     items.push(...itemsMap.values());
 
     console.log(`✅ Fallback extraiu ${items.length} itens`);
-    
+
     if (items.length > 0) {
       console.log("📊 Primeiros itens extraídos:");
       items.slice(0, 3).forEach((item, index) => {
-        console.log(`   ${index + 1}. ${item.productCode} - ${item.description.substring(0, 50)}...`);
-        console.log(`      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`);
+        console.log(
+          `   ${index + 1}. ${item.productCode} - ${item.description.substring(
+            0,
+            50
+          )}...`
+        );
+        console.log(
+          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`
+        );
       });
     }
-    
+
     return items;
   } catch (error) {
     console.log("❌ Fallback falhou:", error.message);
@@ -146,35 +162,41 @@ exports.processPdf = async (req, res) => {
     // ✅ VALIDAÇÃO DE TAMANHO DO ARQUIVO
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     if (req.file.size > MAX_FILE_SIZE) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "Arquivo muito grande. Máximo: 10MB",
-        details: `Tamanho atual: ${(req.file.size / (1024 * 1024)).toFixed(2)}MB`
+        details: `Tamanho atual: ${(req.file.size / (1024 * 1024)).toFixed(
+          2
+        )}MB`,
       });
     }
 
     console.log("📄 Arquivo recebido:", req.file.originalname);
-    console.log("📏 Tamanho do arquivo:", (req.file.size / 1024).toFixed(2), "KB");
+    console.log(
+      "📏 Tamanho do arquivo:",
+      (req.file.size / 1024).toFixed(2),
+      "KB"
+    );
 
     // Garante que a pasta temporária exista
     await fs.mkdir(tempDir, { recursive: true });
-    
+
     // ✅ Sanitizar nome do arquivo para evitar problemas com caracteres especiais
     const timestamp = Date.now();
     const sanitizedFileName = `upload_${timestamp}.pdf`;
     const tempPdfPath = path.join(tempDir, sanitizedFileName);
     await fs.writeFile(tempPdfPath, req.file.buffer);
-    
+
     console.log("📝 Arquivo original:", req.file.originalname);
     console.log("📝 Arquivo sanitizado:", sanitizedFileName);
     console.log("📂 Caminho completo:", tempPdfPath);
-    
+
     // ✅ CORREÇÃO: Definir variáveis corretamente
     const fileBaseName = path.basename(tempPdfPath, path.extname(tempPdfPath));
     const out_path_prefix = path.join(tempDir, fileBaseName);
-    
+
     console.log("🎯 Prefixo de saída:", out_path_prefix);
     console.log("🖼️ Convertendo PDF para imagens com 'node-poppler'...");
-    
+
     let imageFiles = [];
 
     try {
@@ -184,91 +206,101 @@ exports.processPdf = async (req, res) => {
           pngFile: true,
         });
         console.log("✅ PDF convertido para imagens com Poppler.");
-        
+
         const files = await fs.readdir(tempDir);
-        imageFiles = files.filter((f) => 
-          f.includes(fileBaseName) && f.endsWith(".png")
+        imageFiles = files.filter(
+          (f) => f.includes(fileBaseName) && f.endsWith(".png")
         );
-        
+
         if (imageFiles.length === 0) {
           imageFiles = files.filter((f) => f.endsWith(".png"));
         }
-        
-        console.log(`📸 Arquivos PNG encontrados com Poppler:`, imageFiles.length);
+
+        console.log(
+          `📸 Arquivos PNG encontrados com Poppler:`,
+          imageFiles.length
+        );
       } catch (popplerError) {
         console.log("⚠️ Poppler não disponível:", popplerError.message);
         console.log("🔄 Tentando método alternativo com pdfjs-dist...");
-        
+
         // ✅ FALLBACK: Usar pdfjs-dist v2 para renderizar PDF
-        const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-        const { createCanvas, DOMMatrix } = require('canvas');
-        
+        const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+        const { createCanvas, DOMMatrix } = require("canvas");
+
         // Configurar DOMMatrix globalmente para pdfjs
         if (!globalThis.DOMMatrix) {
           globalThis.DOMMatrix = DOMMatrix;
         }
-        
+
         const data = new Uint8Array(req.file.buffer);
         const loadingTask = pdfjsLib.getDocument({ data });
         const pdfDocument = await loadingTask.promise;
-        
+
         console.log(`📄 PDF carregado: ${pdfDocument.numPages} páginas`);
-        
+
         // Renderizar cada página como PNG
         for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
           const page = await pdfDocument.getPage(pageNum);
           const viewport = page.getViewport({ scale: 2.0 });
-          
+
           const canvas = createCanvas(viewport.width, viewport.height);
-          const context = canvas.getContext('2d');
-          
+          const context = canvas.getContext("2d");
+
           await page.render({
             canvasContext: context,
-            viewport: viewport
+            viewport: viewport,
           }).promise;
-          
+
           const pngFileName = `${fileBaseName}-${pageNum}.png`;
           const pngPath = path.join(tempDir, pngFileName);
-          const buffer = canvas.toBuffer('image/png');
+          const buffer = canvas.toBuffer("image/png");
           await fs.writeFile(pngPath, buffer);
-          
+
           imageFiles.push(pngFileName);
           console.log(`✅ Página ${pageNum} renderizada: ${pngFileName}`);
         }
       }
     } catch (error) {
       console.error("❌ Erro ao processar PDF:", error);
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: "Falha ao processar PDF",
-        details: error.message
+        details: error.message,
       });
     }
 
     if (imageFiles.length === 0) {
       console.log("❌ Nenhuma imagem foi gerada.");
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: "Falha ao processar PDF",
-        details: "Não foi possível converter o PDF para imagens."
+        details: "Não foi possível converter o PDF para imagens.",
       });
     }
 
     // Ordena as imagens numericamente
     imageFiles.sort((a, b) => {
-      const numA = parseInt(a.match(/(\d+)\.png$/)?.[1] || a.match(/-(\d+)\.png$/)?.[1] || 0, 10);
-      const numB = parseInt(b.match(/(\d+)\.png$/)?.[1] || b.match(/-(\d+)\.png$/)?.[1] || 0, 10);
+      const numA = parseInt(
+        a.match(/(\d+)\.png$/)?.[1] || a.match(/-(\d+)\.png$/)?.[1] || 0,
+        10
+      );
+      const numB = parseInt(
+        b.match(/(\d+)\.png$/)?.[1] || b.match(/-(\d+)\.png$/)?.[1] || 0,
+        10
+      );
       return numA - numB;
     });
 
     console.log(`📸 ${imageFiles.length} imagens criadas do PDF`);
     console.log("🤖 Extraindo dados do PDF...");
-    
+
     // ✅ USA EXTRAÇÃO DIRETA DO TEXTO DO PDF
     const extractedItems = await fallbackTextExtraction(req.file.buffer);
-    
+
     if (!extractedItems || extractedItems.length === 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: "Não foi possível extrair itens do PDF",
-        details: "Verifique se o PDF está no formato correto da Blumenau Iluminação"
+        details:
+          "Verifique se o PDF está no formato correto da Blumenau Iluminação",
       });
     }
 
@@ -852,7 +884,11 @@ async function processCsvData(csvText, selectedBrand) {
     };
 
     // ✅ CORREÇÃO: Só adiciona se tiver código E nome
-    if (product.productCode && product.name && product.productCode.trim() !== "") {
+    if (
+      product.productCode &&
+      product.name &&
+      product.productCode.trim() !== ""
+    ) {
       products.push(product);
     }
   }
@@ -994,7 +1030,7 @@ async function importProductsToDatabase(products) {
 
 // ✅ CONTROLLER PARA FINALIZAR COMPRA DE PDF - CORRIGIDO
 exports.finalizePurchaseFromPdf = async (req, res) => {
-  const { brandId, purchaseDate ,items } = req.body;
+  const { brandId, purchaseDate, items } = req.body;
 
   console.log("📦 [PDF] Dados recebidos para finalizar compra:");
   console.log("🏷️ Brand ID:", brandId, "Tipo:", typeof brandId);
@@ -1141,7 +1177,9 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
           if (currentPrice !== price) {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${productId}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
+              VALUES (${productId}, ${price}, ${quantity}, ${
+              purchaseDate || new Date().toISOString()
+            })
             `;
             console.log(
               `📊 Histórico de preço atualizado para produto ID ${productId}`
@@ -1175,7 +1213,9 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para produto existente
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${purchaseDate || new Date().toISOString()})
+              VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${
+              purchaseDate || new Date().toISOString()
+            })
             `;
 
             console.log(
@@ -1210,7 +1250,9 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             // ✅ REGISTRA NO HISTÓRICO DE PREÇOS para novo produto
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${purchaseDate || new Date().toISOString()})
+              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
+              purchaseDate || new Date().toISOString()
+            })
             `;
 
             console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
@@ -1286,7 +1328,7 @@ exports.processCsv = async (req, res) => {
     }));
 
     console.log(`✅ CSV processado: ${parsed.length} itens com subcódigos`);
-    
+
     return res.status(200).json(parsed);
   } catch (error) {
     console.error("💥 ERRO ao processar CSV (preview):", error);
@@ -1373,7 +1415,7 @@ exports.listTempFiles = async (req, res) => {
   try {
     const tempDir = path.join(__dirname, "..", "temp");
     const files = await fs.readdir(tempDir);
-    
+
     const fileDetails = await Promise.all(
       files.map(async (file) => {
         const filePath = path.join(tempDir, file);
@@ -1382,18 +1424,18 @@ exports.listTempFiles = async (req, res) => {
           name: file,
           size: stats.size,
           isFile: stats.isFile(),
-          created: stats.birthtime
+          created: stats.birthtime,
         };
       })
     );
 
     res.status(200).json({
       tempDir,
-      files: fileDetails
+      files: fileDetails,
     });
   } catch (error) {
     res.status(500).json({
-      error: error.message
+      error: error.message,
     });
   }
 };

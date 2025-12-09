@@ -1,4 +1,10 @@
-const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => {
+const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  total,
+  limit,
+}) => {
   const startItem = (currentPage - 1) * limit + 1;
   const endItem = Math.min(currentPage * limit, total);
 
@@ -6,7 +12,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
-    
+
     if (totalPages <= maxPagesToShow) {
       // Mostra todas as páginas
       for (let i = 1; i <= totalPages; i++) {
@@ -15,14 +21,29 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
     } else {
       // Lógica para mostrar ... quando há muitas páginas
       if (currentPage <= 3) {
-        pages.push(1, 2, 3, 4, '...', totalPages);
+        pages.push(1, 2, 3, 4, "...", totalPages);
       } else if (currentPage >= totalPages - 2) {
-        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+        pages.push(
+          1,
+          "...",
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+          totalPages
+        );
       } else {
-        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+        pages.push(
+          1,
+          "...",
+          currentPage - 1,
+          currentPage,
+          currentPage + 1,
+          "...",
+          totalPages
+        );
       }
     }
-    
+
     return pages;
   };
 
@@ -32,8 +53,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-white border-t border-gray-200">
       {/* Informação de itens */}
       <div className="text-sm text-gray-700">
-        Mostrando <span className="font-medium">{startItem}</span> a{' '}
-        <span className="font-medium">{endItem}</span> de{' '}
+        Mostrando <span className="font-medium">{startItem}</span> a{" "}
+        <span className="font-medium">{endItem}</span> de{" "}
         <span className="font-medium">{total}</span> resultados
       </div>
 
@@ -45,8 +66,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
           disabled={currentPage === 1}
           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
             currentPage === 1
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
           }`}
         >
           Anterior
@@ -54,8 +75,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
 
         {/* Números de página */}
         <div className="hidden sm:flex items-center gap-1">
-          {getPageNumbers().map((page, index) => (
-            page === '...' ? (
+          {getPageNumbers().map((page, index) =>
+            page === "..." ? (
               <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
                 ...
               </span>
@@ -65,14 +86,14 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
                 onClick={() => onPageChange(page)}
                 className={`min-w-[2.5rem] px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                   currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
                 }`}
               >
                 {page}
               </button>
             )
-          ))}
+          )}
         </div>
 
         {/* Indicador mobile */}
@@ -86,8 +107,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, total, limit }) => 
           disabled={currentPage === totalPages}
           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
             currentPage === totalPages
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+              : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
           }`}
         >
           Próximo

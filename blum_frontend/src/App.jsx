@@ -28,7 +28,7 @@ const App = () => {
   const userRole = user?.role;
   const username = user?.username;
   const userId = user?.id;
-  
+
   const reps = {
     admin_1: "Admin",
     siane_1: "Siane",
@@ -64,15 +64,15 @@ const App = () => {
       id: userId,
       role: role,
       username: userData.username,
-      name: userData.name
+      name: userData.name,
     };
     setUser(userInfo);
     setCurrentPage("dashboard");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
     setUser(null);
     setCurrentPage("dashboard");
   };
@@ -97,26 +97,26 @@ const App = () => {
   // Verificar autenticação ao montar o componente
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      const savedUser = localStorage.getItem('user');
-      
+      const token = localStorage.getItem("token");
+      const savedUser = localStorage.getItem("user");
+
       if (token && savedUser) {
         try {
           // Verificar se o token ainda é válido
           await verifyToken();
           const userData = JSON.parse(savedUser);
           setUser(userData);
-          setCurrentPage('dashboard');
+          setCurrentPage("dashboard");
         } catch (error) {
-          console.error('Token inválido ou expirado:', error);
+          console.error("Token inválido ou expirado:", error);
           // Token inválido ou expirado - limpar
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
         }
       }
       setIsLoading(false);
     };
-    
+
     checkAuth();
   }, []);
 
@@ -150,7 +150,7 @@ const App = () => {
           <Dashboard
             onNavigate={setCurrentPage}
             username={username}
-            userId={username} 
+            userId={username}
             userRole={userRole}
           />
         );

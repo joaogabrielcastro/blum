@@ -29,7 +29,7 @@ class OrderService {
    */
   async calculateItemsCommission(items, discount = 0) {
     let subtotal = 0;
-    
+
     const itemsWithCommission = await Promise.all(
       items.map(async (item) => {
         const price = parseFloat(item.price) || 0;
@@ -43,7 +43,8 @@ class OrderService {
         // Aplicar desconto proporcional no cálculo da comissão
         const discountFactor = 1 - parseFloat(discount) / 100;
         const itemTotalAfterDiscount = itemTotal * discountFactor;
-        const commissionAmount = (itemTotalAfterDiscount * commissionRate) / 100;
+        const commissionAmount =
+          (itemTotalAfterDiscount * commissionRate) / 100;
 
         return {
           ...item,
@@ -67,7 +68,7 @@ class OrderService {
       subtotal,
       discountAmount,
       finalTotal,
-      totalCommission
+      totalCommission,
     };
   }
 
@@ -140,17 +141,28 @@ class OrderService {
     const { clientid, userid, description, items, discount } = orderData;
 
     // Validação
-    if (!clientid || !userid || !items || !Array.isArray(items) || items.length === 0) {
-      throw new Error("Dados incompletos. clientid, userid e items (array) são obrigatórios");
+    if (
+      !clientid ||
+      !userid ||
+      !items ||
+      !Array.isArray(items) ||
+      items.length === 0
+    ) {
+      throw new Error(
+        "Dados incompletos. clientid, userid e items (array) são obrigatórios"
+      );
     }
 
     // Verificar estoque de todos os produtos
     for (const item of items) {
       if (item.productId) {
-        const product = await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
-        
+        const product =
+          await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
+
         if (product.length === 0) {
-          throw new Error(`Produto "${item.productName || item.productId}" não encontrado`);
+          throw new Error(
+            `Produto "${item.productName || item.productId}" não encontrado`
+          );
         }
 
         const availableStock = product[0].stock;
@@ -159,7 +171,7 @@ class OrderService {
         if (requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
-            `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
+              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
           );
         }
       }
@@ -174,7 +186,9 @@ class OrderService {
       VALUES 
         (${clientid}, ${userid}, ${description || ""}, 
          ${JSON.stringify(calculated.items)}, 
-         ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission}, 
+         ${discount || 0}, ${calculated.finalTotal}, ${
+      calculated.totalCommission
+    }, 
          'Em aberto', NOW())
       RETURNING *
     `;
@@ -192,16 +206,21 @@ class OrderService {
     const { clientid, userid, description, items, discount } = orderData;
 
     if (!clientid || !userid || !items || !Array.isArray(items)) {
-      throw new Error("Dados incompletos. clientid, userid e items (array) são obrigatórios");
+      throw new Error(
+        "Dados incompletos. clientid, userid e items (array) são obrigatórios"
+      );
     }
 
     // Verificar estoque de todos os produtos
     for (const item of items) {
       if (item.productId) {
-        const product = await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
-        
+        const product =
+          await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
+
         if (product.length === 0) {
-          throw new Error(`Produto "${item.productName || item.productId}" não encontrado`);
+          throw new Error(
+            `Produto "${item.productName || item.productId}" não encontrado`
+          );
         }
 
         const availableStock = product[0].stock;
@@ -210,7 +229,7 @@ class OrderService {
         if (requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
-            `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
+              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
           );
         }
       }
@@ -271,7 +290,7 @@ class OrderService {
    */
   async delete(id) {
     const result = await sql`DELETE FROM orders WHERE id = ${id} RETURNING *`;
-    
+
     if (result.length === 0) {
       throw new Error("Pedido não encontrado");
     }

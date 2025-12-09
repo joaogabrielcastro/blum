@@ -23,7 +23,7 @@ class ReportService {
    */
   async getStats(filters = {}) {
     const { period, userRole, userId } = filters;
-    
+
     let baseQuery = `
       SELECT 
         COALESCE(COUNT(id), 0) AS "totalOrders", 
@@ -115,7 +115,7 @@ class ReportService {
       conditions.push(`o.userid = $${params.length}`);
     }
 
-    const whereClause = conditions.join(' AND ');
+    const whereClause = conditions.join(" AND ");
 
     const query = `
       SELECT 

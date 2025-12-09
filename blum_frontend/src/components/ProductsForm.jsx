@@ -4,7 +4,7 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
-    subcode: "", 
+    subcode: "",
     price: "",
     brand: "",
     stock: "",
@@ -46,8 +46,7 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!formData.productcode.trim())
       newErrors.productcode = "Código é obrigatório";
-    if (!formData.subcode.trim())
-      newErrors.subcode = "Subcódigo é obrigatório";
+    if (!formData.subcode.trim()) newErrors.subcode = "Subcódigo é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
@@ -72,7 +71,7 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
         subcode: formData.subcode.trim(), // ✅ INCLUI SUBCÓDIGO NO PAYLOAD
-        price: parseFloat(formData.price.replace(',', '.')) || 0,
+        price: parseFloat(formData.price.replace(",", ".")) || 0,
         brand: formData.brand,
         stock: parseInt(formData.stock) || 0,
         minstock: parseInt(formData.minstock) || 0,
@@ -82,24 +81,31 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
-      
+
       // Mostra detalhes de validação se disponíveis
       let errorMessage = "";
-      
+
       // Verifica se é erro de duplicação
-      if (error.message && (error.message.includes("Já existe") || error.message.includes("já está em uso"))) {
+      if (
+        error.message &&
+        (error.message.includes("Já existe") ||
+          error.message.includes("já está em uso"))
+      ) {
         errorMessage = error.message;
       } else if (error.details && Array.isArray(error.details)) {
-        const fieldErrors = error.details.map(err => 
-          `${err.path || err.param || 'Campo'}: ${err.msg || err.message}`
-        ).join('\n');
+        const fieldErrors = error.details
+          .map(
+            (err) =>
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+          )
+          .join("\n");
         errorMessage = `Erro ao salvar produto.\n\nErros:\n${fieldErrors}`;
       } else if (error.message) {
         errorMessage = `Erro ao salvar produto.\n${error.message}`;
       } else {
         errorMessage = "Erro ao salvar produto. Tente novamente.";
       }
-      
+
       alert(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -158,7 +164,9 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-gray-700 mb-2">Código do Produto:</label>
+            <label className="block text-gray-700 mb-2">
+              Código do Produto:
+            </label>
             <input
               type="text"
               name="productcode"
@@ -285,14 +293,30 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
         {/* ✅ SEÇÃO DE INFORMAÇÕES IMPORTANTES */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
           <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            <svg
+              className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
             </svg>
             <div>
-              <h4 className="text-sm font-medium text-blue-800">Informações sobre os códigos</h4>
+              <h4 className="text-sm font-medium text-blue-800">
+                Informações sobre os códigos
+              </h4>
               <ul className="text-sm text-blue-700 mt-1 space-y-1">
-                <li>• <strong>Código do Produto:</strong> Código do fabricante/fornecedor</li>
-                <li>• <strong>Subcódigo:</strong> Código único interno do seu atacado (obrigatório)</li>
+                <li>
+                  • <strong>Código do Produto:</strong> Código do
+                  fabricante/fornecedor
+                </li>
+                <li>
+                  • <strong>Subcódigo:</strong> Código único interno do seu
+                  atacado (obrigatório)
+                </li>
               </ul>
             </div>
           </div>
@@ -314,9 +338,24 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
           >
             {isSubmitting ? (
               <div className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <svg
+                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 Salvando...
               </div>

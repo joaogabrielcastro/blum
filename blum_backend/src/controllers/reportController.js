@@ -1,4 +1,4 @@
-const reportService = require('../services/reportService');
+const reportService = require("../services/reportService");
 
 // GET SALES BY REP - Vendas por representante
 exports.getSalesByRep = async (req, res) => {
@@ -6,8 +6,13 @@ exports.getSalesByRep = async (req, res) => {
     const sales = await reportService.getSalesByRep();
     res.status(200).json(sales);
   } catch (error) {
-    console.error("Erro ao gerar relatório de vendas por representante:", error);
-    res.status(500).json({ error: "Erro ao gerar relatório de vendas por representante." });
+    console.error(
+      "Erro ao gerar relatório de vendas por representante:",
+      error
+    );
+    res
+      .status(500)
+      .json({ error: "Erro ao gerar relatório de vendas por representante." });
   }
 };
 
@@ -19,7 +24,9 @@ exports.getReportStats = async (req, res) => {
     res.status(200).json(stats);
   } catch (error) {
     console.error("Erro ao buscar estatísticas do relatório:", error);
-    res.status(500).json({ error: "Erro ao buscar estatísticas do relatório." });
+    res
+      .status(500)
+      .json({ error: "Erro ao buscar estatísticas do relatório." });
   }
 };
 
@@ -27,7 +34,11 @@ exports.getReportStats = async (req, res) => {
 exports.getCommissionReport = async (req, res) => {
   try {
     const { startDate, endDate, userId } = req.query;
-    const results = await reportService.getCommissionReport({ startDate, endDate, userId });
+    const results = await reportService.getCommissionReport({
+      startDate,
+      endDate,
+      userId,
+    });
     res.status(200).json(results);
   } catch (error) {
     console.error("Erro ao gerar relatório de comissões:", error);
@@ -39,7 +50,11 @@ exports.getCommissionReport = async (req, res) => {
 exports.getCommissionByBrand = async (req, res) => {
   try {
     const { startDate, endDate, sellerId } = req.query;
-    const results = await reportService.getCommissionByBrand({ startDate, endDate, sellerId });
+    const results = await reportService.getCommissionByBrand({
+      startDate,
+      endDate,
+      sellerId,
+    });
     res.status(200).json(results);
   } catch (error) {
     console.error("Erro ao gerar relatório por marca:", error);

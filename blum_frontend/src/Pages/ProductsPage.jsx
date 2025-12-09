@@ -22,7 +22,12 @@ const ProductsPage = ({ userRole }) => {
   const [deleteType, setDeleteType] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, totalPages: 0 });
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 50,
+    totalPages: 0,
+  });
   const [currentPage, setCurrentPage] = useState(1);
 
   // ✅ VERIFICA SE É ADMIN
@@ -53,7 +58,12 @@ const ProductsPage = ({ userRole }) => {
       } else {
         // Fallback para API antiga sem paginação
         setProducts(response);
-        setPagination({ total: response.length, page: 1, limit: 50, totalPages: 1 });
+        setPagination({
+          total: response.length,
+          page: 1,
+          limit: 50,
+          totalPages: 1,
+        });
       }
 
       // Buscar Representadas apenas se necessário
@@ -158,9 +168,10 @@ const ProductsPage = ({ userRole }) => {
       setDeleteType(null);
       setDeleteId(null);
     } catch (err) {
-      const errorMessage = err.message.includes('404') || err.message.includes('não encontrado')
-        ? "Produto não encontrado. A lista será atualizada."
-        : "Erro ao excluir produto. Tente novamente.";
+      const errorMessage =
+        err.message.includes("404") || err.message.includes("não encontrado")
+          ? "Produto não encontrado. A lista será atualizada."
+          : "Erro ao excluir produto. Tente novamente.";
       setError(errorMessage);
       console.error("Erro ao excluir produto:", err);
       // Atualiza a lista mesmo com erro para remover produtos inexistentes
@@ -289,7 +300,7 @@ const ProductsPage = ({ userRole }) => {
           setDeleteType(null);
           setDeleteId(null);
         }}
-        userRole={userRole} 
+        userRole={userRole}
       />
 
       {/* ✅ LISTA DE PRODUTOS - RESPONSIVA */}
@@ -344,7 +355,10 @@ const ProductsPage = ({ userRole }) => {
             {/* Cards Mobile - Mostra apenas em mobile */}
             <div className="md:hidden divide-y divide-gray-200">
               {filteredProducts.map((product) => (
-                <div key={product.id} className="p-4 hover:bg-gray-50 transition-colors">
+                <div
+                  key={product.id}
+                  className="p-4 hover:bg-gray-50 transition-colors"
+                >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 text-sm mb-1">
@@ -359,7 +373,7 @@ const ProductsPage = ({ userRole }) => {
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-3">
                     <div className="flex gap-4">
                       <div>
@@ -375,26 +389,48 @@ const ProductsPage = ({ userRole }) => {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleEditProduct(product)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Editar"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
                         </svg>
                       </button>
-                      
+
                       {isAdmin && (
                         <button
-                          onClick={() => confirmDeleteAction("product", product.id)}
+                          onClick={() =>
+                            confirmDeleteAction("product", product.id)
+                          }
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Excluir"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </button>
                       )}

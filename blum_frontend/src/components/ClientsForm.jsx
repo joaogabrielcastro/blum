@@ -141,19 +141,24 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
       onClientAdded();
     } catch (error) {
       console.error("Erro ao salvar cliente:", error);
-      
+
       // Mostra detalhes de validação se disponíveis
-      let errorMessage = `Falha ao ${isEditing ? "atualizar" : "adicionar"} cliente.`;
-      
+      let errorMessage = `Falha ao ${
+        isEditing ? "atualizar" : "adicionar"
+      } cliente.`;
+
       if (error.details && Array.isArray(error.details)) {
-        const fieldErrors = error.details.map(err => 
-          `${err.path || err.param || 'Campo'}: ${err.msg || err.message}`
-        ).join('\n');
+        const fieldErrors = error.details
+          .map(
+            (err) =>
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+          )
+          .join("\n");
         errorMessage += `\n\nErros:\n${fieldErrors}`;
       } else if (error.message) {
         errorMessage += `\n${error.message}`;
       }
-      
+
       alert(errorMessage);
     } finally {
       setLoading(false);

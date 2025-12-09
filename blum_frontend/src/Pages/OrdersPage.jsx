@@ -19,11 +19,11 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
   console.log("DEBUG - Brands type:", typeof brands);
 
   // Validar e transformar brands para garantir segurança
-  const safeBrands = Array.isArray(brands) 
-    ? brands.map(brand => ({
+  const safeBrands = Array.isArray(brands)
+    ? brands.map((brand) => ({
         id: brand.id,
-        name: brand.name || '',
-        commission_rate: brand.commission_rate || 0
+        name: brand.name || "",
+        commission_rate: brand.commission_rate || 0,
       }))
     : [];
 
@@ -45,10 +45,10 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
 
       // Formata os pedidos usando a função importada
       const formattedOrders = ordersData.map((order) => formatOrderData(order));
-      
+
       // DEBUG: Verificar dados formatados
       console.log("DEBUG - Formatted orders:", formattedOrders);
-      
+
       setOrders(formattedOrders);
 
       const clientsMap = {};
@@ -86,9 +86,15 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         );
       }
     } catch (error) {
-      const errorMessage = error.message?.includes('404') || error.message?.includes('não encontrado')
-        ? `${type === 'delete' ? 'Pedido' : 'Pedido'} não encontrado. A lista será atualizada.`
-        : `Falha ao ${type === 'delete' ? 'excluir' : 'finalizar'} pedido. Tente novamente.`;
+      const errorMessage =
+        error.message?.includes("404") ||
+        error.message?.includes("não encontrado")
+          ? `${
+              type === "delete" ? "Pedido" : "Pedido"
+            } não encontrado. A lista será atualizada.`
+          : `Falha ao ${
+              type === "delete" ? "excluir" : "finalizar"
+            } pedido. Tente novamente.`;
       alert(errorMessage);
       // Recarrega a lista em caso de erro
       await fetchOrders();

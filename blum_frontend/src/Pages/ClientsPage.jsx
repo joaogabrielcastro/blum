@@ -95,9 +95,11 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
       setTimeout(() => setError(null), 3000);
     } catch (error) {
       console.error("Erro ao deletar cliente:", error);
-      const errorMessage = error.message?.includes('404') || error.message?.includes('não encontrado')
-        ? "Cliente não encontrado. A lista será atualizada."
-        : "Falha ao excluir cliente. Tente novamente.";
+      const errorMessage =
+        error.message?.includes("404") ||
+        error.message?.includes("não encontrado")
+          ? "Cliente não encontrado. A lista será atualizada."
+          : "Falha ao excluir cliente. Tente novamente.";
       setError({
         type: "error",
         message: errorMessage,
