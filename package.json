@@ -1,0 +1,23 @@
+{
+  "name": "blum",
+  "version": "1.0.0",
+  "description": "![Status](https://img.shields.io/badge/status-active-success.svg)\r ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)\r ![License](https://img.shields.io/badge/license-MIT-blue.svg)",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joaogabrielcastro/blum.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/joaogabrielcastro/blum/issues"
+  },
+  "homepage": "https://github.com/joaogabrielcastro/blum#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^24.10.1"
+  }
+}

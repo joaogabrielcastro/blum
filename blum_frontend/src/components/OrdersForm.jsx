@@ -51,7 +51,9 @@ const OrdersForm = ({
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const productsData = await apiService.getProducts();
+        const productsResponse = await apiService.getProducts();
+        // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
+        const productsData = productsResponse?.data || productsResponse;
         setProducts(productsData);
       } catch (error) {
         console.error("Erro ao buscar produtos:", error);
@@ -125,6 +127,21 @@ const OrdersForm = ({
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
+    
+    // Valida quantidade contra estoque disponível
+    if (field === "quantity" && newItems[index].availableStock) {
+      if (value > newItems[index].availableStock) {
+        alert(
+          `Quantidade solicitada (${value}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`
+        );
+        return; // Não permite a mudança
+      }
+      if (value < 1) {
+        alert("A quantidade deve ser no mínimo 1");
+        return;
+      }
+    }
+    
     newItems[index][field] = value;
     setItems(newItems);
   };
@@ -135,14 +152,21 @@ const OrdersForm = ({
         (item) => item.productName === product.name
       );
       if (!existingItem) {
+        // Verifica se há estoque disponível
+        if (product.stock <= 0) {
+          alert(`Produto "${product.name}" sem estoque disponível!`);
+          return;
+        }
+        
         const newItem = {
           productName: product.name,
           brand: product.brand,
           quantity: 1,
           price: product.price,
           productId: product.id,
-          productcode: product.productcode, // ✅ ADICIONA CÓDIGO
-          subcode: product.subcode, // ✅ ADICIONA SUBCÓDIGO
+          productcode: product.productcode,
+          subcode: product.subcode,
+          availableStock: product.stock, // Armazena estoque disponível
         };
         setItems((prevItems) => [...prevItems, newItem]);
       } else {
@@ -202,6 +226,24 @@ const OrdersForm = ({
       );
       return;
     }
+
+    // Valida estoque antes de submeter
+    const stockErrors = [];
+    items.forEach((item) => {
+      if (item.availableStock && item.quantity > item.availableStock) {
+        stockErrors.push(
+          `"${item.productName}": Solicitado ${item.quantity}, Disponível ${item.availableStock}`
+        );
+      }
+    });
+    
+    if (stockErrors.length > 0) {
+      alert(
+        `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join('\n')}\n\nPor favor, ajuste as quantidades antes de continuar.`
+      );
+      return;
+    }
+
     try {
       const orderData = {
         clientid: parseInt(clientId),
@@ -225,7 +267,20 @@ const OrdersForm = ({
       onOrderAdded();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-      alert("Falha ao salvar o pedido. Tente novamente.");
+      
+      // Mostra detalhes de validação se disponíveis
+      let errorMessage = `Falha ao ${editingOrder ? 'atualizar' : 'criar'} o pedido.`;
+      
+      if (error.details && Array.isArray(error.details)) {
+        const fieldErrors = error.details.map(err => 
+          `${err.path || err.param || 'Campo'}: ${err.msg || err.message}`
+        ).join('\n');
+        errorMessage += `\n\nErros de validação:\n${fieldErrors}`;
+      } else if (error.message) {
+        errorMessage += `\n${error.message}`;
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -472,19 +527,27 @@ const OrdersForm = ({
                           </div>
                         </td>
                         <td className="px-3 py-4 whitespace-nowrap">
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "quantity",
-                                parseInt(e.target.value)
-                              )
-                            }
-                            className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
+                          <div className="flex flex-col items-center gap-1">
+                            <input
+                              type="number"
+                              min="1"
+                              max={item.availableStock || undefined}
+                              value={item.quantity}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "quantity",
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            {item.availableStock && (
+                              <span className="text-xs text-gray-500">
+                                Disponível: {item.availableStock}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm text-gray-700">

@@ -3,3 +3,14 @@ blum_backend/node_modules
 cache
 blum_backend/.env
 blum_frontend/.env
+blum_frontend/build/
+blum_backend/src/temp/*
+!blum_backend/src/temp/.gitkeep
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

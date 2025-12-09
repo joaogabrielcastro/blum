@@ -9,21 +9,26 @@ import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import apiService from "./services/apiService";
+import { verifyToken } from "./services/apiService";
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
   const [currentPage, setCurrentPage] = useState("dashboard");
-  const [userRole, setUserRole] = useState(null);
-  const [username, setUsername] = useState(null);
   const [brands, setBrands] = useState([]);
   const [clients, setClients] = useState({});
   const [selectedClientId, setSelectedClientId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Estado para monitorar o status da conexão
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const userId = username;
+  // Variáveis derivadas do estado user
+  const isLoggedIn = !!user;
+  const userRole = user?.role;
+  const username = user?.username;
+  const userId = user?.id;
+  
   const reps = {
     admin_1: "Admin",
     siane_1: "Siane",
@@ -53,19 +58,23 @@ const App = () => {
     }
   };
 
-  const handleLogin = (role, user) => {
-    console.log("Login realizado:", { role, user });
-    setIsLoggedIn(true);
-    setUserRole(role);
-    setUsername(user);
+  const handleLogin = (role, userId, userData) => {
+    console.log("Login realizado:", { role, userId, userData });
+    const userInfo = {
+      id: userId,
+      role: role,
+      username: userData.username,
+      name: userData.name
+    };
+    setUser(userInfo);
     setCurrentPage("dashboard");
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserRole(null);
-    setUsername(null);
-    setCurrentPage("login");
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setCurrentPage("dashboard");
   };
 
   // Função para navegar para o histórico de um cliente
@@ -84,6 +93,32 @@ const App = () => {
     setCurrentPage("clients");
     setSelectedClientId(null);
   };
+
+  // Verificar autenticação ao montar o componente
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      const savedUser = localStorage.getItem('user');
+      
+      if (token && savedUser) {
+        try {
+          // Verificar se o token ainda é válido
+          await verifyToken();
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          setCurrentPage('dashboard');
+        } catch (error) {
+          console.error('Token inválido ou expirado:', error);
+          // Token inválido ou expirado - limpar
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      }
+      setIsLoading(false);
+    };
+    
+    checkAuth();
+  }, []);
 
   // Monitorar status da conexão
   useEffect(() => {
@@ -164,6 +199,18 @@ const App = () => {
         return <Dashboard onNavigate={setCurrentPage} username={username} />;
     }
   };
+
+  // Mostrar loading enquanto verifica autenticação
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans text-gray-800 antialiased bg-gray-50">

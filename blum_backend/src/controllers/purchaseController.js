@@ -8,166 +8,124 @@ require("dotenv").config();
 
 const sql = neon(process.env.DATABASE_URL);
 
-// ✅ MODELOS DISPONÍVEIS PARA TESTE
-const AVAILABLE_MODELS = ["gemini-2.0-flash-exp", "gemini-2.0-flash"];
-
-// Função para converter o buffer de imagem para base64
-async function fileToGenerativePart(filePath, mimeType) {
-  const data = await fs.readFile(filePath);
-  return {
-    inlineData: {
-      data: data.toString("base64"),
-      mimeType,
-    },
-  };
-}
-
-// ✅ FUNÇÃO OTIMIZADA PARA CHAMAR A API (COM MULTIPLOS MODELOS)
-async function callGeminiAPI(promptText, imageParts) {
-  console.log("🔗 Conectando à API Gemini (Modo Multimodal)...");
-
-  for (const modelName of AVAILABLE_MODELS) {
-    try {
-      console.log(`🧪 Tentando modelo: ${modelName}`);
-
-      const API_URL = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-      const requestBody = {
-        contents: [
-          {
-            parts: [{ text: promptText }, ...imageParts],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-        },
-      };
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (response.status === 404) {
-          console.log(`❌ ${modelName} não disponível`);
-          continue; // Tenta próximo modelo
-        }
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (!data.candidates?.[0]?.content) {
-        throw new Error("Resposta da API em formato inesperado");
-      }
-
-      console.log(`✅ Sucesso com modelo: ${modelName}`);
-
-      return {
-        text: data.candidates[0].content.parts[0].text,
-        modelUsed: modelName,
-      };
-    } catch (error) {
-      console.log(`❌ ${modelName} falhou: ${error.message}`);
-      // Continua para o próximo modelo
-    }
-  }
-
-  throw new Error(
-    "Nenhum dos modelos disponíveis funcionou. Verifique sua chave API."
-  );
-}
-
-// ✅ FUNÇÃO AUXILIAR PARA EXTRAIR MARCA DA DESCRIÇÃO
-function extractBrandFromDescription(description) {
-  if (!description) return "BLUMENAU";
-
-  // Se a descrição contém "B" no início (como nos exemplos), usa BLUMENAU
-  if (description.includes("B") && /^[A-Z]\d/.test(description)) {
-    return "BLUMENAU";
-  }
-
-  // Você pode adicionar mais lógicas aqui baseado nos seus fornecedores
-  const brandKeywords = {
-    BLUMENAU: ["blumenau", "blu"],
-    OUTRA_MARCA: ["outra", "marca"],
-  };
-
-  const descLower = description.toLowerCase();
-  for (const [brand, keywords] of Object.entries(brandKeywords)) {
-    if (keywords.some((keyword) => descLower.includes(keyword))) {
-      return brand;
-    }
-  }
-
-  return "BLUMENAU"; // Padrão
-}
-
-// ✅ FUNÇÃO DE FALLBACK PARA EXTRAÇÃO DE TEXTO - CORRIGIDA
+// ✅ FUNÇÃO DE EXTRAÇÃO DE TEXTO DO PDF
 async function fallbackTextExtraction(pdfBuffer) {
   try {
-    // ✅ CORREÇÃO: Importar pdf-parse corretamente
-    const pdf = require("pdf-parse");
-    const data = await pdf(pdfBuffer);
-
     console.log("🔄 Usando fallback de extração de texto...");
-    const text = data.text;
-    console.log(`📝 Texto extraído (${text.length} caracteres):`, text.substring(0, 500) + "...");
+    
+    // Usar pdfjs-dist para extrair texto
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    const data = new Uint8Array(pdfBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data });
+    const pdfDocument = await loadingTask.promise;
+    
+    let fullText = '';
+    
+    // Extrair texto de todas as páginas
+    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      const page = await pdfDocument.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    console.log(`📝 Texto extraído (${fullText.length} caracteres):`, fullText.substring(0, 500) + "...");
 
-    // Lógica de extração por regex baseada na estrutura do seu PDF
+    // Extração baseada no formato REAL do PDF Blumenau Iluminação
     const items = [];
-    const lines = text.split("\n");
-
-    let inItemsSection = false;
-
-    for (const line of lines) {
-      // Detecta início da seção de itens
-      if (line.includes("ITENS") || line.match(/\|\s*Item\s*\|/)) {
-        inItemsSection = true;
-        continue;
+    const itemsMap = new Map(); // Evita duplicatas
+    
+    // Formato da tabela (conforme imagem):
+    // Item | Marca | Produto (código 8 dígitos) | Descrição | NCM | Quantidade | Preço Lista | Preço Unit. | ...
+    // Exemplo: "2 B 85406001 Painel LED Tech Slim 24W ... B4051 190 10 22,08 24,23"
+    
+    console.log("🔍 Procurando por códigos de 8 dígitos...");
+    
+    // Busca todos os códigos de 8 dígitos no texto (produtos)
+    const codePattern = /(\d+)\s+([A-Z])\s+(\d{8})/g;
+    let match;
+    let foundCodes = 0;
+    
+    while ((match = codePattern.exec(fullText)) !== null) {
+      foundCodes++;
+      const itemNum = match[1];
+      const marca = match[2];
+      const productCode = match[3];
+      
+      // Pega contexto ao redor do código (300 caracteres após)
+      const startPos = match.index;
+      const contextText = fullText.substring(startPos, startPos + 400);
+      
+      // Extrai descrição (texto entre código e NCM)
+      let description = '';
+      const descMatch = contextText.match(/\d{8}\s+(.+?)\s+\d{5}\s+\d+/);
+      if (descMatch) {
+        description = descMatch[1].trim();
+      } else {
+        // Fallback: pega texto após o código até encontrar números grandes
+        const afterCode = contextText.substring(contextText.indexOf(productCode) + 8);
+        description = afterCode.substring(0, 100).trim();
       }
-
-      // Detecta fim da seção de itens
-      if (line.includes("ENDEREÇO DE ENTREGA") || line.includes("TOTAIS")) {
-        inItemsSection = false;
-        continue;
-      }
-
-      if (inItemsSection) {
-        // Procura por padrões de linha de produto (ajuste conforme necessário)
-        const productMatch = line.match(
-          /\|\s*(\d+)\s*\|\s*[A-Z]?\s*\|\s*(\d+)\s*\|/
-        );
-        if (productMatch) {
-          const itemNumber = productMatch[1];
-          const productCode = productMatch[2];
-
-          // Tenta extrair descrição e preço (lógica básica)
-          const parts = line.split("|").filter((part) => part.trim());
-          if (parts.length >= 6) {
-            const description = parts[3]?.trim() || "";
-            const quantity = parseInt(parts[4]?.trim()) || 0;
-            const unitPrice =
-              parseFloat(parts[5]?.trim().replace(",", ".")) || 0;
-
-            if (productCode && description && quantity > 0) {
-              items.push({
-                productCode: productCode,
-                description: description,
-                quantity: quantity,
-                unitPrice: unitPrice,
-              });
-            }
+      
+      // Procura quantidade e preço após o NCM
+      // Padrão observado: "94051 190   10   22,08   24,23"
+      // NCM + número auxiliar + espaços múltiplos + quantidade + espaços + preços
+      const pricePattern = /\d{5}\s+\d+\s+(\d+)\s+([\d,]+)\s+([\d,]+)/;
+      const priceMatch = contextText.match(pricePattern);
+      
+      if (priceMatch) {
+        const quantity = parseInt(priceMatch[1]) || 1;
+        const priceListStr = priceMatch[2].replace(/\./g, '').replace(',', '.');
+        const unitPriceStr = priceMatch[3].replace(/\./g, '').replace(',', '.');
+        
+        const priceList = parseFloat(priceListStr) || 0;
+        const unitPrice = parseFloat(unitPriceStr) || 0;
+        
+        // Debug dos primeiros itens
+        if (foundCodes <= 3) {
+          console.log(`   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`);
+          console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
+        }
+        
+        // Valida se os valores fazem sentido
+        if (unitPrice > 0 && quantity > 0 && quantity < 10000) {
+          // Usa Map para evitar duplicatas do mesmo código
+          if (!itemsMap.has(productCode)) {
+            itemsMap.set(productCode, {
+              productCode: productCode,
+              description: description.substring(0, 200),
+              quantity: quantity,
+              unitPrice: unitPrice,
+            });
           }
+        } else {
+          if (foundCodes <= 3) {
+            console.log(`   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`);
+          }
+        }
+      } else {
+        if (foundCodes <= 3) {
+          console.log(`   ⚠️ Sem match de preço para código ${productCode}`);
+          console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
         }
       }
     }
+    
+    console.log(`🔍 ${foundCodes} códigos de produto encontrados no texto`);
+    
+    // Converte Map para array
+    items.push(...itemsMap.values());
 
     console.log(`✅ Fallback extraiu ${items.length} itens`);
+    
+    if (items.length > 0) {
+      console.log("📊 Primeiros itens extraídos:");
+      items.slice(0, 3).forEach((item, index) => {
+        console.log(`   ${index + 1}. ${item.productCode} - ${item.description.substring(0, 50)}...`);
+        console.log(`      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`);
+      });
+    }
+    
     return items;
   } catch (error) {
     console.log("❌ Fallback falhou:", error.message);
@@ -199,52 +157,99 @@ exports.processPdf = async (req, res) => {
 
     // Garante que a pasta temporária exista
     await fs.mkdir(tempDir, { recursive: true });
-    const tempPdfPath = path.join(tempDir, req.file.originalname);
+    
+    // ✅ Sanitizar nome do arquivo para evitar problemas com caracteres especiais
+    const timestamp = Date.now();
+    const sanitizedFileName = `upload_${timestamp}.pdf`;
+    const tempPdfPath = path.join(tempDir, sanitizedFileName);
     await fs.writeFile(tempPdfPath, req.file.buffer);
+    
+    console.log("📝 Arquivo original:", req.file.originalname);
+    console.log("📝 Arquivo sanitizado:", sanitizedFileName);
+    console.log("📂 Caminho completo:", tempPdfPath);
     
     // ✅ CORREÇÃO: Definir variáveis corretamente
     const fileBaseName = path.basename(tempPdfPath, path.extname(tempPdfPath));
     const out_path_prefix = path.join(tempDir, fileBaseName);
-
+    
+    console.log("🎯 Prefixo de saída:", out_path_prefix);
     console.log("🖼️ Convertendo PDF para imagens com 'node-poppler'...");
     
-    let conversionSuccess = false;
     let imageFiles = [];
 
     try {
-      // ✅ TENTATIVA 1: Conversão simples sem opções problemáticas
-      await poppler.pdfToCairo(tempPdfPath, out_path_prefix, {
-        pngFile: true,
-      });
-      console.log("✅ PDF convertido para imagens com sucesso.");
-      conversionSuccess = true;
-    } catch (conversionError) {
-      console.log("❌ Falha na conversão com pdfToCairo:", conversionError.message);
-    }
-
-    // ✅ VERIFICAR SE AS IMAGENS FORAM GERADAS
-    if (conversionSuccess) {
-      const files = await fs.readdir(tempDir);
-      
-      // ✅ CORREÇÃO: Buscar arquivos PNG de forma mais flexível
-      imageFiles = files.filter((f) => 
-        f.includes(fileBaseName) && f.endsWith(".png")
-      );
-      
-      // ✅ Tentar também arquivos com numeração diferente
-      if (imageFiles.length === 0) {
-        imageFiles = files.filter((f) => f.endsWith(".png"));
-        console.log(`🔍 Procurando qualquer arquivo PNG: ${imageFiles.length} encontrados`);
+      // ✅ TENTATIVA 1: Conversão com Poppler
+      try {
+        await poppler.pdfToCairo(tempPdfPath, out_path_prefix, {
+          pngFile: true,
+        });
+        console.log("✅ PDF convertido para imagens com Poppler.");
+        
+        const files = await fs.readdir(tempDir);
+        imageFiles = files.filter((f) => 
+          f.includes(fileBaseName) && f.endsWith(".png")
+        );
+        
+        if (imageFiles.length === 0) {
+          imageFiles = files.filter((f) => f.endsWith(".png"));
+        }
+        
+        console.log(`📸 Arquivos PNG encontrados com Poppler:`, imageFiles.length);
+      } catch (popplerError) {
+        console.log("⚠️ Poppler não disponível:", popplerError.message);
+        console.log("🔄 Tentando método alternativo com pdfjs-dist...");
+        
+        // ✅ FALLBACK: Usar pdfjs-dist v2 para renderizar PDF
+        const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+        const { createCanvas, DOMMatrix } = require('canvas');
+        
+        // Configurar DOMMatrix globalmente para pdfjs
+        if (!globalThis.DOMMatrix) {
+          globalThis.DOMMatrix = DOMMatrix;
+        }
+        
+        const data = new Uint8Array(req.file.buffer);
+        const loadingTask = pdfjsLib.getDocument({ data });
+        const pdfDocument = await loadingTask.promise;
+        
+        console.log(`📄 PDF carregado: ${pdfDocument.numPages} páginas`);
+        
+        // Renderizar cada página como PNG
+        for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+          const page = await pdfDocument.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          
+          const canvas = createCanvas(viewport.width, viewport.height);
+          const context = canvas.getContext('2d');
+          
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+          
+          const pngFileName = `${fileBaseName}-${pageNum}.png`;
+          const pngPath = path.join(tempDir, pngFileName);
+          const buffer = canvas.toBuffer('image/png');
+          await fs.writeFile(pngPath, buffer);
+          
+          imageFiles.push(pngFileName);
+          console.log(`✅ Página ${pageNum} renderizada: ${pngFileName}`);
+        }
       }
-
-      console.log(`📸 Arquivos PNG encontrados:`, imageFiles);
+    } catch (error) {
+      console.error("❌ Erro ao processar PDF:", error);
+      return res.status(500).json({ 
+        error: "Falha ao processar PDF",
+        details: error.message
+      });
     }
 
-    // Se não gerou imagens, usar fallback
     if (imageFiles.length === 0) {
-      console.log("❌ Nenhuma imagem foi gerada, usando fallback...");
-      const fallbackData = await fallbackTextExtraction(req.file.buffer);
-      return res.status(200).json(fallbackData);
+      console.log("❌ Nenhuma imagem foi gerada.");
+      return res.status(500).json({ 
+        error: "Falha ao processar PDF",
+        details: "Não foi possível converter o PDF para imagens."
+      });
     }
 
     // Ordena as imagens numericamente
@@ -254,98 +259,25 @@ exports.processPdf = async (req, res) => {
       return numA - numB;
     });
 
-    console.log(`📸 ${imageFiles.length} imagens para processar:`, imageFiles);
-
-    const imageParts = [];
-    for (const file of imageFiles) {
-      try {
-        const imagePath = path.join(tempDir, file);
-        // ✅ VERIFICAR se o arquivo existe e tem tamanho > 0
-        const stats = await fs.stat(imagePath);
-        if (stats.size > 0) {
-          imageParts.push(
-            await fileToGenerativePart(imagePath, "image/png")
-          );
-          console.log(`✅ Imagem ${file} carregada: ${stats.size} bytes`);
-        } else {
-          console.log(`⚠️ Imagem ${file} está vazia, ignorando...`);
-        }
-      } catch (imageError) {
-        console.log(`⚠️ Erro ao processar imagem ${file}:`, imageError.message);
-      }
+    console.log(`📸 ${imageFiles.length} imagens criadas do PDF`);
+    console.log("🤖 Extraindo dados do PDF...");
+    
+    // ✅ USA EXTRAÇÃO DIRETA DO TEXTO DO PDF
+    const extractedItems = await fallbackTextExtraction(req.file.buffer);
+    
+    if (!extractedItems || extractedItems.length === 0) {
+      return res.status(400).json({ 
+        error: "Não foi possível extrair itens do PDF",
+        details: "Verifique se o PDF está no formato correto da Blumenau Iluminação"
+      });
     }
 
-    if (imageParts.length === 0) {
-      console.log("❌ Nenhuma imagem válida foi carregada, usando fallback...");
-      const fallbackData = await fallbackTextExtraction(req.file.buffer);
-      return res.status(200).json(fallbackData);
-    }
+    console.log(`📝 ${extractedItems.length} itens extraídos com sucesso`);
 
-    console.log(`📦 ${imageParts.length} imagens preparadas para a API.`);
-
-    // ✅ PROMPT CORRIGIDO - AGORA EXTRAI O PREÇO COM IPI
-    const prompt = `
-Você é um especialista em extrair dados de tabelas de orçamentos em PDF.
-
-ANALISE AS IMAGENS E EXTRAIA TODOS OS ITENS DA TABELA DE "ITENS" OU "PRODUTOS".
-
-PARA CADA LINHA DA TABELA, extraia estas 4 informações EXATAS:
-1. "productCode": Código do produto (coluna "Produto")
-2. "description": Descrição completa (coluna "Descrição") 
-3. "quantity": Quantidade (coluna "Quant. Solíc." ou similar)
-4. "unitPrice": Preço unitário líquido + IPI (coluna "Preço Unit. Liq. + IPI" ou similar)
-
-⚠️ ATENÇÃO CRÍTICA:
-- Use SEMPRE o preço unitário líquido + IPI (NÃO use o preço líquido sem IPI)
-- Procure pela coluna "Preço Unit. Liq. + IPI" ou "Preço Final Unit. com IPI + ST"
-- Se houver "Preço Unit. Liq." e "Preço Unit. Liq. + IPI", use sempre o SEGUNDO (com IPI)
-
-REGRA IMPORTANTES:
-- IGNORE cabeçalhos, totais e linha que não sejam produtos
-- Converta vírgulas em pontos para números decimais (ex: 8,01 → 8.01)
-- Para quantity, use números inteiros
-- Para unitPrice, use números decimais
-- Inclua TODOS os itens de TODAS as páginas
-- Foque apenas na tabela principal de produtos
-
-ESTRUTURA ESPERADA DO JSON:
-[
-  {
-    "productCode": "0324000",
-    "description": "Lamp E27 2W/BI-Volt – Vela Chama 2 400K Flam. LED",
-    "quantity": 10,
-    "unitPrice": 8.01  // ✅ AGORA COM IPI
-  }
-]
-
-Retorne APENAS o array JSON válido, sem markdown, sem texto adicional, sem explicações.
-`;
-
-    console.log("🤖 Enviando prompt e imagens para IA...");
-    const result = await callGeminiAPI(prompt, imageParts);
-    const aiText = result.text;
-    const modelUsed = result.modelUsed;
-
-    console.log("📝 Resposta recebida do modelo:", modelUsed);
-
-    // 4. Processa a resposta da IA
+    // 4. Processa os dados extraídos
     let parsedData;
     try {
-      // Limpeza agressiva do texto
-      let cleanedText = aiText
-        .trim()
-        .replace(/```json\s*/g, "")
-        .replace(/```\s*/g, "")
-        .replace(/^[^[]*/, "")
-        .replace(/[^\]]*$/, "")
-        .trim();
-
-      console.log(
-        "📋 Texto limpo para parse:",
-        cleanedText.substring(0, 200) + "..."
-      );
-
-      parsedData = JSON.parse(cleanedText);
+      parsedData = extractedItems;
 
       // Validação dos dados extraídos
       if (!Array.isArray(parsedData)) {
@@ -721,27 +653,20 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
   }
 };
 
-// ✅ ROTA DE TESTE DE CONEXÃO ATUALIZADA
+// ✅ ROTA DE TESTE DE CONEXÃO (Simplificada - APIs removidas)
 exports.testConnection = async (req, res) => {
   try {
-    console.log("🧪 Testando conexão com modelos disponíveis...");
-    console.log("📋 Modelos disponíveis:", AVAILABLE_MODELS);
-
-    const testPrompt = "Responda apenas com a palavra 'CONECTADO'";
-    const result = await callGeminiAPI(testPrompt, []); // Sem imagens para teste simples
+    console.log("🧪 Testando extração de texto do PDF...");
 
     res.status(200).json({
       success: true,
-      message: "Conexão estabelecida com sucesso!",
-      modelUsed: result.modelUsed,
-      availableModels: AVAILABLE_MODELS,
-      response: result.text,
+      message: "Backend funcionando. Usando extração de texto por regex.",
+      method: "fallback-text-extraction",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message,
-      availableModels: AVAILABLE_MODELS,
     });
   }
 };
@@ -767,14 +692,13 @@ exports.debugPdf = async (req, res) => {
         data.text.includes("Quant. Solíc") || data.text.includes("Quant"),
       hasPrice: data.text.includes("Preço Unit. Liq"),
       sampleText: data.text.substring(0, 1500),
-      availableModels: AVAILABLE_MODELS,
+      method: "fallback-text-extraction",
     };
 
     res.status(200).json(analysis);
   } catch (error) {
     res.status(500).json({
       error: error.message,
-      availableModels: AVAILABLE_MODELS,
     });
   }
 };
@@ -1474,5 +1398,4 @@ exports.listTempFiles = async (req, res) => {
   }
 };
 
-// ✅ EXPORTAR OS MODELOS DISPONÍVEIS
-exports.AVAILABLE_MODELS = AVAILABLE_MODELS;
+// ✅ APIs removidas - usando apenas extração de texto por regex

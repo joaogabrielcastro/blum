@@ -1,113 +1,58 @@
-// clientController.js - Certifique-se de que todas as funções estão exportadas
-const { neon } = require("@neondatabase/serverless");
-const sql = neon(process.env.DATABASE_URL);
+const clientService = require('../services/clientService');
 
-// Get all clients
 exports.getAll = async (req, res) => {
   try {
-    const clients = await sql`SELECT * FROM clients ORDER BY "createdAt" DESC`;
+    const clients = await clientService.findAll();
     res.status(200).json(clients);
   } catch (error) {
     console.error("Erro ao buscar clientes:", error);
-    res.status(500).json({ error: "Erro ao buscar clientes." });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Get client by ID
 exports.getClientById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({ error: "ID do cliente inválido." });
-    }
-    
-    const clients = await sql`SELECT * FROM clients WHERE id = ${id}`;
-    
-    if (clients.length === 0) {
-      return res.status(404).json({ error: "Cliente não encontrado." });
-    }
-    
-    res.status(200).json(clients[0]);
+    const client = await clientService.findById(id);
+    res.status(200).json(client);
   } catch (error) {
     console.error("Erro ao buscar cliente:", error);
-    res.status(500).json({ error: "Erro ao buscar cliente." });
+    const status = error.message.includes('inválido') || error.message.includes('não encontrado') ? 404 : 500;
+    res.status(status).json({ error: error.message });
   }
 };
 
-// Create client
 exports.create = async (req, res) => {
-  // 1. Adicione 'email' aqui
-  const { companyName, contactPerson, phone, region, cnpj, email } = req.body;
-
-  if (!companyName || !cnpj) {
-    return res.status(400).json({ error: "Nome da empresa e CNPJ são obrigatórios." });
-  }
-
   try {
-    const result = await sql(
-      // 2. Adicione a coluna "email" e o placeholder $6
-      `INSERT INTO clients ("companyName", "contactPerson", phone, region, cnpj, "email", "createdAt")
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING *`,
-      // 3. Adicione a variável 'email' na lista
-      [companyName, contactPerson, phone, region, cnpj, email]
-    );
-    res.status(201).json(result[0]);
+    const client = await clientService.create(req.body);
+    res.status(201).json(client);
   } catch (error) {
     console.error("Erro ao criar cliente:", error);
-    res.status(500).json({ error: "Erro ao criar cliente." });
+    res.status(400).json({ error: error.message });
   }
 };
 
-// Update client
 exports.update = async (req, res) => {
-  const { id } = req.params;
-  const { companyName, contactPerson, phone, region, cnpj } = req.body;
-
-  if (!companyName) {
-    return res.status(400).json({ error: "Nome da empresa é obrigatório." });
-  }
-
   try {
-    const result = await sql(
-      `UPDATE clients 
-       SET "companyName" = $1, "contactPerson" = $2, phone = $3, region = $4, cnpj = $5
-       WHERE id = $6
-       RETURNING *`,
-      [companyName, contactPerson, phone, region, cnpj, id]
-    );
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: "Cliente não encontrado." });
-    }
-
-    res.status(200).json(result[0]);
+    const { id } = req.params;
+    const client = await clientService.update(id, req.body);
+    res.status(200).json(client);
   } catch (error) {
     console.error("Erro ao atualizar cliente:", error);
-    res.status(500).json({ error: "Erro ao atualizar cliente." });
+    const status = error.message.includes('não encontrado') ? 404 : 400;
+    res.status(status).json({ error: error.message });
   }
 };
 
-// Delete client - ESTA FUNÇÃO ESTAVA FALTANDO
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    if (!id || isNaN(parseInt(id))) {
-      return res.status(400).json({ error: "ID do cliente inválido." });
-    }
-    
-    const result = await sql`DELETE FROM clients WHERE id = ${id} RETURNING *`;
-    
-    if (result.length === 0) {
-      return res.status(404).json({ error: "Cliente não encontrado." });
-    }
-    
+    await clientService.delete(id);
     res.status(200).json({ message: "Cliente deletado com sucesso." });
   } catch (error) {
     console.error("Erro ao deletar cliente:", error);
-    res.status(500).json({ error: "Erro ao deletar cliente." });
+    const status = error.message.includes('inválido') || error.message.includes('não encontrado') ? 404 : 500;
+    res.status(status).json({ error: error.message });
   }
 };
 

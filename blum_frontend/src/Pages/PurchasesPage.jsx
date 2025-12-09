@@ -24,11 +24,14 @@ const usePurchaseLogic = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const [productsData, brandsData] = await Promise.all([
+        const [productsResponse, brandsData] = await Promise.all([
           apiService.getProducts(),
           apiService.getBrands(),
         ]);
 
+        // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
+        const productsData = productsResponse?.data || productsResponse;
+        
         setUserProducts(productsData);
         setBrands(brandsData);
 
@@ -328,7 +331,8 @@ const preMappedItems = itemsFromAI.map((item, index) => {
       setCsvFile(null);
 
       // Recarrega produtos
-      const updatedProducts = await apiService.getProducts();
+      const productsResponse = await apiService.getProducts();
+      const updatedProducts = productsResponse?.data || productsResponse;
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao confirmar importação CSV:", err);
@@ -404,19 +408,6 @@ const preMappedItems = itemsFromAI.map((item, index) => {
   // ✅ Renderização condicional igual ao PDF
   return (
     <>
-      {/* Debug visual temporário */}
-      {parsedCsvItems.length > 0 && (
-        <div className="fixed top-4 right-4 bg-green-100 border border-green-400 p-3 rounded-lg z-50 shadow-lg">
-          <div className="text-sm font-mono">
-            <div>✅ CSV Processado!</div>
-            <div>
-              📊 Itens: <strong>{parsedCsvItems.length}</strong>
-            </div>
-            <div>🎯 Mostrando Tabela</div>
-          </div>
-        </div>
-      )}
-
       {parsedCsvItems.length === 0 ? (
         // ✅ TELA DE UPLOAD (igual ao PDF)
         <UploadSection
@@ -669,7 +660,8 @@ const PurchasesPage = () => {
       setSelectedFile(null);
 
       // Recarrega produtos
-      const updatedProducts = await apiService.getProducts();
+      const productsResponse = await apiService.getProducts();
+      const updatedProducts = productsResponse?.data || productsResponse;
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao processar PDF:", err);
@@ -721,6 +713,16 @@ const PurchasesPage = () => {
           />
         ) : (
           <>
+            {/* ✅ MENSAGEM DE SUCESSO VERDE - IGUAL AO CSV */}
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
+              <h3 className="text-green-800 font-bold text-lg">
+                ✅ PDF Processado com Sucesso!
+              </h3>
+              <p className="text-green-700">
+                {parsedItems.length} itens encontrados. Verifique e confirme os dados abaixo.
+              </p>
+            </div>
+
             <PurchaseDateSection
               date={purchaseDate}
               onDateChange={setPurchaseDate}

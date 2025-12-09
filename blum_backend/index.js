@@ -12,15 +12,27 @@ const sql = neon(process.env.DATABASE_URL);
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+
+// CORS configurado adequadamente
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Rotas
+const authRoutes = require("./src/routes/authRoutes");
 const clientRoutes = require("./src/routes/clientRoutes");
 const productRoutes = require("./src/routes/productRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
 const reportRoutes = require("./src/routes/reportRoutes");
 const brandRoutes = require("./src/routes/brandRoutes");
 
+// Rota de autenticação (pública)
+app.use("/api/v1/auth", authRoutes);
+
+// Rotas protegidas (serão configuradas com middleware posteriormente)
 app.use("/api/v1/clients", clientRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/orders", orderRoutes);
@@ -49,6 +61,30 @@ const setupDatabase = async () => {
     await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, clientid INTEGER REFERENCES clients(id) ON DELETE CASCADE, userid VARCHAR(255) NOT NULL, items JSONB, totalprice DECIMAL(10,2) NOT NULL, status VARCHAR(50) DEFAULT 'Em aberto', description TEXT, createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, finishedat TIMESTAMP WITH TIME ZONE)`;
 
     await sql`CREATE TABLE IF NOT EXISTS brands (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE NOT NULL, commission_rate DECIMAL(5,2) DEFAULT 0)`;
+
+    // Tabela de usuários para autenticação
+    await sql`CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'salesperson')),
+      name VARCHAR(255),
+      createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )`;
+
+    // Índices para melhor performance
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`;
+
+    // Tabela de histórico de preços
+    await sql`CREATE TABLE IF NOT EXISTS price_history (
+      id SERIAL PRIMARY KEY,
+      productid INTEGER REFERENCES products(id) ON DELETE CASCADE,
+      old_price DECIMAL(10,2),
+      new_price DECIMAL(10,2),
+      changed_by VARCHAR(255),
+      changedat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )`;
 
     // Adiciona a coluna 'discount' na tabela 'orders' se não existir
     const columnCheckOrders =

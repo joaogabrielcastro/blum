@@ -86,7 +86,12 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         );
       }
     } catch (error) {
-      alert("Falha ao executar ação. Tente novamente.");
+      const errorMessage = error.message?.includes('404') || error.message?.includes('não encontrado')
+        ? `${type === 'delete' ? 'Pedido' : 'Pedido'} não encontrado. A lista será atualizada.`
+        : `Falha ao ${type === 'delete' ? 'excluir' : 'finalizar'} pedido. Tente novamente.`;
+      alert(errorMessage);
+      // Recarrega a lista em caso de erro
+      await fetchOrders();
     } finally {
       setModalAction({ type: null, orderId: null });
     }

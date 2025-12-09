@@ -82,6 +82,25 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
+      
+      // Mostra detalhes de validação se disponíveis
+      let errorMessage = "";
+      
+      // Verifica se é erro de duplicação
+      if (error.message && (error.message.includes("Já existe") || error.message.includes("já está em uso"))) {
+        errorMessage = error.message;
+      } else if (error.details && Array.isArray(error.details)) {
+        const fieldErrors = error.details.map(err => 
+          `${err.path || err.param || 'Campo'}: ${err.msg || err.message}`
+        ).join('\n');
+        errorMessage = `Erro ao salvar produto.\n\nErros:\n${fieldErrors}`;
+      } else if (error.message) {
+        errorMessage = `Erro ao salvar produto.\n${error.message}`;
+      } else {
+        errorMessage = "Erro ao salvar produto. Tente novamente.";
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

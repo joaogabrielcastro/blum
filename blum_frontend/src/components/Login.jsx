@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { login } from "../services/apiService";
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState("");
@@ -8,26 +9,12 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState("");
   const [isFormValid, setIsFormValid] = useState(false);
 
-  const users = [
-    {
-      username: "admin",
-      password: "123",
-      role: "admin",
-      name: "Administrador",
-    },
-    { username: "siane", password: "123", role: "salesperson", name: "Siane" },
-    {
-      username: "eduardo",
-      password: "123",
-      role: "salesperson",
-      name: "Eduardo",
-    },
-    {
-      username: "vendedor",
-      password: "123",
-      role: "salesperson",
-      name: "Vendedor",
-    },
+  // Usuários de exemplo para login rápido (apenas UI)
+  const quickLoginUsers = [
+    { username: "admin", role: "admin", name: "Administrador" },
+    { username: "siane", role: "salesperson", name: "Siane" },
+    { username: "eduardo", role: "salesperson", name: "Eduardo" },
+    { username: "vendedor", role: "salesperson", name: "Vendedor" },
   ];
 
   // Validar formulário em tempo real
@@ -39,33 +26,33 @@ const Login = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    
+
     if (!isFormValid) return;
-    
+
     setIsLoading(true);
 
-    // Simula um pequeno delay para melhor UX
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      // Fazer requisição de login para o backend
+      const response = await login(username, password);
 
-    if (username === "admin" && password === "123") {
-      onLogin("admin", "admin");
-    } else if (username === "siane" && password === "123") {
-      onLogin("salesperson", "siane");
-    } else if (username === "vendedor" && password === "123") {
-      onLogin("salesperson", "vendedor");
-    } else if (username === "eduardo" && password === "123") {
-      onLogin("salesperson", "eduardo");
-    } else {
-      setError("Usuário ou senha inválidos");
+      // Salvar token e informações do usuário
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      // Chamar callback de login com role e userId
+      onLogin(response.user.role, response.user.id, response.user);
+    } catch (err) {
+      console.error("Erro no login:", err);
+      setError(err.message || "Usuário ou senha inválidos");
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const handleQuickLogin = (user) => {
     setUsername(user.username);
-    setPassword(user.password);
-    setError(""); // Limpar erros ao usar login rápido
+    // Não preencher senha automaticamente por segurança
+    setError("");
   };
 
   return (
@@ -86,23 +73,32 @@ const Login = ({ onLogin }) => {
               />
             </div>
             <h1 className="text-2xl font-bold text-gray-800 mb-1">BL1um</h1>
-            <p className="text-gray-600 text-sm uppercase font-semibold tracking-wider mb-2">CURITIBA</p>
-            <p className="text-gray-500 text-xs">Sistema de Gestão Comercial</p>
+            <p className="text-gray-600 text-sm uppercase font-semibold tracking-wider mb-2">
+              CURITIBA
+            </p>
           </div>
-          
+
           {/* Mensagem de erro */}
           {error && (
-            <div 
+            <div
               className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-center"
               role="alert"
             >
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
               <span className="text-sm">{error}</span>
             </div>
           )}
-          
+
           {/* Formulário */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -241,39 +237,6 @@ const Login = ({ onLogin }) => {
               )}
             </button>
           </form>
-
-          {/* Acesso rápido para desenvolvimento */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <h3 className="text-xs font-medium text-gray-600 mb-2 text-center">
-                Acesso Rápido (Desenvolvimento)
-              </h3>
-              <div className="grid grid-cols-1 gap-1">
-                {users.map((user) => (
-                  <button
-                    key={user.username}
-                    onClick={() => handleQuickLogin(user)}
-                    className="text-xs text-blue-600 hover:text-blue-800 p-1 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-between"
-                    aria-label={`Login rápido como ${user.name}`}
-                  >
-                    <span>
-                      {user.name} ({user.role})
-                    </span>
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Footer */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              © 2024 BLUM Curitiba. Todos os direitos reservados.
-            </p>
-          </div>
         </div>
 
         {/* Mensagem de boas-vindas */}
