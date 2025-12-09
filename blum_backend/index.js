@@ -18,7 +18,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://localhost:3000",
   "https://blum-azure.vercel.app",
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
@@ -26,12 +26,12 @@ app.use(
     origin: function (origin, callback) {
       // Permite requisições sem origin (mobile apps, Postman, etc)
       if (!origin) return callback(null, true);
-      
+
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.log('❌ CORS bloqueado para origem:', origin);
-        callback(new Error('Not allowed by CORS'));
+        console.log("❌ CORS bloqueado para origem:", origin);
+        callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
