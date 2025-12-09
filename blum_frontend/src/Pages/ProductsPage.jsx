@@ -200,7 +200,7 @@ const ProductsPage = ({ userRole }) => {
       setConfirmDelete(null);
       setDeleteType(null);
       setDeleteId(null);
-      
+
       // Recarregar dados após deletar
       await fetchData();
 

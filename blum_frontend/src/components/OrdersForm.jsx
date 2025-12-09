@@ -55,7 +55,7 @@ const OrdersForm = ({
         const productsResponse = await apiService.getProducts("all", 1, 10000);
         // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
         const productsData = productsResponse?.data || productsResponse;
-        
+
         // ✅ GARANTIR QUE SEMPRE SEJA UM ARRAY
         const safeProducts = Array.isArray(productsData) ? productsData : [];
         setProducts(safeProducts);

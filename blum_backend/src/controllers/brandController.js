@@ -4,7 +4,8 @@ const sql = neon(process.env.DATABASE_URL);
 // ✅ CORRIGIDO: Agora retorna o ID também
 exports.getBrands = async (req, res) => {
   try {
-    const brands = await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
+    const brands =
+      await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
     res.status(200).json(brands);
   } catch (error) {
     console.error("Erro ao buscar marcas:", error);
@@ -15,11 +16,11 @@ exports.getBrands = async (req, res) => {
 // Função para criar marca
 exports.createBrand = async (req, res) => {
   const { name, commission_rate = 0 } = req.body;
-  
+
   if (!name) {
     return res.status(400).json({ error: "O nome da marca é obrigatório." });
   }
-  
+
   try {
     await sql`
       INSERT INTO brands (name, commission_rate) 
@@ -36,7 +37,7 @@ exports.createBrand = async (req, res) => {
 exports.updateBrand = async (req, res) => {
   const { oldName } = req.params;
   const { name, commission_rate } = req.body;
-  
+
   try {
     await sql`
       UPDATE brands 

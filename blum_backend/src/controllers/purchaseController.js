@@ -53,13 +53,15 @@ async function fallbackTextExtraction(pdfBuffer) {
     while ((match = productPattern.exec(fullText)) !== null) {
       const code = match[1].trim();
       // Remove espaços e normaliza
-      const cleanCode = code.replace(/\s+/g, '');
+      const cleanCode = code.replace(/\s+/g, "");
       if (cleanCode.length >= 7) {
         foundCodesSet.add(cleanCode);
       }
     }
 
-    console.log(`📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`);
+    console.log(
+      `📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`
+    );
 
     // Agora processa cada código encontrado
     let foundCodes = 0;
@@ -77,16 +79,20 @@ async function fallbackTextExtraction(pdfBuffer) {
       // Extrai descrição (texto entre código e NCM)
       let description = "";
       const codePos = contextText.indexOf(productCode);
-      const descPattern = new RegExp(productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+");
+      const descPattern = new RegExp(
+        productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+"
+      );
       const descMatch = contextText.match(descPattern);
-      
+
       if (descMatch) {
         description = descMatch[1].trim();
       } else {
         // Fallback: pega texto após o código até encontrar números grandes
         const afterCode = contextText.substring(codePos + 8);
         const textUntilNumbers = afterCode.match(/^([^0-9]{20,})/);
-        description = textUntilNumbers ? textUntilNumbers[1].trim() : afterCode.substring(0, 100).trim();
+        description = textUntilNumbers
+          ? textUntilNumbers[1].trim()
+          : afterCode.substring(0, 100).trim();
       }
 
       // Procura quantidade e preço após o NCM
@@ -143,7 +149,9 @@ async function fallbackTextExtraction(pdfBuffer) {
     // Converte Map para array
     items.push(...itemsMap.values());
 
-    console.log(`✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`);
+    console.log(
+      `✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`
+    );
 
     if (items.length > 0) {
       console.log("📊 Primeiros itens extraídos:");
