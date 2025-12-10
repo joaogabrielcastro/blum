@@ -19,7 +19,6 @@
     "multer": "^2.0.2",
     "node-cache": "^5.1.2",
     "node-poppler": "^8.0.5",
-    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^2.16.105"
   },
   "devDependencies": {
