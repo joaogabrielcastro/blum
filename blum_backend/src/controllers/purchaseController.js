@@ -29,10 +29,8 @@ async function fallbackTextExtraction(pdfBuffer) {
       fullText += pageText + "\n";
     }
 
-    console.log(
-      `📝 Texto extraído (${fullText.length} caracteres)`
-    );
-    
+    console.log(`📝 Texto extraído (${fullText.length} caracteres)`);
+
     // ✅ LOG DAS PRIMEIRAS 50 LINHAS PARA DEBUG (uma por vez)
     const debugLines = fullText.split(/\r?\n/);
     console.log("==================== ESTRUTURA DO PDF ====================");
@@ -55,14 +53,16 @@ async function fallbackTextExtraction(pdfBuffer) {
     console.log("🔍 Procurando por códigos de produtos...");
 
     // Detecta rapidamente se o PDF é um DANFE (nota fiscal eletrônica)
-    const isDanfe = /DANFE|CHAVE DE ACESSO|Identificação do emitente|DOCUMENTO AUXILIAR DA NOTA FISCAL|NF-e|NOTA FISCAL ELETRÔNICA/i.test(
-      fullText
-    );
+    const isDanfe =
+      /DANFE|CHAVE DE ACESSO|Identificação do emitente|DOCUMENTO AUXILIAR DA NOTA FISCAL|NF-e|NOTA FISCAL ELETRÔNICA/i.test(
+        fullText,
+      );
 
     // Identifica o fornecedor da nota fiscal
     const identifySupplier = (text) => {
       const upperText = text.toUpperCase();
-      if (upperText.includes("BLUMENAU") || upperText.includes("BLUM")) return "BLUMENAU";
+      if (upperText.includes("BLUMENAU") || upperText.includes("BLUM"))
+        return "BLUMENAU";
       if (upperText.includes("AVANT")) return "AVANT";
       if (upperText.includes("ELGIN")) return "ELGIN";
       return "DESCONHECIDO";
@@ -78,29 +78,33 @@ async function fallbackTextExtraction(pdfBuffer) {
       const processedCodes = new Set();
 
       // ✅ BUSCA A SEÇÃO DE PRODUTOS NO TEXTO (pode estar tudo em uma linha)
-      const productSectionMatch = text.match(/DADOS DO PRODUTO.*?SERVIÇO(.*?)(?:DADOS ADICIONAIS|INFORMAÇÕES COMPLEMENTARES|$)/is);
-      
+      const productSectionMatch = text.match(
+        /DADOS DO PRODUTO.*?SERVIÇO(.*?)(?:DADOS ADICIONAIS|INFORMAÇÕES COMPLEMENTARES|$)/is,
+      );
+
       if (!productSectionMatch) {
         console.log("⚠️ Seção 'DADOS DO PRODUTO' não encontrada");
         return [];
       }
 
       const productSection = productSectionMatch[1];
-      console.log(`📍 Seção de produtos encontrada (${productSection.length} caracteres)`);
+      console.log(
+        `📍 Seção de produtos encontrada (${productSection.length} caracteres)`,
+      );
 
       // ✅ PADRÕES DE CÓDIGOS POR FORNECEDOR
       const codePatterns = {
-        ELGIN: /\b(LAMP\d{7,10})\b/g,           // LAMP0000010
-        AVANT: /\b(\d{9})\b/g,                  // 289211375
-        BLUM: /\b(\d{6,8})\b/g,                 // Códigos variados
+        ELGIN: /\b(LAMP\d{7,10})\b/g, // LAMP0000010
+        AVANT: /\b(\d{9})\b/g, // 289211375
+        BLUM: /\b(\d{6,8})\b/g, // Códigos variados
       };
 
       // ✅ EXTRAÇÃO BASEADA EM PADRÃO ESPECÍFICO DO FORNECEDOR
       let codePattern = codePatterns.AVANT; // Padrão padrão
-      
-      if (supplier === 'ELGIN') {
+
+      if (supplier === "ELGIN") {
         codePattern = codePatterns.ELGIN;
-      } else if (supplier === 'BLUMENAU') {
+      } else if (supplier === "BLUMENAU") {
         codePattern = codePatterns.BLUM;
       }
 
@@ -110,12 +114,13 @@ async function fallbackTextExtraction(pdfBuffer) {
 
       for (const match of matches) {
         const productCode = match[1];
-        
+
         // Ignora se já processou
         if (processedCodes.has(productCode)) continue;
-        
+
         // Ignora NCMs (8 dígitos com padrão específico)
-        if (productCode.length === 8 && /^\d{4}0\d{3}$/.test(productCode)) continue;
+        if (productCode.length === 8 && /^\d{4}0\d{3}$/.test(productCode))
+          continue;
 
         // ✅ EXTRAI CONTEXTO AO REDOR DO CÓDIGO (500 caracteres antes e depois)
         const codeIndex = productSection.indexOf(productCode, match.index);
@@ -126,11 +131,11 @@ async function fallbackTextExtraction(pdfBuffer) {
         // ✅ EXTRAÇÃO DE DESCRIÇÃO
         // Padrão: CÓDIGO + espaços + DESCRIÇÃO + espaços + NCM (8 dígitos)
         const descPattern = new RegExp(
-          productCode + '\\s+([A-Za-z0-9\\-\\/\\s]{5,150}?)\\s+\\d{8}',
-          'i'
+          productCode + "\\s+([A-Za-z0-9\\-\\/\\s]{5,150}?)\\s+\\d{8}",
+          "i",
         );
         const descMatch = context.match(descPattern);
-        
+
         let description = "";
         if (descMatch) {
           description = descMatch[1].trim().replace(/\s+/g, " ");
@@ -144,21 +149,21 @@ async function fallbackTextExtraction(pdfBuffer) {
         // ✅ EXTRAÇÃO DE QUANTIDADE E PREÇO
         // Padrão comum DANFE: ... UN QUANTIDADE V.UNITARIO V.TOTAL ...
         // Exemplo: UN 400,00 4,2100 1.684,00
-        
+
         const pricePattern = /UN\s+(\d{1,6},\d{2,4})\s+(\d{1,6},\d{2,4})/;
         const priceMatch = context.match(pricePattern);
-        
+
         let quantity = 1;
         let unitPrice = 0;
-        
+
         if (priceMatch) {
-          quantity = parseFloat(priceMatch[1].replace(',', '.'));
-          unitPrice = parseFloat(priceMatch[2].replace(',', '.'));
+          quantity = parseFloat(priceMatch[1].replace(",", "."));
+          unitPrice = parseFloat(priceMatch[2].replace(",", "."));
         } else {
           // Fallback: busca qualquer número decimal
           const anyPriceMatch = context.match(/(\d{1,6},\d{2,4})/);
           if (anyPriceMatch) {
-            unitPrice = parseFloat(anyPriceMatch[1].replace(',', '.'));
+            unitPrice = parseFloat(anyPriceMatch[1].replace(",", "."));
           }
         }
 
@@ -181,8 +186,12 @@ async function fallbackTextExtraction(pdfBuffer) {
           unitPrice: Number(unitPrice.toFixed(2)),
         });
 
-        console.log(`   ✅ Item ${results.length}: ${productCode} - ${description.substring(0, 40)}...`);
-        console.log(`      Qtd: ${Math.round(quantity)} | Preço: R$ ${unitPrice.toFixed(2)}`);
+        console.log(
+          `   ✅ Item ${results.length}: ${productCode} - ${description.substring(0, 40)}...`,
+        );
+        console.log(
+          `      Qtd: ${Math.round(quantity)} | Preço: R$ ${unitPrice.toFixed(2)}`,
+        );
       }
 
       console.log(`📊 Parser DANFE extraiu ${results.length} itens`);
@@ -190,13 +199,19 @@ async function fallbackTextExtraction(pdfBuffer) {
     };
 
     if (isDanfe) {
-      console.log("📄 Documento identificado como DANFE - usando parser DANFE universal");
+      console.log(
+        "📄 Documento identificado como DANFE - usando parser DANFE universal",
+      );
       const danfeItems = parseDanfe(fullText);
       if (danfeItems && danfeItems.length > 0) {
-        console.log(`✅ Parser DANFE extraiu ${danfeItems.length} itens com sucesso`);
+        console.log(
+          `✅ Parser DANFE extraiu ${danfeItems.length} itens com sucesso`,
+        );
         return danfeItems;
       } else {
-        console.log("⚠️ Parser DANFE não encontrou itens — continuando com parser específico Blum");
+        console.log(
+          "⚠️ Parser DANFE não encontrou itens — continuando com parser específico Blum",
+        );
       }
     }
 
@@ -216,7 +231,7 @@ async function fallbackTextExtraction(pdfBuffer) {
     }
 
     console.log(
-      `📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`
+      `📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`,
     );
 
     // Agora processa cada código encontrado
@@ -236,7 +251,7 @@ async function fallbackTextExtraction(pdfBuffer) {
       let description = "";
       const codePos = contextText.indexOf(productCode);
       const descPattern = new RegExp(
-        productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+"
+        productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+",
       );
       const descMatch = contextText.match(descPattern);
 
@@ -269,7 +284,7 @@ async function fallbackTextExtraction(pdfBuffer) {
         // Debug dos primeiros itens
         if (foundCodes <= 3) {
           console.log(
-            `   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`
+            `   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`,
           );
           console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
         }
@@ -288,7 +303,7 @@ async function fallbackTextExtraction(pdfBuffer) {
         } else {
           if (foundCodes <= 3) {
             console.log(
-              `   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`
+              `   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`,
             );
           }
         }
@@ -306,7 +321,7 @@ async function fallbackTextExtraction(pdfBuffer) {
     items.push(...itemsMap.values());
 
     console.log(
-      `✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`
+      `✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`,
     );
 
     if (items.length > 0) {
@@ -315,11 +330,11 @@ async function fallbackTextExtraction(pdfBuffer) {
         console.log(
           `   ${index + 1}. ${item.productCode} - ${item.description.substring(
             0,
-            50
-          )}...`
+            50,
+          )}...`,
         );
         console.log(
-          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`
+          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`,
         );
       });
     }
@@ -347,7 +362,7 @@ exports.processPdf = async (req, res) => {
       return res.status(400).json({
         error: "Arquivo muito grande. Máximo: 10MB",
         details: `Tamanho atual: ${(req.file.size / (1024 * 1024)).toFixed(
-          2
+          2,
         )}MB`,
       });
     }
@@ -356,7 +371,7 @@ exports.processPdf = async (req, res) => {
     console.log(
       "📏 Tamanho do arquivo:",
       (req.file.size / 1024).toFixed(2),
-      "KB"
+      "KB",
     );
 
     // Garante que a pasta temporária exista
@@ -391,7 +406,7 @@ exports.processPdf = async (req, res) => {
 
         const files = await fs.readdir(tempDir);
         imageFiles = files.filter(
-          (f) => f.includes(fileBaseName) && f.endsWith(".png")
+          (f) => f.includes(fileBaseName) && f.endsWith(".png"),
         );
 
         if (imageFiles.length === 0) {
@@ -400,7 +415,7 @@ exports.processPdf = async (req, res) => {
 
         console.log(
           `📸 Arquivos PNG encontrados com Poppler:`,
-          imageFiles.length
+          imageFiles.length,
         );
       } catch (popplerError) {
         console.log("⚠️ Poppler não disponível:", popplerError.message);
@@ -463,11 +478,11 @@ exports.processPdf = async (req, res) => {
     imageFiles.sort((a, b) => {
       const numA = parseInt(
         a.match(/(\d+)\.png$/)?.[1] || a.match(/-(\d+)\.png$/)?.[1] || 0,
-        10
+        10,
       );
       const numB = parseInt(
         b.match(/(\d+)\.png$/)?.[1] || b.match(/-(\d+)\.png$/)?.[1] || 0,
-        10
+        10,
       );
       return numA - numB;
     });
@@ -527,17 +542,17 @@ exports.processPdf = async (req, res) => {
         }));
 
       console.log(
-        `✅ ${validatedData.length} itens válidos de ${parsedData.length} totais`
+        `✅ ${validatedData.length} itens válidos de ${parsedData.length} totais`,
       );
 
       // ✅ LOG DOS PRIMEIROS ITENS PARA VERIFICAÇÃO
       console.log("📊 Primeiros itens extraídos:");
       validatedData.slice(0, 3).forEach((item, index) => {
         console.log(
-          `   ${index + 1}. ${item.productCode} - ${item.description}`
+          `   ${index + 1}. ${item.productCode} - ${item.description}`,
         );
         console.log(
-          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice}`
+          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice}`,
         );
       });
 
@@ -581,8 +596,8 @@ exports.processPdf = async (req, res) => {
         fs
           .unlink(path.join(tempDir, file))
           .catch((err) =>
-            console.log(`⚠️ Erro ao deletar ${file}:`, err.message)
-          )
+            console.log(`⚠️ Erro ao deletar ${file}:`, err.message),
+          ),
       );
       await Promise.all(deletePromises);
       console.log("🧹 Arquivos temporários limpos.");
@@ -612,7 +627,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
 
   // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
   const missingSubcodes = items.filter(
-    (item) => !item.subcode || item.subcode.trim() === ""
+    (item) => !item.subcode || item.subcode.trim() === "",
   );
   if (missingSubcodes.length > 0) {
     return res.status(400).json({
@@ -624,7 +639,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
   // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
   const subcodes = items.map((item) => item.subcode.trim());
   const duplicateSubcodes = subcodes.filter(
-    (code, index) => subcodes.indexOf(code) !== index
+    (code, index) => subcodes.indexOf(code) !== index,
   );
   if (duplicateSubcodes.length > 0) {
     return res.status(400).json({
@@ -741,11 +756,11 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${productId}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
             console.log(
-              `📊 Histórico de preço atualizado para produto ID ${productId}`
+              `📊 Histórico de preço atualizado para produto ID ${productId}`,
             );
           }
 
@@ -755,7 +770,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
         // ✅ CRIAR NOVO PRODUTO A PARTIR DO CSV
         else if (item.productCode && item.description) {
           console.log(
-            `🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`
+            `🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`,
           );
 
           // Verifica se já existe um produto com esse código
@@ -777,12 +792,12 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${existingWithCode[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(
-              `✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`
+              `✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`,
             );
             results.updated++;
           } else {
@@ -814,8 +829,8 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(`✅ [CSV] Novo produto criado: ID ${newProduct[0].id}`);
@@ -834,7 +849,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
       } catch (error) {
         console.error(
           `❌ [CSV] Erro no item ${item.productCode}:`,
-          error.message
+          error.message,
         );
         results.errors.push({
           productCode: item.productCode,
@@ -845,7 +860,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
     }
 
     console.log(
-      `📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
+      `📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`,
     );
 
     res.status(200).json({
@@ -913,7 +928,9 @@ exports.debugPdf = async (req, res) => {
     console.log(`📝 Texto extraído: ${fullText.length} caracteres`);
 
     // Identifica tipo de documento
-    const isDanfe = /DANFE|CHAVE DE ACESSO|DOCUMENTO AUXILIAR|NF-e/i.test(fullText);
+    const isDanfe = /DANFE|CHAVE DE ACESSO|DOCUMENTO AUXILIAR|NF-e/i.test(
+      fullText,
+    );
     const isBlum = /blumenau|blum/i.test(fullText);
     const isAvant = /avant/i.test(fullText);
     const isElgin = /elgin/i.test(fullText);
@@ -930,7 +947,9 @@ exports.debugPdf = async (req, res) => {
       hasCodigoProduto: /CÓDIGO|COD\.|PRODUTO/i.test(fullText),
       hasDescricao: /DESCRIÇÃO|DESCRIÇAO|PRODUTO/i.test(fullText),
       hasQuantidade: /QUANTIDADE|QTDE|QTD/i.test(fullText),
-      hasValorUnitario: /VALOR UNIT|VL\.UNIT|PREÇO UNIT|V\. UNIT/i.test(fullText),
+      hasValorUnitario: /VALOR UNIT|VL\.UNIT|PREÇO UNIT|V\. UNIT/i.test(
+        fullText,
+      ),
       hasNCM: /NCM|CLASSIF/i.test(fullText),
       hasUnidade: /UNID\.|UN\s|UNIDADE/i.test(fullText),
       hasTotais: /VALOR TOTAL|TOTAL DA NOTA|TOTAL DOS PRODUTOS/i.test(fullText),
@@ -962,24 +981,29 @@ exports.debugPdf = async (req, res) => {
       supplier: supplier,
       keywords: keywords,
       sampleText: fullText.substring(0, 1000) + "...",
-      firstLines: fullText.split("\n").slice(0, 30).filter(l => l.trim()),
+      firstLines: fullText
+        .split("\n")
+        .slice(0, 30)
+        .filter((l) => l.trim()),
       productCodesFound: productCodes.length,
       sampleCodes: productCodes.slice(0, 10),
       extractedItems: extractedItems.length,
-      sampleItems: extractedItems.slice(0, 5).map(item => ({
+      sampleItems: extractedItems.slice(0, 5).map((item) => ({
         code: item.productCode,
         description: item.description.substring(0, 50) + "...",
         quantity: item.quantity,
-        price: `R$ ${item.unitPrice.toFixed(2)}`
+        price: `R$ ${item.unitPrice.toFixed(2)}`,
       })),
       extraction: {
         success: extractedItems.length > 0,
         method: "parser-danfe-universal",
         itemsExtracted: extractedItems.length,
-      }
+      },
     };
 
-    console.log(`✅ Diagnóstico completo: ${extractedItems.length} itens extraídos`);
+    console.log(
+      `✅ Diagnóstico completo: ${extractedItems.length} itens extraídos`,
+    );
     res.status(200).json(analysis);
   } catch (error) {
     console.error("❌ Erro no diagnóstico:", error);
@@ -1013,7 +1037,7 @@ exports.importCsv = async (req, res) => {
     const brandResult =
       await sql`SELECT id, name FROM brands WHERE id = ${parseInt(
         brandId,
-        10
+        10,
       )}`;
     if (brandResult.length === 0) {
       return res.status(400).json({ error: "Marca não encontrada." });
@@ -1049,7 +1073,7 @@ exports.importCsv = async (req, res) => {
           product.productCode
         }", Nome: "${product.name.substring(0, 30)}...", Preço: ${
           product.price
-        }, Estoque: ${product.stock}, Marca: "${product.brand}"`
+        }, Estoque: ${product.stock}, Marca: "${product.brand}"`,
       );
     });
 
@@ -1110,7 +1134,7 @@ async function processCsvData(csvText, selectedBrand) {
             "price",
             "valor",
             "precounitario",
-          ])
+          ]),
         ) || 0,
       stock:
         parseInt(
@@ -1120,7 +1144,7 @@ async function processCsvData(csvText, selectedBrand) {
             "quantidade",
             "qtd",
             "quantity",
-          ])
+          ]),
         ) || 0,
       // ✅ NOVO: Extrair subcode do CSV
       subcode: getValueByHeader(headers, values, [
@@ -1238,8 +1262,8 @@ async function importProductsToDatabase(products) {
         results.details.push(
           `✅ Atualizado: ${product.productCode} - ${product.name.substring(
             0,
-            30
-          )}...`
+            30,
+          )}...`,
         );
       } else {
         // ✅ CRIA novo produto COM SUBCODE
@@ -1259,18 +1283,18 @@ async function importProductsToDatabase(products) {
         results.details.push(
           `🆕 Criado: ${product.productCode} - ${product.name.substring(
             0,
-            30
-          )}...`
+            30,
+          )}...`,
         );
       }
     } catch (error) {
       console.error(
         `   ❌ ERRO no produto ${product.productCode}:`,
-        error.message
+        error.message,
       );
       results.errors++;
       results.details.push(
-        `❌ Erro: ${product.productCode} - ${error.message}`
+        `❌ Erro: ${product.productCode} - ${error.message}`,
       );
     }
   }
@@ -1302,7 +1326,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
 
   // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
   const missingSubcodes = items.filter(
-    (item) => !item.subcode || item.subcode.trim() === ""
+    (item) => !item.subcode || item.subcode.trim() === "",
   );
   if (missingSubcodes.length > 0) {
     return res.status(400).json({
@@ -1314,7 +1338,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
   // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
   const subcodes = items.map((item) => item.subcode.trim());
   const duplicateSubcodes = subcodes.filter(
-    (code, index) => subcodes.indexOf(code) !== index
+    (code, index) => subcodes.indexOf(code) !== index,
   );
   if (duplicateSubcodes.length > 0) {
     return res.status(400).json({
@@ -1341,7 +1365,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     }
 
     console.log(
-      `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`
+      `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`,
     );
 
     // ✅ BUSCA A MARCA NO BANCO
@@ -1433,11 +1457,11 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${productId}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
             console.log(
-              `📊 Histórico de preço atualizado para produto ID ${productId}`
+              `📊 Histórico de preço atualizado para produto ID ${productId}`,
             );
           }
 
@@ -1447,7 +1471,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
         // ✅ CRIAR NOVO PRODUTO A PARTIR DO PDF
         else if (item.productCode && item.description) {
           console.log(
-            `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`
+            `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`,
           );
 
           // Verifica se já existe um produto com esse código
@@ -1469,12 +1493,12 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(
-              `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`
+              `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`,
             );
             results.updated++;
           } else {
@@ -1506,8 +1530,8 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
@@ -1526,7 +1550,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
       } catch (error) {
         console.error(
           `❌ [PDF] Erro no item ${item.productCode}:`,
-          error.message
+          error.message,
         );
         results.errors.push({
           productCode: item.productCode,
@@ -1537,7 +1561,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     }
 
     console.log(
-      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
+      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`,
     );
 
     res.status(200).json({
@@ -1596,7 +1620,7 @@ exports.getPriceHistory = async (req, res) => {
 
   try {
     console.log(
-      `📊 Buscando histórico de preços para produto ID: ${productId}`
+      `📊 Buscando histórico de preços para produto ID: ${productId}`,
     );
 
     const history = await sql`
@@ -1633,7 +1657,7 @@ exports.getLastPurchasePrice = async (req, res) => {
 
   try {
     console.log(
-      `💰 Buscando último preço de compra para produto ID: ${productId}`
+      `💰 Buscando último preço de compra para produto ID: ${productId}`,
     );
 
     const lastPurchase = await sql`
@@ -1681,7 +1705,7 @@ exports.listTempFiles = async (req, res) => {
           isFile: stats.isFile(),
           created: stats.birthtime,
         };
-      })
+      }),
     );
 
     res.status(200).json({
