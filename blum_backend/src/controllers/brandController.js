@@ -56,18 +56,30 @@ exports.deleteBrand = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Buscar o nome da marca pelo ID
-    const brand = await sql`
-      SELECT name FROM brands WHERE id = ${id}
-    `;
+    // Verifica se o parâmetro é um ID numérico ou um nome
+    const isNumericId = /^\d+$/.test(id);
+    
+    let brand;
+    if (isNumericId) {
+      // Busca por ID
+      brand = await sql`
+        SELECT id, name FROM brands WHERE id = ${parseInt(id)}
+      `;
+    } else {
+      // Busca por nome (para compatibilidade com frontend antigo)
+      brand = await sql`
+        SELECT id, name FROM brands WHERE name = ${id}
+      `;
+    }
 
     if (brand.length === 0) {
       return res.status(404).json({ error: "Marca não encontrada." });
     }
 
+    const brandId = brand[0].id;
     const brandName = brand[0].name;
 
-    // Verificar se existem produtos com esta marca
+    // Verificar se existem produtos com esta marca (usa o nome da marca)
     const productsWithBrand = await sql`
       SELECT COUNT(*) as count FROM products WHERE brand = ${brandName}
     `;
@@ -82,7 +94,7 @@ exports.deleteBrand = async (req, res) => {
     // Deletar a marca pelo ID
     const result = await sql`
       DELETE FROM brands 
-      WHERE id = ${id}
+      WHERE id = ${brandId}
       RETURNING *
     `;
 
@@ -93,7 +105,10 @@ exports.deleteBrand = async (req, res) => {
     res.status(200).json({ message: "Marca deletada com sucesso!" });
   } catch (error) {
     console.error("Erro ao deletar marca:", error);
-    res.status(500).json({ error: "Erro ao deletar marca." });
+    res.status(500).json({ 
+      error: "Erro ao deletar marca.",
+      details: error.message 
+    });
   }
 };
 

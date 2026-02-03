@@ -201,13 +201,17 @@ const ProductsPage = ({ userRole }) => {
       setDeleteType(null);
       setDeleteId(null);
 
-      // Recarregar dados após deletar
-      await fetchData();
+      // Recarregar marcas imediatamente após deletar
+      const brandsData = await apiService.getBrands();
+      setBrands(brandsData);
 
       // Se a Representada selecionada foi deletada, voltar para "Todas"
       if (selectedBrand === brandId) {
         setSelectedBrand("all");
       }
+
+      // Recarregar produtos
+      await fetchData();
     } catch (err) {
       setError(err.message || "Erro ao excluir Representada. Tente novamente.");
       console.error("Erro ao excluir Representada:", err);
