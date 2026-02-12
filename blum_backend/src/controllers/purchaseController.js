@@ -8,12 +8,20 @@ require("dotenv").config();
 
 const sql = neon(process.env.DATABASE_URL);
 
-// ✅ FUNÇÃO DE EXTRAÇÃO DE TEXTO DO PDF
+// ===========================
+// 📦 IMPORTA MÓDULO DE EXTRAÇÃO
+// ===========================
+// ✅ Consolidado: Toda lógica de extração agora está em smart_extractor.js
+const smartExtractor = require("../../scripts/smart_extractor");
+
+// ===========================
+// 🔄 FUNÇÃO PRINCIPAL DE EXTRAÇÃO
+// ===========================
 async function fallbackTextExtraction(pdfBuffer) {
   try {
-    console.log("🔄 Usando fallback de extração de texto...");
+    console.log("🔄 Iniciando extração de texto do PDF...");
 
-    // Usar pdfjs-dist para extrair texto
+    // Extrair texto com pdfjs-dist
     const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
     const data = new Uint8Array(pdfBuffer);
     const loadingTask = pdfjsLib.getDocument({ data });
@@ -21,7 +29,6 @@ async function fallbackTextExtraction(pdfBuffer) {
 
     let fullText = "";
 
-    // Extrair texto de todas as páginas
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       const page = await pdfDocument.getPage(pageNum);
       const textContent = await page.getTextContent();
@@ -29,148 +36,16 @@ async function fallbackTextExtraction(pdfBuffer) {
       fullText += pageText + "\n";
     }
 
-    console.log(
-      `📝 Texto extraído (${fullText.length} caracteres):`,
-      fullText.substring(0, 500) + "..."
-    );
+    console.log(`📝 Texto extraído (${fullText.length} caracteres)`);
+    console.log(`📄 Preview: ${fullText.substring(0, 300)}...`);
 
-    // Extração baseada no formato REAL do PDF Blumenau Iluminação
-    const items = [];
-    const itemsMap = new Map(); // Evita duplicatas
+    // ✅ USA SMART_EXTRACTOR (consolidado)
+    const items = await smartExtractor.extractFromAnyText(fullText);
 
-    // Formato da tabela (conforme imagem):
-    // Item | Marca | Produto (código 8 dígitos) | Descrição | NCM | Quantidade | Preço Lista | Preço Unit. | ...
-    // Exemplo: "2 B 85406001 Painel LED Tech Slim 24W ... B4051 190 10 22,08 24,23"
-
-    console.log("🔍 Procurando por códigos de produtos...");
-
-    // ✅ BUSCA TODOS OS CÓDIGOS DE PRODUTOS (com ou sem pontos, 7-10 dígitos)
-    // Padrão: marca B seguida de código de produto
-    const productPattern = /B\s+(\d[\d.]{5,10})\s+/g;
-    const foundCodesSet = new Set();
-    let match;
-
-    while ((match = productPattern.exec(fullText)) !== null) {
-      const code = match[1].trim();
-      // Remove espaços e normaliza
-      const cleanCode = code.replace(/\s+/g, "");
-      if (cleanCode.length >= 7) {
-        foundCodesSet.add(cleanCode);
-      }
-    }
-
-    console.log(
-      `📋 Total de códigos únicos de produtos encontrados: ${foundCodesSet.size}`
-    );
-
-    // Agora processa cada código encontrado
-    let foundCodes = 0;
-    for (const productCode of foundCodesSet) {
-      foundCodes++;
-
-      // Encontra a posição do código no texto
-      const codeIndex = fullText.indexOf(productCode);
-      if (codeIndex === -1) continue;
-
-      // Pega contexto ao redor do código (100 antes e 400 depois)
-      const startPos = Math.max(0, codeIndex - 100);
-      const contextText = fullText.substring(startPos, codeIndex + 500);
-
-      // Extrai descrição (texto entre código e NCM)
-      let description = "";
-      const codePos = contextText.indexOf(productCode);
-      const descPattern = new RegExp(
-        productCode + "\\s+(.+?)\\s+\\d{4,5}\\s+\\d+"
-      );
-      const descMatch = contextText.match(descPattern);
-
-      if (descMatch) {
-        description = descMatch[1].trim();
-      } else {
-        // Fallback: pega texto após o código até encontrar números grandes
-        const afterCode = contextText.substring(codePos + 8);
-        const textUntilNumbers = afterCode.match(/^([^0-9]{20,})/);
-        description = textUntilNumbers
-          ? textUntilNumbers[1].trim()
-          : afterCode.substring(0, 100).trim();
-      }
-
-      // Procura quantidade e preço após o NCM
-      // Padrão observado: "94051 190   10   22,08   24,23"
-      // NCM + número auxiliar + espaços múltiplos + quantidade + espaços + preços
-      // ✅ PADRÃO MAIS FLEXÍVEL: aceita variações de espaçamento
-      const pricePattern = /\d{4,5}\s+\d+\s+(\d+)\s+([\d,.]+)\s+([\d,.]+)/;
-      const priceMatch = contextText.match(pricePattern);
-
-      if (priceMatch) {
-        const quantity = parseInt(priceMatch[1]) || 1;
-        const priceListStr = priceMatch[2].replace(/\./g, "").replace(",", ".");
-        const unitPriceStr = priceMatch[3].replace(/\./g, "").replace(",", ".");
-
-        const priceList = parseFloat(priceListStr) || 0;
-        const unitPrice = parseFloat(unitPriceStr) || 0;
-
-        // Debug dos primeiros itens
-        if (foundCodes <= 3) {
-          console.log(
-            `   Debug item ${foundCodes}: Código=${productCode}, Qtd=${quantity}, Preço=${unitPrice}`
-          );
-          console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
-        }
-
-        // Valida se os valores fazem sentido
-        if (unitPrice > 0 && quantity > 0 && quantity < 10000) {
-          // Usa Map para evitar duplicatas do mesmo código
-          if (!itemsMap.has(productCode)) {
-            itemsMap.set(productCode, {
-              productCode: productCode,
-              description: description.substring(0, 200),
-              quantity: quantity,
-              unitPrice: unitPrice,
-            });
-          }
-        } else {
-          if (foundCodes <= 3) {
-            console.log(
-              `   ⚠️ Item rejeitado: unitPrice=${unitPrice}, quantity=${quantity}`
-            );
-          }
-        }
-      } else {
-        if (foundCodes <= 3) {
-          console.log(`   ⚠️ Sem match de preço para código ${productCode}`);
-          console.log(`   Contexto: ${contextText.substring(0, 150)}...`);
-        }
-      }
-    }
-
-    console.log(`🔍 ${foundCodes} códigos de produto encontrados no texto`);
-
-    // Converte Map para array
-    items.push(...itemsMap.values());
-
-    console.log(
-      `✅ Fallback extraiu ${items.length} itens de ${foundCodes} códigos encontrados`
-    );
-
-    if (items.length > 0) {
-      console.log("📊 Primeiros itens extraídos:");
-      items.slice(0, 3).forEach((item, index) => {
-        console.log(
-          `   ${index + 1}. ${item.productCode} - ${item.description.substring(
-            0,
-            50
-          )}...`
-        );
-        console.log(
-          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice.toFixed(2)}`
-        );
-      });
-    }
-
+    console.log(`✅ Total de produtos extraídos: ${items.length}`);
     return items;
   } catch (error) {
-    console.log("❌ Fallback falhou:", error.message);
+    console.log("❌ Extração falhou:", error.message);
     return [];
   }
 }
@@ -191,7 +66,7 @@ exports.processPdf = async (req, res) => {
       return res.status(400).json({
         error: "Arquivo muito grande. Máximo: 10MB",
         details: `Tamanho atual: ${(req.file.size / (1024 * 1024)).toFixed(
-          2
+          2,
         )}MB`,
       });
     }
@@ -200,7 +75,7 @@ exports.processPdf = async (req, res) => {
     console.log(
       "📏 Tamanho do arquivo:",
       (req.file.size / 1024).toFixed(2),
-      "KB"
+      "KB",
     );
 
     // Garante que a pasta temporária exista
@@ -235,7 +110,7 @@ exports.processPdf = async (req, res) => {
 
         const files = await fs.readdir(tempDir);
         imageFiles = files.filter(
-          (f) => f.includes(fileBaseName) && f.endsWith(".png")
+          (f) => f.includes(fileBaseName) && f.endsWith(".png"),
         );
 
         if (imageFiles.length === 0) {
@@ -244,7 +119,7 @@ exports.processPdf = async (req, res) => {
 
         console.log(
           `📸 Arquivos PNG encontrados com Poppler:`,
-          imageFiles.length
+          imageFiles.length,
         );
       } catch (popplerError) {
         console.log("⚠️ Poppler não disponível:", popplerError.message);
@@ -307,11 +182,11 @@ exports.processPdf = async (req, res) => {
     imageFiles.sort((a, b) => {
       const numA = parseInt(
         a.match(/(\d+)\.png$/)?.[1] || a.match(/-(\d+)\.png$/)?.[1] || 0,
-        10
+        10,
       );
       const numB = parseInt(
         b.match(/(\d+)\.png$/)?.[1] || b.match(/-(\d+)\.png$/)?.[1] || 0,
-        10
+        10,
       );
       return numA - numB;
     });
@@ -322,64 +197,8 @@ exports.processPdf = async (req, res) => {
     // ✅ USA EXTRAÇÃO DIRETA DO TEXTO DO PDF
     let extractedItems = await fallbackTextExtraction(req.file.buffer);
 
-    if (!extractedItems || extractedItems.length === 0) {
-      console.log('⚠️ fallbackTextExtraction não encontrou itens — tentando smart_extractor como fallback...');
-      try {
-        const pdfParseModule = require('pdf-parse');
-        const smart = require('../../scripts/smart_extractor');
-
-        // pdf-parse may export several shapes; try common ones
-        let pdfData;
-        const tryPdfParse = async () => {
-          if (typeof pdfParseModule === 'function') return await pdfParseModule(req.file.buffer);
-          if (pdfParseModule && typeof pdfParseModule.default === 'function') return await pdfParseModule.default(req.file.buffer);
-          if (pdfParseModule && typeof pdfParseModule.parse === 'function') return await pdfParseModule.parse(req.file.buffer);
-          if (pdfParseModule && typeof pdfParseModule.parseBuffer === 'function') return await pdfParseModule.parseBuffer(req.file.buffer);
-          return null;
-        };
-
-        try {
-          pdfData = await tryPdfParse();
-        } catch (e) {
-          console.log('⚠️ pdf-parse chamou mas falhou:', e && e.message ? e.message : e);
-          pdfData = null;
-        }
-
-        // If pdf-parse didn't provide usable text, fallback to pdfjs-dist extraction
-        let text = '';
-        if (pdfData && pdfData.text) {
-          text = pdfData.text;
-        } else {
-          console.log('⚠️ pdf-parse não retornou texto — extraindo via pdfjs-dist como fallback para smart_extractor');
-          try {
-            const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-            const dataUint8 = new Uint8Array(req.file.buffer);
-            const loadingTask = pdfjsLib.getDocument({ data: dataUint8 });
-            const pdfDocument = await loadingTask.promise;
-            let accum = '';
-            for (let p = 1; p <= pdfDocument.numPages; p++) {
-              const page = await pdfDocument.getPage(p);
-              const tc = await page.getTextContent();
-              accum += tc.items.map((it) => it.str).join(' ') + '\n';
-            }
-            text = accum;
-          } catch (pdfjsErr) {
-            console.log('❌ Falha ao extrair texto com pdfjs-dist:', pdfjsErr && pdfjsErr.message ? pdfjsErr.message : pdfjsErr);
-            text = '';
-          }
-        }
-
-        const smartItems = await smart.extractFromAnyText(text);
-        if (smartItems && smartItems.length > 0) {
-          console.log(`✅ smart_extractor encontrou ${smartItems.length} itens — usando como resultado`);
-          extractedItems = smartItems;
-        } else {
-          console.log('⚠️ smart_extractor não encontrou itens.');
-        }
-      } catch (smartErr) {
-        console.log('❌ Erro ao executar smart_extractor:', smartErr && smartErr.message ? smartErr.message : smartErr);
-      }
-    }
+    // ✅ fallbackTextExtraction já usa smart_extractor internamente
+    // Não precisa de fallback adicional aqui
 
     if (!extractedItems || extractedItems.length === 0) {
       return res.status(400).json({
@@ -430,17 +249,17 @@ exports.processPdf = async (req, res) => {
         }));
 
       console.log(
-        `✅ ${validatedData.length} itens válidos de ${parsedData.length} totais`
+        `✅ ${validatedData.length} itens válidos de ${parsedData.length} totais`,
       );
 
       // ✅ LOG DOS PRIMEIROS ITENS PARA VERIFICAÇÃO
       console.log("📊 Primeiros itens extraídos:");
       validatedData.slice(0, 3).forEach((item, index) => {
         console.log(
-          `   ${index + 1}. ${item.productCode} - ${item.description}`
+          `   ${index + 1}. ${item.productCode} - ${item.description}`,
         );
         console.log(
-          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice}`
+          `      Qtd: ${item.quantity} | Preço: R$ ${item.unitPrice}`,
         );
       });
 
@@ -484,8 +303,8 @@ exports.processPdf = async (req, res) => {
         fs
           .unlink(path.join(tempDir, file))
           .catch((err) =>
-            console.log(`⚠️ Erro ao deletar ${file}:`, err.message)
-          )
+            console.log(`⚠️ Erro ao deletar ${file}:`, err.message),
+          ),
       );
       await Promise.all(deletePromises);
       console.log("🧹 Arquivos temporários limpos.");
@@ -515,7 +334,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
 
   // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
   const missingSubcodes = items.filter(
-    (item) => !item.subcode || item.subcode.trim() === ""
+    (item) => !item.subcode || item.subcode.trim() === "",
   );
   if (missingSubcodes.length > 0) {
     return res.status(400).json({
@@ -527,7 +346,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
   // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
   const subcodes = items.map((item) => item.subcode.trim());
   const duplicateSubcodes = subcodes.filter(
-    (code, index) => subcodes.indexOf(code) !== index
+    (code, index) => subcodes.indexOf(code) !== index,
   );
   if (duplicateSubcodes.length > 0) {
     return res.status(400).json({
@@ -644,11 +463,11 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${productId}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
             console.log(
-              `📊 Histórico de preço atualizado para produto ID ${productId}`
+              `📊 Histórico de preço atualizado para produto ID ${productId}`,
             );
           }
 
@@ -658,7 +477,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
         // ✅ CRIAR NOVO PRODUTO A PARTIR DO CSV
         else if (item.productCode && item.description) {
           console.log(
-            `🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`
+            `🆕 [CSV] Criando novo produto: ${item.productCode} - ${item.description}`,
           );
 
           // Verifica se já existe um produto com esse código
@@ -680,12 +499,12 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${existingWithCode[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(
-              `✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`
+              `✅ [CSV] Produto existente atualizado pelo código: ${item.productCode}`,
             );
             results.updated++;
           } else {
@@ -717,8 +536,8 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(`✅ [CSV] Novo produto criado: ID ${newProduct[0].id}`);
@@ -737,7 +556,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
       } catch (error) {
         console.error(
           `❌ [CSV] Erro no item ${item.productCode}:`,
-          error.message
+          error.message,
         );
         results.errors.push({
           productCode: item.productCode,
@@ -748,7 +567,7 @@ exports.finalizePurchaseFromCsv = async (req, res) => {
     }
 
     console.log(
-      `📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
+      `📊 [CSV] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`,
     );
 
     res.status(200).json({
@@ -843,7 +662,7 @@ exports.importCsv = async (req, res) => {
     const brandResult =
       await sql`SELECT id, name FROM brands WHERE id = ${parseInt(
         brandId,
-        10
+        10,
       )}`;
     if (brandResult.length === 0) {
       return res.status(400).json({ error: "Marca não encontrada." });
@@ -879,7 +698,7 @@ exports.importCsv = async (req, res) => {
           product.productCode
         }", Nome: "${product.name.substring(0, 30)}...", Preço: ${
           product.price
-        }, Estoque: ${product.stock}, Marca: "${product.brand}"`
+        }, Estoque: ${product.stock}, Marca: "${product.brand}"`,
       );
     });
 
@@ -940,7 +759,7 @@ async function processCsvData(csvText, selectedBrand) {
             "price",
             "valor",
             "precounitario",
-          ])
+          ]),
         ) || 0,
       stock:
         parseInt(
@@ -950,7 +769,7 @@ async function processCsvData(csvText, selectedBrand) {
             "quantidade",
             "qtd",
             "quantity",
-          ])
+          ]),
         ) || 0,
       // ✅ NOVO: Extrair subcode do CSV
       subcode: getValueByHeader(headers, values, [
@@ -1068,8 +887,8 @@ async function importProductsToDatabase(products) {
         results.details.push(
           `✅ Atualizado: ${product.productCode} - ${product.name.substring(
             0,
-            30
-          )}...`
+            30,
+          )}...`,
         );
       } else {
         // ✅ CRIA novo produto COM SUBCODE
@@ -1089,18 +908,18 @@ async function importProductsToDatabase(products) {
         results.details.push(
           `🆕 Criado: ${product.productCode} - ${product.name.substring(
             0,
-            30
-          )}...`
+            30,
+          )}...`,
         );
       }
     } catch (error) {
       console.error(
         `   ❌ ERRO no produto ${product.productCode}:`,
-        error.message
+        error.message,
       );
       results.errors++;
       results.details.push(
-        `❌ Erro: ${product.productCode} - ${error.message}`
+        `❌ Erro: ${product.productCode} - ${error.message}`,
       );
     }
   }
@@ -1132,7 +951,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
 
   // ✅ VALIDAÇÃO DOS SUBCÓDIGOS
   const missingSubcodes = items.filter(
-    (item) => !item.subcode || item.subcode.trim() === ""
+    (item) => !item.subcode || item.subcode.trim() === "",
   );
   if (missingSubcodes.length > 0) {
     return res.status(400).json({
@@ -1144,7 +963,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
   // ✅ VALIDAÇÃO DE SUBCÓDIGOS ÚNICOS
   const subcodes = items.map((item) => item.subcode.trim());
   const duplicateSubcodes = subcodes.filter(
-    (code, index) => subcodes.indexOf(code) !== index
+    (code, index) => subcodes.indexOf(code) !== index,
   );
   if (duplicateSubcodes.length > 0) {
     return res.status(400).json({
@@ -1171,7 +990,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     }
 
     console.log(
-      `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`
+      `🏷️ [PDF] Brand ID convertido: ${brandIdInt} (original: ${brandId})`,
     );
 
     // ✅ BUSCA A MARCA NO BANCO
@@ -1263,11 +1082,11 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${productId}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
             console.log(
-              `📊 Histórico de preço atualizado para produto ID ${productId}`
+              `📊 Histórico de preço atualizado para produto ID ${productId}`,
             );
           }
 
@@ -1277,7 +1096,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
         // ✅ CRIAR NOVO PRODUTO A PARTIR DO PDF
         else if (item.productCode && item.description) {
           console.log(
-            `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`
+            `🆕 [PDF] Criando novo produto: ${item.productCode} - ${item.description}`,
           );
 
           // Verifica se já existe um produto com esse código
@@ -1299,12 +1118,12 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${existingWithCode[0].id}, ${price}, ${quantity} , ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(
-              `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`
+              `✅ [PDF] Produto existente atualizado pelo código: ${item.productCode}`,
             );
             results.updated++;
           } else {
@@ -1336,8 +1155,8 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
             await sql`
               INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
               VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
-              purchaseDate || new Date().toISOString()
-            })
+                purchaseDate || new Date().toISOString()
+              })
             `;
 
             console.log(`✅ [PDF] Novo produto criado: ID ${newProduct[0].id}`);
@@ -1356,7 +1175,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
       } catch (error) {
         console.error(
           `❌ [PDF] Erro no item ${item.productCode}:`,
-          error.message
+          error.message,
         );
         results.errors.push({
           productCode: item.productCode,
@@ -1367,7 +1186,7 @@ exports.finalizePurchaseFromPdf = async (req, res) => {
     }
 
     console.log(
-      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`
+      `📊 [PDF] Resultado final: ${results.updated} atualizados, ${results.created} criados, ${results.errors.length} erros`,
     );
 
     res.status(200).json({
@@ -1426,7 +1245,7 @@ exports.getPriceHistory = async (req, res) => {
 
   try {
     console.log(
-      `📊 Buscando histórico de preços para produto ID: ${productId}`
+      `📊 Buscando histórico de preços para produto ID: ${productId}`,
     );
 
     const history = await sql`
@@ -1463,7 +1282,7 @@ exports.getLastPurchasePrice = async (req, res) => {
 
   try {
     console.log(
-      `💰 Buscando último preço de compra para produto ID: ${productId}`
+      `💰 Buscando último preço de compra para produto ID: ${productId}`,
     );
 
     const lastPurchase = await sql`
@@ -1511,7 +1330,7 @@ exports.listTempFiles = async (req, res) => {
           isFile: stats.isFile(),
           created: stats.birthtime,
         };
-      })
+      }),
     );
 
     res.status(200).json({
