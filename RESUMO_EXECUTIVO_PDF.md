@@ -2,11 +2,11 @@
 
 ## Status Atual dos 3 Tipos de PDF
 
-| Fornecedor | Status | Funcionalidade | Problema |
-|-----------|--------|----------------|----------|
-| **AVANT** | ✅ Funcional | Extrai DANFE corretamente | Nenhum |
-| **CLUMENAU** | ⚠️ Funcional (com ressalvas) | Extrai tabela Blumenau | Lógica frágil, depende de "B" |
-| **ELGIN** | ❌ NÃO IMPLEMENTADO | ⛔ Retorna vazio | **CRÍTICO - Não funciona!** |
+| Fornecedor   | Status                       | Funcionalidade            | Problema                      |
+| ------------ | ---------------------------- | ------------------------- | ----------------------------- |
+| **AVANT**    | ✅ Funcional                 | Extrai DANFE corretamente | Nenhum                        |
+| **CLUMENAU** | ⚠️ Funcional (com ressalvas) | Extrai tabela Blumenau    | Lógica frágil, depende de "B" |
+| **ELGIN**    | ❌ NÃO IMPLEMENTADO          | ⛔ Retorna vazio          | **CRÍTICO - Não funciona!**   |
 
 ---
 
@@ -23,6 +23,7 @@ código(7-9dig) + descrição + NCM(8dig) + CST + CFOP + UN + quantidade + preç
 ```
 
 **Exemplo:**
+
 ```
 289211375 LED-BULBO-HP 8W 85395200 100 5102 UN 400,00 4,2100 1.684,00
           ↑            ↑        ↑                  ↑      ↑      ↑
@@ -45,6 +46,7 @@ Item | Marca | Produto  | Descrição            | NCM      | Qtd | Preço
 ```
 
 **Problemas:**
+
 - Se a marca não for "B", não reconhece ❌
 - Descrição pode vir quebrada em múltiplas linhas ⚠️
 - Regex de preço muito simplista ⚠️
@@ -61,24 +63,26 @@ Item | Marca | Produto  | Descrição            | NCM      | Qtd | Preço
 
 function extractElgin(fullText) {
   console.log("🏭 Usando extração ELGIN...");
-  
+
   const items = [];
   const itemsMap = new Map();
-  
+
   // TODO: Definir padrão específico da Elgin quando tiver exemplo
   // Por enquanto usa lógica genérica
-  
-  return Array.from(itemsMap.values());  // ⛔ SEMPRE VAZIO!
+
+  return Array.from(itemsMap.values()); // ⛔ SEMPRE VAZIO!
 }
 ```
 
 **O que acontece hoje:**
+
 1. Sistema detecta "ELGIN" corretamente ✅
 2. Chama `extractElgin()` ✅
 3. Função retorna array vazio ❌
 4. Nenhum produto é extraído ❌
 
 **🚨 SOLUÇÃO NECESSÁRIA:**
+
 - Conseguir um PDF exemplo da Elgin
 - Analisar o formato da tabela
 - Implementar regex específica
@@ -109,12 +113,14 @@ ELGIN:
 ### ⚠️ PROBLEMA CRÍTICO: Elgin não funciona!
 
 **Hoje:** Se um usuário enviar um PDF da Elgin:
+
 1. ✅ Sistema detecta "ELGIN"
 2. ❌ `extractElgin()` retorna `[]` (vazio)
 3. ⚠️ Tenta fallback genérico (pode dar errado)
 4. 💥 **Resultado: Nenhum ou poucos produtos extraídos**
 
 **Solução:**
+
 1. 📄 Conseguir PDF exemplo da Elgin
 2. 🔍 Analisar formato (código, descrição, qtd, preço)
 3. 💻 Implementar `extractElgin()` com regex específica
@@ -130,7 +136,7 @@ blum_backend/src/controllers/purchaseController.js
 └─ Linha 276: case "ELGIN" → Chama função vazia
 
 blum_backend/scripts/smart_extractor.js
-├─ Linha 155-160: extractElgin() ❌ VAZIA  
+├─ Linha 155-160: extractElgin() ❌ VAZIA
 └─ Linha 225: case "ELGIN" → Chama função vazia
 ```
 
@@ -139,15 +145,18 @@ blum_backend/scripts/smart_extractor.js
 ## ✅ Recomendações Finais
 
 ### PRIORIDADE ALTA (Fazer Agora)
+
 1. ⚠️ **Implementar Elgin** - conseguir PDF exemplo
 2. 🧪 **Testar Clumenau** - verificar se funciona com PDFs variados
 
 ### PRIORIDADE MÉDIA (Fazer Depois)
+
 3. 🔧 **Melhorar Clumenau** - adicionar padrões alternativos
 4. 📝 **Consolidar código** - remover duplicação entre arquivos
 5. 🧪 **Criar testes** - automatizar validação dos 3 tipos
 
 ### PRIORIDADE BAIXA (Opcional)
+
 6. 📚 **Documentar** - criar guia de manutenção
 7. 🎨 **Refatorar** - melhorar estrutura do código
 

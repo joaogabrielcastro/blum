@@ -12,11 +12,13 @@
 ### 1. **Código Consolidado** ✅
 
 **Antes:** Funções duplicadas em 2 arquivos
+
 - ❌ `purchaseController.js` tinha: `detectSupplier()`, `extractAvant()`, `extractClumenau()`, `extractElgin()`, `extractGeneric()`
 - ❌ `smart_extractor.js` tinha as **mesmas** funções duplicadas
 - ❌ **Total:** ~400 linhas de código duplicado
 
 **Depois:** Uma única fonte de verdade
+
 - ✅ `smart_extractor.js` mantém **todas** as funções de extração
 - ✅ `purchaseController.js` **importa** e usa o módulo
 - ✅ **Redução:** ~300 linhas de código removidas
@@ -47,9 +49,10 @@ blum_backend/
 ## 🔄 Fluxo Simplificado
 
 ### **Antes (Código Duplicado):**
+
 ```
-📄 PDF → Controller extrai texto → 
-    Controller detecta fornecedor → 
+📄 PDF → Controller extrai texto →
+    Controller detecta fornecedor →
     Controller extrai produtos →
     Retorna resultado
 
@@ -57,8 +60,9 @@ blum_backend/
 ```
 
 ### **Depois (Código Consolidado):**
+
 ```
-📄 PDF → Controller extrai texto → 
+📄 PDF → Controller extrai texto →
     smartExtractor.extractFromAnyText(texto) →
         ├─ Detecta fornecedor
         ├─ Executa extração específica
@@ -74,21 +78,25 @@ blum_backend/
 ## 💡 Benefícios da Refatoração
 
 ### 1. **Manutenção Simplificada** 🔧
+
 - ✅ Alterar lógica de extração = editar **1 arquivo** ao invés de 2
 - ✅ Adicionar novo fornecedor = modificar apenas `smart_extractor.js`
 - ✅ Corrigir bugs = garantia de fix em todos os lugares
 
 ### 2. **Código Mais Limpo** 📝
+
 - ✅ Controller foca em lógica HTTP (requisição/resposta)
 - ✅ Extrator foca em lógica de negócio (detectar/extrair)
 - ✅ Responsabilidades bem separadas
 
 ### 3. **Testabilidade** 🧪
+
 - ✅ Pode testar `smart_extractor.js` isoladamente
 - ✅ Não precisa de servidor HTTP para testar extração
 - ✅ Testes unitários mais fáceis
 
 ### 4. **Reutilização** ♻️
+
 - ✅ Outros controllers podem usar `smart_extractor`
 - ✅ CLI scripts podem usar o mesmo módulo
 - ✅ Testes podem usar diretamente
@@ -98,6 +106,7 @@ blum_backend/
 ## 📊 Comparação de Código
 
 ### **Antes (purchaseController.js - linhas 14-238):**
+
 ```javascript
 // ❌ 224 linhas de funções duplicadas
 
@@ -124,19 +133,27 @@ async function extractGeneric(fullText) {
 async function fallbackTextExtraction(pdfBuffer) {
   // ... extrai texto
   const supplier = detectSupplier(fullText);
-  
+
   switch (supplier) {
-    case "AVANT": items = extractAvant(fullText); break;
-    case "CLUMENAU": items = extractClumenau(fullText); break;
-    case "ELGIN": items = extractElgin(fullText); break;
-    default: items = await extractGeneric(fullText);
+    case "AVANT":
+      items = extractAvant(fullText);
+      break;
+    case "CLUMENAU":
+      items = extractClumenau(fullText);
+      break;
+    case "ELGIN":
+      items = extractElgin(fullText);
+      break;
+    default:
+      items = await extractGeneric(fullText);
   }
-  
+
   return items;
 }
 ```
 
 ### **Depois (purchaseController.js - 15 linhas):**
+
 ```javascript
 // ✅ Apenas 15 linhas - importa e usa
 
@@ -176,27 +193,30 @@ async function fallbackTextExtraction(pdfBuffer) {
 
 ## 🎯 Status Atual dos Fornecedores
 
-| Fornecedor | Status | Localização |
-|-----------|--------|-------------|
-| **AVANT** | ✅ Funcional | `smart_extractor.js` linha 33-78 |
-| **CLUMENAU** | ⚠️ Funcional (pode melhorar) | `smart_extractor.js` linha 84-134 |
-| **ELGIN** | ❌ **Não implementado** | `smart_extractor.js` linha 140-145 |
+| Fornecedor   | Status                       | Localização                        |
+| ------------ | ---------------------------- | ---------------------------------- |
+| **AVANT**    | ✅ Funcional                 | `smart_extractor.js` linha 33-78   |
+| **CLUMENAU** | ⚠️ Funcional (pode melhorar) | `smart_extractor.js` linha 84-134  |
+| **ELGIN**    | ❌ **Não implementado**      | `smart_extractor.js` linha 140-145 |
 
 ---
 
 ## 🚀 Próximos Passos
 
 ### PRIORIDADE ALTA
-1. ⚠️ **Implementar Elgin** 
+
+1. ⚠️ **Implementar Elgin**
    - Conseguir PDF exemplo
    - Adicionar regex em `smart_extractor.js` linha 140-145
 
 ### PRIORIDADE MÉDIA
+
 2. 🔧 **Melhorar Clumenau**
    - Adicionar padrões alternativos (sem "B")
    - Testar com PDFs variados
 
 ### PRIORIDADE BAIXA
+
 3. 🧪 **Criar Testes**
    - Testes unitários para `smart_extractor.js`
    - Mocks de PDFs para cada fornecedor
@@ -213,33 +233,32 @@ async function fallbackTextExtraction(pdfBuffer) {
 // Adicionar detecção (linha ~25)
 function detectSupplier(text) {
   const textUpper = text.toUpperCase();
-  
+
   // ... código existente ...
-  
+
   // NOVO: Detecta NOVA EMPRESA
-  if (textUpper.includes('NOVA EMPRESA') || 
-      textUpper.includes('NOVA-EMP')) {
-    return 'NOVA_EMPRESA';
+  if (textUpper.includes("NOVA EMPRESA") || textUpper.includes("NOVA-EMP")) {
+    return "NOVA_EMPRESA";
   }
-  
-  return 'GENERIC';
+
+  return "GENERIC";
 }
 ```
 
 ```javascript
 // Adicionar função de extração (linha ~160)
 function extractNovaEmpresa(text) {
-  console.log('🏭 Usando extração NOVA_EMPRESA...');
-  
+  console.log("🏭 Usando extração NOVA_EMPRESA...");
+
   const items = [];
   const itemsMap = new Map();
-  
+
   // TODO: Implementar lógica específica
   // Exemplo de regex:
   const pattern = /(\d{6,8})\s+([A-Za-z].{10,100}?)\s+(\d{1,5})\s+([\d,.]+)/;
-  
+
   // ... lógica de extração ...
-  
+
   return Array.from(itemsMap.values());
 }
 ```
@@ -248,15 +267,24 @@ function extractNovaEmpresa(text) {
 // Adicionar no switch (linha ~213)
 async function extractFromAnyText(text) {
   // ...
-  
-  switch(supplier) {
-    case 'AVANT': items = extractAvant(text); break;
-    case 'CLUMENAU': items = extractClumenau(text); break;
-    case 'ELGIN': items = extractElgin(text); break;
-    case 'NOVA_EMPRESA': items = extractNovaEmpresa(text); break;  // NOVO
-    default: items = extractGeneric(text);
+
+  switch (supplier) {
+    case "AVANT":
+      items = extractAvant(text);
+      break;
+    case "CLUMENAU":
+      items = extractClumenau(text);
+      break;
+    case "ELGIN":
+      items = extractElgin(text);
+      break;
+    case "NOVA_EMPRESA":
+      items = extractNovaEmpresa(text);
+      break; // NOVO
+    default:
+      items = extractGeneric(text);
   }
-  
+
   return items;
 }
 ```
@@ -271,12 +299,14 @@ Ele automaticamente usará a nova lógica.
 ## 🎉 Conclusão
 
 ### Antes da Refatoração:
+
 - ❌ ~400 linhas duplicadas
 - ❌ Manutenção em 2 arquivos
 - ❌ Risco de inconsistência
 - ❌ Difícil adicionar novos fornecedores
 
 ### Depois da Refatoração:
+
 - ✅ Código consolidado (1 fonte)
 - ✅ ~300 linhas removidas
 - ✅ Manutenção simplificada
@@ -289,10 +319,12 @@ Ele automaticamente usará a nova lógica.
 **Status:** ✅ **REFATORAÇÃO CONCLUÍDA COM SUCESSO**
 
 **Arquivos Modificados:**
+
 1. `purchaseController.js` - Removidas ~300 linhas de código duplicado
 2. `smart_extractor.js` - Mantido como fonte única de extração
 
 **Benefício Imediato:**
+
 - Código mais limpo e manutenível
 - Facilita implementação da Elgin
 - Reduz risco de bugs por inconsistência
