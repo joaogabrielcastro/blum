@@ -47,7 +47,7 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
           reportParams.userRole = "salesperson";
           console.log(
             "🔍 Vendedor - Aplicando filtro por usuário:",
-            currentUserId
+            currentUserId,
           );
         }
         // SE FOR ADMIN: NÃO aplica filtro (vê tudo)
@@ -79,7 +79,7 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
 
         // PREPARAR DADOS PARA O GRÁFICO (igual ao ReportsPage)
         const finishedOrders = ordersResponse.filter(
-          (order) => order.status === "Entregue"
+          (order) => order.status === "Entregue",
         );
 
         // Agrupar vendas por data para gráfico
@@ -184,7 +184,7 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
         </div>
       </div>
       <span>
-        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full overflow-x-auto">
           {/* Conteúdo Principal */}
         </div>
       </span>

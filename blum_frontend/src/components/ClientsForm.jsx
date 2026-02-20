@@ -26,17 +26,17 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
     if (cleanCNPJ.length <= 8)
       return `${cleanCNPJ.slice(0, 2)}.${cleanCNPJ.slice(
         2,
-        5
+        5,
       )}.${cleanCNPJ.slice(5)}`;
     if (cleanCNPJ.length <= 12)
       return `${cleanCNPJ.slice(0, 2)}.${cleanCNPJ.slice(
         2,
-        5
+        5,
       )}.${cleanCNPJ.slice(5, 8)}/${cleanCNPJ.slice(8)}`;
 
     return `${cleanCNPJ.slice(0, 2)}.${cleanCNPJ.slice(2, 5)}.${cleanCNPJ.slice(
       5,
-      8
+      8,
     )}/${cleanCNPJ.slice(8, 12)}-${cleanCNPJ.slice(12, 14)}`;
   };
 
@@ -151,7 +151,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
         const fieldErrors = error.details
           .map(
             (err) =>
-              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
         errorMessage += `\n\nErros:\n${fieldErrors}`;
@@ -168,7 +168,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-auto">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 max-w-4xl mx-auto">
+        <div className="bg-white p-2 sm:p-4 md:p-8 rounded-2xl shadow-xl border border-gray-200 max-w-4xl mx-auto w-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">
             {isEditing ? "Editar Cliente" : "Adicionar Novo Cliente"}
           </h2>
@@ -308,8 +308,8 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                 {loading
                   ? "Salvando..."
                   : isEditing
-                  ? "Atualizar Cliente"
-                  : "Salvar Cliente"}
+                    ? "Atualizar Cliente"
+                    : "Salvar Cliente"}
               </button>
             </div>
           </form>

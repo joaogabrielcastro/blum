@@ -103,7 +103,7 @@ const OrdersForm = ({
                 product.productcode.toLowerCase().includes(searchTerm)) ||
               // ✅ BUSCA POR SUBCÓDIGO
               (product.subcode &&
-                product.subcode.toLowerCase().includes(searchTerm)))
+                product.subcode.toLowerCase().includes(searchTerm))),
         );
 
         // ✅ ORDENA POR RELEVÂNCIA
@@ -150,7 +150,7 @@ const OrdersForm = ({
     if (field === "quantity" && newItems[index].availableStock) {
       if (value > newItems[index].availableStock) {
         alert(
-          `Quantidade solicitada (${value}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`
+          `Quantidade solicitada (${value}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
         );
         return; // Não permite a mudança
       }
@@ -167,7 +167,7 @@ const OrdersForm = ({
   const handleProductSelect = (product) => {
     if (product) {
       const existingItem = items.find(
-        (item) => item.productName === product.name
+        (item) => item.productName === product.name,
       );
       if (!existingItem) {
         // Verifica se há estoque disponível
@@ -206,14 +206,14 @@ const OrdersForm = ({
   };
 
   const filteredClients = Object.entries(clients).filter(([id, name]) =>
-    name.toLowerCase().includes(clientSearch.toLowerCase())
+    name.toLowerCase().includes(clientSearch.toLowerCase()),
   );
 
   const handleClientSearch = (e) => {
     const selectedName = e.target.value;
     setClientSearch(selectedName);
     const client = Object.entries(clients).find(
-      ([id, name]) => name.toLowerCase() === selectedName.toLowerCase()
+      ([id, name]) => name.toLowerCase() === selectedName.toLowerCase(),
     );
     if (client) {
       setClientId(client[0]);
@@ -240,7 +240,7 @@ const OrdersForm = ({
     }
     if (!userId) {
       alert(
-        "ID do usuário não disponível. Por favor, tente fazer login novamente."
+        "ID do usuário não disponível. Por favor, tente fazer login novamente.",
       );
       return;
     }
@@ -250,7 +250,7 @@ const OrdersForm = ({
     items.forEach((item) => {
       if (item.availableStock && item.quantity > item.availableStock) {
         stockErrors.push(
-          `"${item.productName}": Solicitado ${item.quantity}, Disponível ${item.availableStock}`
+          `"${item.productName}": Solicitado ${item.quantity}, Disponível ${item.availableStock}`,
         );
       }
     });
@@ -258,8 +258,8 @@ const OrdersForm = ({
     if (stockErrors.length > 0) {
       alert(
         `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join(
-          "\n"
-        )}\n\nPor favor, ajuste as quantidades antes de continuar.`
+          "\n",
+        )}\n\nPor favor, ajuste as quantidades antes de continuar.`,
       );
       return;
     }
@@ -297,7 +297,7 @@ const OrdersForm = ({
         const fieldErrors = error.details
           .map(
             (err) =>
-              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
         errorMessage += `\n\nErros de validação:\n${fieldErrors}`;
@@ -310,14 +310,14 @@ const OrdersForm = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-8">
       <h2 className="text-3xl font-bold text-gray-800 mb-8">
         {editingOrder ? "Editar Pedido" : "Criar Novo Pedido"}
       </h2>
-      <div className="overflow-x-auto max-[420px]:overflow-x-scroll scroll-smooth">
+      <div className="overflow-x-auto max-[420px]:overflow-x-scroll scroll-smooth w-full">
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-xl shadow-lg p-8 space-y-8 min-w-[420px]"
+          className="bg-white rounded-xl shadow-lg p-2 sm:p-4 md:p-8 space-y-8 min-w-[320px] w-full"
         >
           {/* --- Cliente e Representada --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -560,7 +560,7 @@ const OrdersForm = ({
                                 handleItemChange(
                                   index,
                                   "quantity",
-                                  parseInt(e.target.value)
+                                  parseInt(e.target.value),
                                 )
                               }
                               className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"

@@ -1,4 +1,4 @@
-const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole}) => {
+const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
   // Função para lidar com a navegação e fechar o menu no mobile
   const handleNavigate = (page) => {
     onNavigate(page);
@@ -8,10 +8,12 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole}) => {
   return (
     <div
       className={`
-        fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col bg-gray-800 p-4 text-white
+        fixed inset-y-0 left-0 z-40 flex transform flex-col bg-gray-800 p-4 text-white
         shadow-xl transition-transform duration-300 ease-in-out
+        w-4/5 max-w-xs md:w-64
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
         md:relative md:translate-x-0 md:rounded-tr-3xl md:rounded-br-3xl
+        overflow-y-auto
       `}
     >
       <div className="mb-10 text-center text-2xl font-bold text-blue-400">

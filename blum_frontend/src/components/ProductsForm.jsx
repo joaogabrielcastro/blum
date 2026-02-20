@@ -96,7 +96,7 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
         const fieldErrors = error.details
           .map(
             (err) =>
-              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`
+              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
         errorMessage = `Erro ao salvar produto.\n\nErros:\n${fieldErrors}`;
@@ -139,7 +139,7 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
   };
 
   return (
-    <div>
+    <div className="bg-white rounded-xl shadow-md p-2 sm:p-4 md:p-6 max-w-lg mx-auto w-full">
       <h2 className="text-xl font-bold mb-4">
         {product ? "Editar Produto" : "Adicionar Novo Produto"}
       </h2>

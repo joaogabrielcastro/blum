@@ -213,9 +213,9 @@ const App = () => {
   }
 
   return (
-    <div className="font-sans text-gray-800 antialiased bg-gray-50">
+    <div className="font-sans text-gray-800 antialiased bg-gray-50 min-h-screen">
       {isLoggedIn ? (
-        <div className="relative flex h-screen overflow-hidden bg-gray-100">
+        <div className="relative flex flex-col md:flex-row h-screen overflow-hidden bg-gray-100">
           <Sidebar
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
@@ -233,7 +233,7 @@ const App = () => {
             ></div>
           )}
 
-          <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-1 flex-col overflow-y-auto w-full max-w-full">
             {/* Botão Hambúrguer - Visível apenas em mobile */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -264,7 +264,9 @@ const App = () => {
             )}
 
             {/* Conteúdo principal */}
-            <main className="flex-1 p-4 md:p-6">{renderPage()}</main>
+            <main className="flex-1 p-2 sm:p-4 md:p-6 max-w-full">
+              {renderPage()}
+            </main>
 
             {/* Footer opcional */}
             <footer className="bg-white border-t border-gray-200 py-4 px-6 mt-auto">

@@ -31,7 +31,7 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
           client.phone?.includes(term) ||
           client.region?.toLowerCase().includes(term) ||
           client.cnpj?.includes(term) ||
-          client.email?.toLowerCase().includes(term)
+          client.email?.toLowerCase().includes(term),
       );
       setFilteredClients(filtered);
     } else {
@@ -85,7 +85,7 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
 
       setClients((prev) => prev.filter((client) => client.id !== clientId));
       setFilteredClients((prev) =>
-        prev.filter((client) => client.id !== clientId)
+        prev.filter((client) => client.id !== clientId),
       );
 
       setDeleteConfirm(null);
@@ -276,7 +276,7 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
                               {client.companyName?.charAt(0) || "C"}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <h3 className="font-bold text-gray-900 text-lg leading-tight truncate">
+                              <h3 className="font-bold text-gray-900 text-lg leading-tight break-words max-w-full whitespace-normal line-clamp-2">
                                 {client.companyName}
                               </h3>
                               <p className="text-gray-500 text-sm font-mono truncate">
