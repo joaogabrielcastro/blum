@@ -1,4 +1,4 @@
-const CACHE_NAME = "blum-cache-v2";
+const CACHE_NAME = "blum-cache-v3";
 
 self.addEventListener("install", (event) => {
   console.log("Service Worker: Instalação");
@@ -15,17 +15,17 @@ self.addEventListener("activate", (event) => {
             console.log("Service Worker: Limpando cache antigo");
             return caches.delete(cache);
           }
-        })
+        }),
       );
-    })
+    }),
   );
 });
 
 self.addEventListener("fetch", (event) => {
   // Só aplica a estratégia de cache para requisições GET.
-  // Ignora todas as outras (POST, PUT, DELETE, etc.).
+  // Ignora todas as outras (POST, PUT, DELETE, etc.) — deixa o browser lidar nativamente.
   if (event.request.method !== "GET") {
-    return event.respondWith(fetch(event.request));
+    return; // não chama event.respondWith, evitando quebra de CORS em requisições cross-origin
   } // A lógica abaixo agora só será executada para requisições GET.
 
   event.respondWith(
@@ -49,6 +49,6 @@ self.addEventListener("fetch", (event) => {
             statusText: "Service Unavailable",
           });
         });
-      })
+      }),
   );
 });
