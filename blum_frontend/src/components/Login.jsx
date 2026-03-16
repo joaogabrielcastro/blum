@@ -32,13 +32,19 @@ const Login = ({ onLogin }) => {
     console.log("[DEBUG] username:", username, "password:", password);
     console.log("[DEBUG] isFormValid:", isFormValid);
     // Mostra o valor da variável de ambiente em tempo de execução
-    console.log("[DEBUG] process.env.REACT_APP_API_URL:", process.env.REACT_APP_API_URL);
+    console.log(
+      "[DEBUG] process.env.REACT_APP_API_URL:",
+      process.env.REACT_APP_API_URL,
+    );
     // Mostra o valor da API_URL importada do apiService
     try {
       const apiServiceModule = await import("../services/apiService");
       console.log("[DEBUG] API_URL do apiService:", apiServiceModule.API_URL);
     } catch (err) {
-      console.log("[DEBUG] Não foi possível importar API_URL do apiService:", err);
+      console.log(
+        "[DEBUG] Não foi possível importar API_URL do apiService:",
+        err,
+      );
     }
 
     if (!isFormValid) return;
