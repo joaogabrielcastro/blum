@@ -23,23 +23,31 @@ const Login = ({ onLogin }) => {
     setError(""); // Limpar erros quando o usuário digitar
   }, [username, password]);
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    // DEBUG EXTRA
-    console.log("[DEBUG] handleSubmit chamado");
-    console.log("[DEBUG] username:", username, "password:", password);
-    console.log("[DEBUG] isFormValid:", isFormValid);
-    // Mostra o valor da variável de ambiente em tempo de execução
-    console.log(
-      "[DEBUG] process.env.REACT_APP_API_URL:",
-      process.env.REACT_APP_API_URL,
-    );
-    // Mostra o valor da API_URL importada do apiService
+    // --- NOVA LÓGICA DE LIMPEZA ---
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim(); 
+
+    console.log(`[DEBUG] Enviando: "${cleanUsername}" | Senha: ${cleanPassword.length} chars`);
+
+    if (!cleanUsername || !cleanPassword) {
+      setError("Preencha usuário e senha");
+      return;
+    }
+    // ------------------------------
+
+    setIsLoading(true);
+
     try {
-      const apiServiceModule = await import("../services/apiService");
-      console.log("[DEBUG] API_URL do apiService:", apiServiceModule.API_URL);
+      // USAR AS VARIÁVEIS LIMPAS AQUI:
+      const response = await login(cleanUsername, cleanPassword);
+      
+      localStorage.setItem("token", response.token);
+      localStorage.setItem("user", JSON.stringify(response.user));
+      onLogin(response.user.role, response.user.id, response.user);
     } catch (err) {
       console.log(
         "[DEBUG] Não foi possível importar API_URL do apiService:",

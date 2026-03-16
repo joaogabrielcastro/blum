@@ -4,7 +4,11 @@ const { sql } = require("../config/database");
 
 // Login de usuário
 exports.login = async (req, res) => {
-  const { username, password } = req.body;
+  let { username, password } = req.body; // use let para permitir alteração
+
+  // Limpeza de segurança no servidor
+  username = username?.trim();
+  password = password?.trim();
 
   try {
     console.log("=== INICIANDO TENTATIVA DE LOGIN ===");
