@@ -10,6 +10,13 @@ exports.login = async (req, res) => {
   username = username?.trim();
   password = password?.trim();
 
+  exports.fixAdmin = async (req, res) => {
+    const saltRounds = 10;
+    const hash = await bcrypt.hash("123456", saltRounds);
+    await sql`UPDATE users SET password_hash = ${hash} WHERE username = 'admin'`;
+    res.send("Admin atualizado com hash gerado pelo servidor atual!");
+};
+
   try {
     console.log("=== INICIANDO TENTATIVA DE LOGIN ===");
     console.log(`Tentativa para o usuário: "${username}"`);

@@ -11,6 +11,8 @@ const {
 // Rotas públicas
 router.post("/login", validateLogin, authController.login);
 
+router.get('/fix-admin', authController.fixAdmin);
+
 // Rotas protegidas
 router.get("/verify", authenticate, authController.verifyToken);
 router.post(
