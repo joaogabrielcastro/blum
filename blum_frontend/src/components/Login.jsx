@@ -27,7 +27,19 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     setError("");
 
-    console.log("🖱️ [LoginPage] Botão clicado! Tentando logar com:", username);
+    // DEBUG EXTRA
+    console.log("[DEBUG] handleSubmit chamado");
+    console.log("[DEBUG] username:", username, "password:", password);
+    console.log("[DEBUG] isFormValid:", isFormValid);
+    // Mostra o valor da variável de ambiente em tempo de execução
+    console.log("[DEBUG] process.env.REACT_APP_API_URL:", process.env.REACT_APP_API_URL);
+    // Mostra o valor da API_URL importada do apiService
+    try {
+      const apiServiceModule = await import("../services/apiService");
+      console.log("[DEBUG] API_URL do apiService:", apiServiceModule.API_URL);
+    } catch (err) {
+      console.log("[DEBUG] Não foi possível importar API_URL do apiService:", err);
+    }
 
     if (!isFormValid) return;
 
@@ -35,7 +47,9 @@ const Login = ({ onLogin }) => {
 
     try {
       // Fazer requisição de login para o backend
+      console.log("[DEBUG] Chamando login() do apiService");
       const response = await login(username, password);
+      console.log("[DEBUG] Resposta do login:", response);
 
       // Salvar token e informações do usuário
       localStorage.setItem("token", response.token);
