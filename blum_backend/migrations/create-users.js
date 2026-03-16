@@ -67,7 +67,7 @@ async function createUsers() {
 
     console.log("✨ Processo concluído!\n");
     console.log(
-      "⚠️  IMPORTANTE: Altere todas as senhas após o primeiro login!\n"
+      "⚠️  IMPORTANTE: Altere todas as senhas após o primeiro login!\n",
     );
 
     // Listar usuários criados

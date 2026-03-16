@@ -10,7 +10,7 @@ async function runMigration() {
     const migrationPath = path.join(
       __dirname,
       "migrations",
-      "002_add_indexes.sql"
+      "002_add_indexes.sql",
     );
     const migrationSQL = fs.readFileSync(migrationPath, "utf8");
 

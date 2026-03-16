@@ -57,7 +57,7 @@ exports.deleteBrand = async (req, res) => {
   try {
     // Verifica se o parâmetro é um ID numérico ou um nome
     const isNumericId = /^\d+$/.test(id);
-    
+
     let brand;
     if (isNumericId) {
       // Busca por ID
@@ -104,9 +104,9 @@ exports.deleteBrand = async (req, res) => {
     res.status(200).json({ message: "Marca deletada com sucesso!" });
   } catch (error) {
     console.error("Erro ao deletar marca:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Erro ao deletar marca.",
-      details: error.message 
+      details: error.message,
     });
   }
 };

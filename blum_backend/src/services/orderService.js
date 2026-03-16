@@ -52,14 +52,14 @@ class OrderService {
           commission_rate: commissionRate,
           commission_amount: parseFloat(commissionAmount.toFixed(2)),
         };
-      })
+      }),
     );
 
     const discountAmount = subtotal * (parseFloat(discount) / 100);
     const finalTotal = subtotal - discountAmount;
     const totalCommission = itemsWithCommission.reduce(
       (total, item) => total + (item.commission_amount || 0),
-      0
+      0,
     );
 
     return {
@@ -148,7 +148,7 @@ class OrderService {
       items.length === 0
     ) {
       throw new Error(
-        "Dados incompletos. clientid, userid e items (array) são obrigatórios"
+        "Dados incompletos. clientid, userid e items (array) são obrigatórios",
       );
     }
 
@@ -160,7 +160,7 @@ class OrderService {
 
         if (product.length === 0) {
           throw new Error(
-            `Produto "${item.productName || item.productId}" não encontrado`
+            `Produto "${item.productName || item.productId}" não encontrado`,
           );
         }
 
@@ -170,7 +170,7 @@ class OrderService {
         if (requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
-              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
+              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
           );
         }
       }
@@ -186,8 +186,8 @@ class OrderService {
         (${clientid}, ${userid}, ${description || ""}, 
          ${JSON.stringify(calculated.items)}, 
          ${discount || 0}, ${calculated.finalTotal}, ${
-      calculated.totalCommission
-    }, 
+           calculated.totalCommission
+         }, 
          'Em aberto', NOW())
       RETURNING *
     `;
@@ -206,7 +206,7 @@ class OrderService {
 
     if (!clientid || !userid || !items || !Array.isArray(items)) {
       throw new Error(
-        "Dados incompletos. clientid, userid e items (array) são obrigatórios"
+        "Dados incompletos. clientid, userid e items (array) são obrigatórios",
       );
     }
 
@@ -218,7 +218,7 @@ class OrderService {
 
         if (product.length === 0) {
           throw new Error(
-            `Produto "${item.productName || item.productId}" não encontrado`
+            `Produto "${item.productName || item.productId}" não encontrado`,
           );
         }
 
@@ -228,7 +228,7 @@ class OrderService {
         if (requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
-              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`
+              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
           );
         }
       }

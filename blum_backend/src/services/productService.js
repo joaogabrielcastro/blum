@@ -130,7 +130,7 @@ class ProductService {
 
       if (existing.length > 0) {
         throw new Error(
-          `Já existe um produto com o código "${productcode}": ${existing[0].name}`
+          `Já existe um produto com o código "${productcode}": ${existing[0].name}`,
         );
       }
     }
@@ -144,7 +144,7 @@ class ProductService {
 
       if (existingSubcode.length > 0) {
         throw new Error(
-          `Já existe um produto com o subcódigo "${subcode}": ${existingSubcode[0].name}`
+          `Já existe um produto com o subcódigo "${subcode}": ${existingSubcode[0].name}`,
         );
       }
     }
@@ -153,7 +153,7 @@ class ProductService {
       `INSERT INTO products (name, productcode, subcode, price, stock, brand, minstock, createdat)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING *`,
-      [name, productcode, subcode || "", price, stock, brand, minstock || 0]
+      [name, productcode, subcode || "", price, stock, brand, minstock || 0],
     );
 
     return result[0];
@@ -182,7 +182,7 @@ class ProductService {
 
       if (existing.length > 0) {
         throw new Error(
-          `O código "${productcode}" já está em uso pelo produto: ${existing[0].name}`
+          `O código "${productcode}" já está em uso pelo produto: ${existing[0].name}`,
         );
       }
     }
@@ -196,7 +196,7 @@ class ProductService {
 
       if (existingSubcode.length > 0) {
         throw new Error(
-          `O subcódigo "${subcode}" já está em uso pelo produto: ${existingSubcode[0].name}`
+          `O subcódigo "${subcode}" já está em uso pelo produto: ${existingSubcode[0].name}`,
         );
       }
     }
@@ -206,7 +206,16 @@ class ProductService {
        SET name = $1, productcode = $2, subcode = $3, price = $4, stock = $5, brand = $6, minstock = $7
        WHERE id = $8
        RETURNING *`,
-      [name, productcode, subcode || "", price, stock, brand, minstock || 0, id]
+      [
+        name,
+        productcode,
+        subcode || "",
+        price,
+        stock,
+        brand,
+        minstock || 0,
+        id,
+      ],
     );
 
     if (result.length === 0) {

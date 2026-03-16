@@ -43,7 +43,7 @@ exports.login = async (req, res) => {
         name: user.name,
       },
       process.env.JWT_SECRET || "blum-secret-key-change-in-production",
-      { expiresIn: "8h" }
+      { expiresIn: "8h" },
     );
 
     res.json({
@@ -170,7 +170,7 @@ exports.updatePassword = async (req, res) => {
     // Verificar senha atual
     const validPassword = await bcrypt.compare(
       currentPassword,
-      users[0].password_hash
+      users[0].password_hash,
     );
 
     if (!validPassword) {

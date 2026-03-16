@@ -5,11 +5,16 @@ const pool = new Pool({
 });
 
 function shiftPlaceholders(queryText, offset) {
-  return queryText.replace(/\$(\d+)/g, (_, index) => `$${Number(index) + offset}`);
+  return queryText.replace(
+    /\$(\d+)/g,
+    (_, index) => `$${Number(index) + offset}`,
+  );
 }
 
 function isSqlFragment(value) {
-  return Boolean(value && value.__isSqlFragment && typeof value.text === "string");
+  return Boolean(
+    value && value.__isSqlFragment && typeof value.text === "string",
+  );
 }
 
 async function execute(text, values = []) {
@@ -61,7 +66,10 @@ function buildTemplate(strings, interpolations) {
 }
 
 function sql(firstArg, ...rest) {
-  if (Array.isArray(firstArg) && Object.prototype.hasOwnProperty.call(firstArg, "raw")) {
+  if (
+    Array.isArray(firstArg) &&
+    Object.prototype.hasOwnProperty.call(firstArg, "raw")
+  ) {
     return buildTemplate(firstArg, rest);
   }
 

@@ -61,7 +61,7 @@ class ClientService {
       `INSERT INTO clients ("companyName", "contactPerson", phone, region, cnpj, "email", "createdAt")
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
        RETURNING *`,
-      [companyName, contactPerson, phone, region, cnpj, email]
+      [companyName, contactPerson, phone, region, cnpj, email],
     );
 
     return result[0];
@@ -88,7 +88,7 @@ class ClientService {
        SET "companyName" = $1, "contactPerson" = $2, phone = $3, region = $4, cnpj = $5
        WHERE id = $6
        RETURNING *`,
-      [companyName, contactPerson, phone, region, cnpj, id]
+      [companyName, contactPerson, phone, region, cnpj, id],
     );
 
     return result[0];
