@@ -13,9 +13,9 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // CORS configurado para múltiplas origens
 const allowedOrigins = [
-  "http://localhost:3001",
-  "http://localhost:3000",
-  "https://blum-azure.vercel.app",
+  "https://blum.jwsoftware.com.br",
+  "http://localhost:3011",
+  "https://api-blum.jwsoftware.com.br",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
