@@ -27,6 +27,8 @@ const Login = ({ onLogin }) => {
     e.preventDefault();
     setError("");
 
+    console.log("🖱️ [LoginPage] Botão clicado! Tentando logar com:", username);
+
     if (!isFormValid) return;
 
     setIsLoading(true);
