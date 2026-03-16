@@ -1,8 +1,10 @@
-# Usa o Node 22 (mesma versão que já estava rodando no seu log)
+# Usa o Node 22 slim para manter a imagem leve
 FROM node:22-slim
 
-# Instala o Poppler E as dependências vitais para o pacote 'canvas'
+# Instala as dependências do sistema
+# Adicionei o 'tini' para evitar o erro EADDRINUSE e gerenciar processos zumbis
 RUN apt-get update && apt-get install -y \
+    tini \
     poppler-utils \
     poppler-data \
     build-essential \
@@ -16,21 +18,25 @@ RUN apt-get update && apt-get install -y \
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de dependências primeiro (melhora o cache do Docker)
+# Copia os arquivos de dependências
 COPY package*.json ./
 
-# Instala as dependências do Node (usando omit=dev conforme o aviso do npm)
+# Instala as dependências (ci é mais seguro para produção que o install comum)
 RUN npm ci --omit=dev
 
-# Copia o resto do código da aplicação
+# Copia o resto do código
 COPY . .
 
-# Expõe a porta
+# Expõe a porta que você definiu (3011)
 EXPOSE 3011
 
-# Define variáveis de ambiente padrão
+# Variáveis de ambiente
 ENV NODE_ENV=production
 ENV PORT=3011
 
-# Comando para iniciar a aplicação
-CMD ["npm", "start"]
+# --- A MÁGICA PARA EVITAR PORTA OCUPADA ---
+# O tini vira o processo principal e gerencia o encerramento do Node corretamente
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Inicia a aplicação (use 'node index.js' direto se possível para ser mais rápido)
+CMD ["node", "index.js"]
