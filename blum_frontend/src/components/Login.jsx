@@ -263,7 +263,7 @@ const Login = ({ onLogin }) => {
                   Entrando...
                 </>
               ) : (
-                "Entrar"
+                "Entrar agora teste"
               )}
             </button>
           </form>
