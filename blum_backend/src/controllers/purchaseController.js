@@ -1,12 +1,10 @@
-const { neon } = require("@neondatabase/serverless");
+const { sql } = require("../config/database");
 const { Poppler } = require("node-poppler");
 const path = require("path");
 const fs = require("fs").promises;
 const poppler = new Poppler();
 
 require("dotenv").config();
-
-const sql = neon(process.env.DATABASE_URL);
 
 // ===========================
 // 📦 IMPORTA MÓDULO DE EXTRAÇÃO

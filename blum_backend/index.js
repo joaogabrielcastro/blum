@@ -2,13 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const purchaseRoutes = require("./src/routes/purchaseRoutes");
-const { neon } = require("@neondatabase/serverless");
+const { sql } = require("./src/config/database");
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-// Conexão com o banco Neon
-const sql = neon(process.env.DATABASE_URL);
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
@@ -62,7 +59,7 @@ app.use("/api/v1/purchases", purchaseRoutes);
 
 const setupDatabase = async () => {
   try {
-    console.log("Conectando ao banco de dados Neon...");
+    console.log("Conectando ao banco de dados PostgreSQL...");
 
     await sql`CREATE TABLE IF NOT EXISTS clients (id SERIAL PRIMARY KEY, companyname VARCHAR(255) NOT NULL, contactperson VARCHAR(255), phone VARCHAR(255), region VARCHAR(255), cnpj VARCHAR(255), createdat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`;
 

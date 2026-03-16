@@ -8,7 +8,6 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.5.1",
     "bcrypt": "^6.0.0",
     "canvas": "^3.2.0",
     "cors": "^2.8.5",
@@ -20,7 +19,8 @@
     "node-cache": "^5.1.2",
     "node-poppler": "^8.0.5",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^2.16.105"
+    "pdfjs-dist": "^2.16.105",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

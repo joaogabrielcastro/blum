@@ -3,9 +3,7 @@
 
 require("dotenv").config();
 const bcrypt = require("bcrypt");
-const { neon } = require("@neondatabase/serverless");
-
-const sql = neon(process.env.DATABASE_URL);
+const { sql } = require("../src/config/database");
 
 const defaultUsers = [
   {
