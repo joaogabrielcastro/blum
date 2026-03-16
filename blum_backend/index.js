@@ -7,9 +7,7 @@ const { sql } = require("./src/config/database");
 const app = express();
 const port = process.env.PORT || 3011;
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`🚀 Servidor rodando na porta ${port}`);
-});
+
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
@@ -18,7 +16,6 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 const allowedOrigins = [
   "https://blum.jwsoftware.com.br",
   "http://localhost:5173",
-  "https://api-blum.jwsoftware.com.br",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
@@ -188,9 +185,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ status: "error", message: err.message });
 });
 
-// Inicializa o servidor
-setupDatabase().then(() => {
-  app.listen(port, () => {
-    console.log(`Servidor rodando em http://localhost:${port}`);
-  });
-});
+const startApp = async () => {
+  try {
+    // Primeiro configura o banco
+    await setupDatabase();
+    
+    // SÓ AGORA liga o servidor (Esta deve ser a ÚNICA vez que app.listen aparece)
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`🚀 Servidor rodando na porta ${port}`);
+      console.log("✅ Banco de dados e Servidor prontos!");
+    });
+    
+  } catch (error) {
+    console.error("❌ Erro ao iniciar a aplicação:", error);
+    process.exit(1);
+  }
+};
+
+startApp();
