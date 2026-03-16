@@ -26,11 +26,11 @@ RUN npm ci --omit=dev
 COPY . .
 
 # Expõe a porta
-EXPOSE 3000
+EXPOSE 3011
 
 # Define variáveis de ambiente padrão
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3011
 
 # Comando para iniciar a aplicação
 CMD ["npm", "start"]

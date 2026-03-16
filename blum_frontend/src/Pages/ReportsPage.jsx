@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import formatCurrency from "../utils/format";
 import SalesChart from "../components/SalesChart";
@@ -17,23 +18,21 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const ordersData = await apiService.getOrders({
-          userRole,
-          userId,
-        });
-
-        const clientsData = await apiService.getClients();
+        const ordersResponse = await fetch(
+          `${API_URL}/api/v1/orders?userRole=${userRole}&userId=${userId}`,
+        );
+        const ordersData = await ordersResponse.json();
+        const clientsResponse = await fetch(`${API_URL}/api/v1/clients`);
+        const clientsData = await clientsResponse.json();
         const clientsMap = {};
         clientsData.forEach((client) => {
           clientsMap[client.id] = client.companyName;
         });
         setClients(clientsMap);
-
         const finishedOrders = ordersData.filter(
-          (order) => order.status === "Entregue"
+          (order) => order.status === "Entregue",
         );
         setAllOrders(finishedOrders);
-
         // Calcular vendas por representante
         const salesMap = finishedOrders.reduce((acc, order) => {
           const repId = order.userid || "N/A";
@@ -65,7 +64,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
               salesMap[repId] > 0
                 ? ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2)
                 : "0.00",
-          })
+          }),
         );
         setCommissionsByRep(commissionsByRepList);
       } catch (error) {
@@ -85,7 +84,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const filterDate = new Date();
     filterDate.setDate(today.getDate() - days);
     return allOrders.filter(
-      (order) => order.finishedat && new Date(order.finishedat) >= filterDate
+      (order) => order.finishedat && new Date(order.finishedat) >= filterDate,
     );
   };
 
@@ -96,8 +95,8 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     filterPeriod === "weekly"
       ? weeklyOrders
       : filterPeriod === "monthly"
-      ? monthlyOrders
-      : allOrders;
+        ? monthlyOrders
+        : allOrders;
 
   // CORREÇÃO: Gráfico por data para evitar poluição visual
   useEffect(() => {
@@ -109,13 +108,13 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
 
       // Agrupar vendas por data para gráfico mais limpo
       const salesByDate = {};
-      
-      ordersToDisplay.forEach(order => {
+
+      ordersToDisplay.forEach((order) => {
         if (!order.finishedat) return;
-        
+
         const date = new Date(order.finishedat).toLocaleDateString("pt-BR");
         const total = parseFloat(order.totalprice) || 0;
-        
+
         if (salesByDate[date]) {
           salesByDate[date] += total;
         } else {
@@ -125,17 +124,20 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
 
       // Ordenar datas cronologicamente
       const sortedDates = Object.keys(salesByDate).sort((a, b) => {
-        return new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'));
+        return (
+          new Date(a.split("/").reverse().join("-")) -
+          new Date(b.split("/").reverse().join("-"))
+        );
       });
 
       // Calcular vendas acumuladas
       let cumulativeSales = 0;
-      const data = sortedDates.map(date => {
+      const data = sortedDates.map((date) => {
         cumulativeSales += salesByDate[date];
         return {
           date: date,
           "Vendas Acumuladas": cumulativeSales,
-          "Vendas do Dia": salesByDate[date]
+          "Vendas do Dia": salesByDate[date],
         };
       });
 
@@ -147,12 +149,12 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
 
   const totalSales = ordersToDisplay.reduce(
     (acc, order) => acc + (parseFloat(order.totalprice) || 0),
-    0
+    0,
   );
 
   const totalCommissions = ordersToDisplay.reduce(
     (acc, order) => acc + (parseFloat(order.total_commission) || 0),
-    0
+    0,
   );
 
   const getRepName = (userId) => {
@@ -248,8 +250,8 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
           {filterPeriod === "monthly" && " (Último Mês)"}
           {filterPeriod === "all" && " (Todos os Períodos)"}
         </h2>
-        <SalesChart 
-          data={chartData} 
+        <SalesChart
+          data={chartData}
           monthlyTarget={monthlyTarget}
           filterPeriod={filterPeriod}
           totalSales={totalSales}
@@ -319,7 +321,8 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         Comissões por Representante
       </h2>
       <p className="text-gray-600 mb-4">
-        Este relatório mostra as comissões reais calculadas por marca dos produtos vendidos.
+        Este relatório mostra as comissões reais calculadas por marca dos
+        produtos vendidos.
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">

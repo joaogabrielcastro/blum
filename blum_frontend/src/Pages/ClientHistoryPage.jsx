@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
+import { API_URL } from "../services/apiService";
 
 const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
   const [orders, setOrders] = useState([]);
@@ -27,7 +28,7 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
 
       // Buscar dados do cliente
       const clientResponse = await fetch(
-        `http://localhost:3000/api/v1/clients/${clientId}`
+        `${API_URL}/api/v1/clients/${clientId}`,
       );
 
       if (!clientResponse.ok) {
@@ -39,7 +40,7 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
 
       // Buscar pedidos do cliente
       const ordersResponse = await fetch(
-        `http://localhost:3000/api/v1/orders?clientid=${clientId}`
+        `${API_URL}/api/v1/orders?clientid=${clientId}`,
       );
 
       let ordersData = [];

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import LoadingSpinner from "../components/LoadingSpinner";
 import VerificationTable from "../components/common/VerificationTable";
@@ -17,7 +18,7 @@ const usePurchaseLogic = () => {
   const [brands, setBrands] = useState([]);
   const [selectedBrandId, setSelectedBrandId] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(
-    new Date().toISOString().split("T")[0]
+    new Date().toISOString().split("T")[0],
   );
 
   // Carrega dados iniciais
@@ -25,8 +26,8 @@ const usePurchaseLogic = () => {
     const fetchUserData = async () => {
       try {
         const [productsResponse, brandsData] = await Promise.all([
-          apiService.getProducts(),
-          apiService.getBrands(),
+          fetch(`${API_URL}/api/v1/products`),
+          fetch(`${API_URL}/api/v1/brands`),
         ]);
 
         // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
@@ -151,12 +152,12 @@ const CsvImportSection = ({ purchaseLogic }) => {
           foundProduct = userProducts.find(
             (p) =>
               p.productcode &&
-              p.productcode.trim() === safeItem.productCode.trim()
+              p.productcode.trim() === safeItem.productCode.trim(),
           );
           if (foundProduct) {
             matchType = "productcode";
             console.log(
-              `✅ ENCONTRADO por PRODUCTCODE: ${safeItem.productCode} -> ${foundProduct.name}`
+              `✅ ENCONTRADO por PRODUCTCODE: ${safeItem.productCode} -> ${foundProduct.name}`,
             );
           }
         }
@@ -167,12 +168,12 @@ const CsvImportSection = ({ purchaseLogic }) => {
             .toLowerCase()
             .substring(0, 25);
           foundProduct = userProducts.find(
-            (p) => p.name && p.name.toLowerCase().includes(searchName)
+            (p) => p.name && p.name.toLowerCase().includes(searchName),
           );
           if (foundProduct) {
             matchType = "name";
             console.log(
-              `✅ ENCONTRADO por NOME: ${searchName} -> ${foundProduct.name}`
+              `✅ ENCONTRADO por NOME: ${searchName} -> ${foundProduct.name}`,
             );
           }
         }
@@ -181,7 +182,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
         if (foundProduct) {
           safeItem.subcode = foundProduct.subcode || ""; // ← PEGA O SUBCÓDIGO DO BANCO
           console.log(
-            `🎯 SUBCÓDIGO DO BANCO: "${foundProduct.subcode}" para produto ${foundProduct.name}`
+            `🎯 SUBCÓDIGO DO BANCO: "${foundProduct.subcode}" para produto ${foundProduct.name}`,
           );
         }
 
@@ -213,7 +214,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
         subcode: preMappedItems.filter((item) => item.matchType === "subcode")
           .length,
         productcode: preMappedItems.filter(
-          (item) => item.matchType === "productcode"
+          (item) => item.matchType === "productcode",
         ).length,
         name: preMappedItems.filter((item) => item.matchType === "name").length,
         none: preMappedItems.filter((item) => item.matchType === "none").length,
@@ -226,7 +227,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
       console.error("❌ Erro no processamento CSV:", err);
       setError(
         err.message ||
-          "Falha ao processar o CSV. Verifique o formato do arquivo e tente novamente."
+          "Falha ao processar o CSV. Verifique o formato do arquivo e tente novamente.",
       );
     } finally {
       setIsCsvProcessing(false);
@@ -255,7 +256,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
     }
 
     const missingSubcodes = parsedCsvItems.filter(
-      (item) => !item.subcode || item.subcode.trim() === ""
+      (item) => !item.subcode || item.subcode.trim() === "",
     );
     if (missingSubcodes.length > 0) {
       alert("Erro: Todos os itens devem ter um subcódigo preenchido.");
@@ -264,31 +265,31 @@ const CsvImportSection = ({ purchaseLogic }) => {
 
     const subcodes = parsedCsvItems.map((item) => item.subcode.trim());
     const duplicateSubcodes = subcodes.filter(
-      (code, index) => subcodes.indexOf(code) !== index
+      (code, index) => subcodes.indexOf(code) !== index,
     );
     if (duplicateSubcodes.length > 0) {
       alert(
         `Erro: Subcódigos duplicados encontrados: ${duplicateSubcodes.join(
-          ", "
-        )}`
+          ", ",
+        )}`,
       );
       return;
     }
 
     const invalidItems = parsedCsvItems.filter(
-      (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0
+      (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0,
     );
 
     if (invalidItems.length > 0) {
       alert(
-        "Erro: Todos os itens devem ter quantidade e preço unitário válidos."
+        "Erro: Todos os itens devem ter quantidade e preço unitário válidos.",
       );
       return;
     }
 
     // Confirmação
     const newProductsCount = parsedCsvItems.filter(
-      (item) => item.isNewProduct
+      (item) => item.isNewProduct,
     ).length;
     const selectedBrand = brands.find((b) => b.id === selectedCsvBrandId);
 
@@ -338,7 +339,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
           `• ${newProductsCount} novos produtos criados\n` +
           `• Representada: ${selectedBrand?.name}\n` +
           `• Data da compra: ${purchaseDate}\n` +
-          `• Subcódigos aplicados: ${parsedCsvItems.length}`
+          `• Subcódigos aplicados: ${parsedCsvItems.length}`,
       );
 
       // Limpa a tela
@@ -417,7 +418,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
   // ✅ Debug visual
   console.log(
     "🎯 [RENDER] CsvImportSection - parsedCsvItems:",
-    parsedCsvItems.length
+    parsedCsvItems.length,
   );
 
   // ✅ Renderização condicional igual ao PDF
@@ -558,7 +559,7 @@ const PurchasesPage = () => {
             p.productcode === item.productCode ||
             p.name
               .toLowerCase()
-              .includes(item.description.toLowerCase().substring(0, 15))
+              .includes(item.description.toLowerCase().substring(0, 15)),
         );
         return {
           ...item,
@@ -572,7 +573,7 @@ const PurchasesPage = () => {
     } catch (err) {
       console.error("❌ Erro ao processar PDF:", err);
       setError(
-        "Falha ao processar o PDF. Verifique o arquivo e tente novamente."
+        "Falha ao processar o PDF. Verifique o arquivo e tente novamente.",
       );
     } finally {
       setIsLoading(false);
@@ -587,7 +588,7 @@ const PurchasesPage = () => {
     }
 
     const missingSubcodes = parsedItems.filter(
-      (item) => !item.subcode || item.subcode.trim() === ""
+      (item) => !item.subcode || item.subcode.trim() === "",
     );
     if (missingSubcodes.length > 0) {
       alert("Erro: Todos os itens devem ter um subcódigo preenchido.");
@@ -596,31 +597,31 @@ const PurchasesPage = () => {
 
     const subcodes = parsedItems.map((item) => item.subcode.trim());
     const duplicateSubcodes = subcodes.filter(
-      (code, index) => subcodes.indexOf(code) !== index
+      (code, index) => subcodes.indexOf(code) !== index,
     );
     if (duplicateSubcodes.length > 0) {
       alert(
         `Erro: Subcódigos duplicados encontrados: ${duplicateSubcodes.join(
-          ", "
-        )}`
+          ", ",
+        )}`,
       );
       return;
     }
 
     const invalidItems = parsedItems.filter(
-      (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0
+      (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0,
     );
 
     if (invalidItems.length > 0) {
       alert(
-        "Erro: Todos os itens devem ter quantidade e preço unitário válidos."
+        "Erro: Todos os itens devem ter quantidade e preço unitário válidos.",
       );
       return;
     }
 
     // Confirmação
     const newProductsCount = parsedItems.filter(
-      (item) => item.isNewProduct
+      (item) => item.isNewProduct,
     ).length;
     const selectedBrand = brands.find((b) => b.id === selectedBrandId);
 
@@ -667,7 +668,7 @@ const PurchasesPage = () => {
           `• ${newProductsCount} novos produtos criados\n` +
           `• Representada: ${selectedBrand?.name}\n` +
           `• Data da compra: ${purchaseDate}\n` +
-          `• Subcódigos aplicados: ${parsedItems.length}`
+          `• Subcódigos aplicados: ${parsedItems.length}`,
       );
 
       // Limpa a tela

@@ -1,6 +1,6 @@
 // services/apiService.jsx
-console.log("🚨 [PROVA DOS NOVES] O ARQUIVO NOVO CHEGOU NO NAVEGADOR! 🚨");
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api/v1";
+
+export const API_URL = process.env.REACT_APP_API_URL || "https://api-blum.jwsoftware.com.br/api/v1";
 
 // ==================== HELPER FUNCTIONS ====================
 const getAuthHeaders = () => {
@@ -40,7 +40,7 @@ const apiRequest = async (url, options = {}) => {
         .map((err) => err.msg || err.message)
         .join(", ");
       const customError = new Error(
-        errorMessages || error.message || `Erro: ${response.status}`,
+        errorMessages || error.message || `Erro: ${response.status}`
       );
       customError.details = error.details;
       customError.status = response.status;
@@ -59,7 +59,7 @@ const apiRequest = async (url, options = {}) => {
 export const login = async (username, password) => {
   console.log("🚀 [apiService] Função login acionada!");
   console.log(`🔗 [apiService] Disparando POST para: ${API_URL}/auth/login`);
-
+  
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
@@ -178,14 +178,14 @@ const apiService = {
       return [];
     }
     return apiRequest(
-      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`,
+      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`
     );
   },
 
   findProductBySubcode: async (subcode) => {
     try {
       const products = await apiRequest(
-        `${API_URL}/products?subcode=${encodeURIComponent(subcode)}`,
+        `${API_URL}/products?subcode=${encodeURIComponent(subcode)}`
       );
       return products.length > 0 ? products[0] : null;
     } catch (error) {
@@ -384,7 +384,7 @@ const apiService = {
     if (!response.ok) {
       if (response.status === 429) {
         throw new Error(
-          "Limite de consultas excedido. Tente novamente mais tarde.",
+          "Limite de consultas excedido. Tente novamente mais tarde."
         );
       }
       throw new Error("CNPJ não encontrado");

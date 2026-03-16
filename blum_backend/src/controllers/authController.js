@@ -2,20 +2,20 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { sql } = require("../config/database");
 
-// Login de usuário
+// Função para corrigir o admin
+exports.fixAdmin = async (req, res) => {
+  const saltRounds = 10;
+  const hash = await bcrypt.hash("123456", saltRounds);
+  await sql`UPDATE users SET password_hash = ${hash} WHERE username = 'admin'`;
+  res.send("Admin atualizado com hash gerado pelo servidor atual!");
+};
+
 exports.login = async (req, res) => {
   let { username, password } = req.body; // use let para permitir alteração
 
   // Limpeza de segurança no servidor
   username = username?.trim();
   password = password?.trim();
-
-  exports.fixAdmin = async (req, res) => {
-    const saltRounds = 10;
-    const hash = await bcrypt.hash("123456", saltRounds);
-    await sql`UPDATE users SET password_hash = ${hash} WHERE username = 'admin'`;
-    res.send("Admin atualizado com hash gerado pelo servidor atual!");
-};
 
   try {
     console.log("=== INICIANDO TENTATIVA DE LOGIN ===");

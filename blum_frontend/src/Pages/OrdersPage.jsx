@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -31,8 +32,8 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
     try {
       setLoading(true);
       const [ordersData, clientsData] = await Promise.all([
-        apiService.getOrders({ userId, userRole }),
-        apiService.getClients(),
+        fetch(`${API_URL}/api/v1/orders?userId=${userId}&userRole=${userRole}`),
+        fetch(`${API_URL}/api/v1/clients`),
       ]);
 
       // DEBUG: Verificar dados brutos
@@ -77,8 +78,8 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                   status: "Entregue",
                   finishedAt: new Date().toISOString(),
                 }
-              : order
-          )
+              : order,
+          ),
         );
       }
     } catch (error) {
@@ -260,7 +261,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                         <p className="text-xs text-gray-500 line-through">
                           {formatCurrency(
                             parseFloat(order.totalPrice) +
-                              parseFloat(order.discount)
+                              parseFloat(order.discount),
                           )}
                         </p>
                       )}

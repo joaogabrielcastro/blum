@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import ProductRow from "../components/ProductRow";
 import ProductsForm from "../components/ProductsForm";
@@ -36,6 +37,9 @@ const ProductsPage = ({ userRole }) => {
   // Carregar dados iniciais
   useEffect(() => {
     fetchData();
+
+    // Exemplo de fetch centralizado:
+    // const response = await fetch(`${API_URL}/api/v1/products`);
   }, [selectedBrand, currentPage]);
 
   // Função para buscar dados com paginação
@@ -48,7 +52,7 @@ const ProductsPage = ({ userRole }) => {
       const response = await apiService.getProducts(
         selectedBrand !== "all" ? selectedBrand : "all",
         currentPage,
-        50
+        50,
       );
 
       // Se a resposta tem estrutura de paginação
@@ -109,7 +113,7 @@ const ProductsPage = ({ userRole }) => {
           (product.productcode &&
             product.productcode.toLowerCase().includes(term)) ||
           (product.subcode && product.subcode.toLowerCase().includes(term)) ||
-          product.brand.toLowerCase().includes(term)
+          product.brand.toLowerCase().includes(term),
       );
     }
 
