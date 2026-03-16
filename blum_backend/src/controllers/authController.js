@@ -7,32 +7,54 @@ exports.login = async (req, res) => {
   const { username, password } = req.body;
 
   try {
+    console.log("=== INICIANDO TENTATIVA DE LOGIN ===");
+    console.log(`Tentativa para o usuário: "${username}"`);
+    console.log(
+      `Senha recebida (tamanho): ${password ? password.length : 0} caracteres`,
+    );
+
     // Validação básica
     if (!username || !password) {
+      console.log("❌ ERRO: Usuário ou senha ausentes na requisição.");
       return res
         .status(400)
         .json({ error: "Usuário e senha são obrigatórios" });
     }
 
     // Buscar usuário no banco
+    console.log("Executando query no banco de dados...");
     const users = await sql`
       SELECT id, username, password_hash, role, name 
       FROM users 
       WHERE username = ${username}
     `;
 
-    if (users.length === 0) {
+    console.log("Retorno bruto da query 'users':", users);
+    console.log(
+      "Quantidade de registros encontrados:",
+      users ? users.length : "undefined/null",
+    );
+
+    if (!users || users.length === 0) {
+      console.log("❌ ERRO: Usuário não encontrado no banco de dados.");
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
 
     const user = users[0];
+    console.log(`Usuário encontrado: ID ${user.id}, Nome: ${user.name}`);
+    console.log("Hash armazenado no banco:", user.password_hash);
 
     // Verificar senha
+    console.log("Iniciando comparação do Bcrypt...");
     const validPassword = await bcrypt.compare(password, user.password_hash);
+    console.log(`Resultado do Bcrypt.compare: ${validPassword}`);
 
     if (!validPassword) {
+      console.log("❌ ERRO: Bcrypt rejeitou a senha (hash não bate).");
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
+
+    console.log("✅ Senha validada com sucesso! Gerando token JWT...");
 
     // Gerar token JWT
     const token = jwt.sign(
@@ -46,6 +68,7 @@ exports.login = async (req, res) => {
       { expiresIn: "8h" },
     );
 
+    console.log("✅ Login concluído. Respondendo ao cliente com sucesso.");
     res.json({
       token,
       user: {
@@ -56,7 +79,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Erro no login:", error);
+    console.error("❌ ERRO FATAL no processo de login:", error);
     res.status(500).json({ error: "Erro no servidor" });
   }
 };
