@@ -1,17 +1,30 @@
 -- Migration: Adicionar índices para melhorar performance das consultas
--- Data: 2025-12-09
+-- Idempotente e tolerante a esquemas legados (coluna de cliente com nomes diferentes).
 
--- Bases legadas: às vezes a coluna veio como company_name em vez de companyname
+-- Garantir coluna companyname em clients (sem abortar o restante do ficheiro)
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'company_name'
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'clients'
   ) AND NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'companyname'
   ) THEN
-    ALTER TABLE clients RENAME COLUMN company_name TO companyname;
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'company_name'
+    ) THEN
+      ALTER TABLE clients RENAME COLUMN company_name TO companyname;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'name'
+    ) THEN
+      ALTER TABLE clients RENAME COLUMN name TO companyname;
+    ELSE
+      ALTER TABLE clients ADD COLUMN companyname VARCHAR(255) NOT NULL DEFAULT '';
+      ALTER TABLE clients ALTER COLUMN companyname DROP DEFAULT;
+    END IF;
   END IF;
 END $$;
 
@@ -22,9 +35,22 @@ CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand);
 CREATE INDEX IF NOT EXISTS idx_products_createdat ON products(createdat DESC);
 
--- Índices na tabela clients
-CREATE INDEX IF NOT EXISTS idx_clients_companyname ON clients(companyname);
-CREATE INDEX IF NOT EXISTS idx_clients_cnpj ON clients(cnpj);
+-- Índices na tabela clients (só se as colunas existirem)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'companyname'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_clients_companyname ON clients(companyname);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'cnpj'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_clients_cnpj ON clients(cnpj);
+  END IF;
+END $$;
 
 -- Índices na tabela orders (verificar nomes de colunas)
 CREATE INDEX IF NOT EXISTS idx_orders_clientid ON orders(clientid);
