@@ -17,7 +17,6 @@ const OrdersForm = ({
   const [totalPrice, setTotalPrice] = useState(0);
   const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState("");
-  const [clientSearch, setClientSearch] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -40,11 +39,15 @@ const OrdersForm = ({
 
   useEffect(() => {
     if (editingOrder) {
-      setClientId(editingOrder.clientid);
+      const cid =
+        editingOrder.clientId ?? editingOrder.clientid ?? editingOrder.client_id;
+      setClientId(cid != null && cid !== "" ? String(cid) : "");
       setDescription(editingOrder.description || "");
       setItems(editingOrder.items || []);
       setDiscount(editingOrder.discount || 0);
-      setTotalPrice(editingOrder.totalprice || 0);
+      setTotalPrice(editingOrder.totalPrice ?? editingOrder.totalprice ?? 0);
+      const firstBrand = editingOrder.items?.find((i) => i.brand)?.brand;
+      if (firstBrand) setSelectedBrand(firstBrand);
     }
   }, [editingOrder, brands, clients]);
 
@@ -205,27 +208,22 @@ const OrdersForm = ({
     setSearchResults([]);
   };
 
-  const filteredClients = Object.entries(clients).filter(([id, name]) =>
-    name.toLowerCase().includes(clientSearch.toLowerCase()),
-  );
-
-  const handleClientSearch = (e) => {
-    const selectedName = e.target.value;
-    setClientSearch(selectedName);
-    const client = Object.entries(clients).find(
-      ([id, name]) => name.toLowerCase() === selectedName.toLowerCase(),
-    );
-    if (client) {
-      setClientId(client[0]);
-    } else {
-      setClientId("");
-    }
-  };
+  const clientOptions = Object.entries(clients || {})
+    .map(([id, name]) => ({
+      id: String(id),
+      label: name != null && String(name).trim() !== "" ? String(name) : `Cliente #${id}`,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!clientId) {
       alert("Por favor, selecione um cliente.");
+      return;
+    }
+
+    if (!selectedBrand) {
+      alert("Por favor, selecione uma representada.");
       return;
     }
 
@@ -325,19 +323,23 @@ const OrdersForm = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cliente *
               </label>
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={clientSearch}
-                onChange={handleClientSearch}
-                list="client-list"
+              <select
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <datalist id="client-list">
-                {filteredClients.map(([id, name]) => (
-                  <option key={id} value={name} />
+              >
+                <option value="">Selecione um cliente</option>
+                {clientOptions.map(({ id, label }) => (
+                  <option key={id} value={id} title={label}>
+                    {label}
+                  </option>
                 ))}
-              </datalist>
+              </select>
+              {clientOptions.length === 0 && (
+                <p className="mt-1 text-sm text-amber-700">
+                  Nenhum cliente cadastrado. Cadastre clientes em Clientes.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -346,17 +348,24 @@ const OrdersForm = ({
               <select
                 value={selectedBrand}
                 onChange={(e) => setSelectedBrand(e.target.value)}
-                disabled={!clientId}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Selecione uma representada</option>
                 {Array.isArray(brands) &&
                   brands.map((brand) => (
-                    <option key={brand.name} value={brand.name}>
+                    <option
+                      key={brand.id ?? brand.name}
+                      value={brand.name}
+                    >
                       {brand.name}
                     </option>
                   ))}
               </select>
+              {Array.isArray(brands) && brands.length === 0 && (
+                <p className="mt-1 text-sm text-amber-700">
+                  Nenhuma representada cadastrada. Cadastre em Produtos.
+                </p>
+              )}
             </div>
           </div>
 

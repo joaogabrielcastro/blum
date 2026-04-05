@@ -1,0 +1,58 @@
+# Modelo para produção: ajuste domínios, segredos e REACT_APP_API_URL.
+# Uso: docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Antes do primeiro deploy:
+# - Gere JWT_SECRET com 32+ caracteres (openssl rand -hex 32)
+# - Defina DATABASE_URL ou use a senha do serviço postgres abaixo
+# - Build do frontend: REACT_APP_API_URL deve ser a URL pública da API (HTTPS)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-blum}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-blum}
+    volumes:
+      - blum_pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-blum} -d ${POSTGRES_DB:-blum}"]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./blum_backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-3011}:3011"
+    environment:
+      NODE_ENV: production
+      PORT: "3011"
+      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:?defina FRONTEND_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./blum_frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:?defina REACT_APP_API_URL}
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  blum_pgdata_prod:

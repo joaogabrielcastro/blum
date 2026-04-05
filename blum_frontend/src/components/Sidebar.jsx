@@ -1,8 +1,20 @@
-const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
-  // Função para lidar com a navegação e fechar o menu no mobile
+import { useNavigate } from "react-router-dom";
+
+const PATHS = {
+  dashboard: "/dashboard",
+  products: "/products",
+  clients: "/clients",
+  orders: "/orders",
+  reports: "/reports",
+  purchases: "/purchases",
+};
+
+const Sidebar = ({ isOpen, onClose, onLogout, userRole }) => {
+  const navigate = useNavigate();
+
   const handleNavigate = (page) => {
-    onNavigate(page);
-    onClose(); // Fecha o menu ao clicar em um item
+    navigate(PATHS[page] || "/dashboard");
+    onClose();
   };
 
   return (
@@ -23,6 +35,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
         <ul className="space-y-4">
           <li>
             <button
+              type="button"
               onClick={() => handleNavigate("dashboard")}
               className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -45,6 +58,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
           </li>
           <li>
             <button
+              type="button"
               onClick={() => handleNavigate("products")}
               className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -68,6 +82,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
           </li>
           <li>
             <button
+              type="button"
               onClick={() => handleNavigate("clients")}
               className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -92,6 +107,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
           </li>
           <li>
             <button
+              type="button"
               onClick={() => handleNavigate("orders")}
               className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -118,6 +134,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
           </li>
           <li>
             <button
+              type="button"
               onClick={() => handleNavigate("reports")}
               className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -142,6 +159,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
           {userRole === "admin" && (
             <li>
               <button
+                type="button"
                 onClick={() => handleNavigate("purchases")}
                 className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
@@ -167,6 +185,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, onLogout, userRole }) => {
         </ul>
       </nav>
       <button
+        type="button"
         onClick={onLogout}
         className="w-full flex items-center justify-center p-3 mt-4 rounded-xl text-red-400 bg-gray-700 hover:bg-red-800 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-red-500"
       >

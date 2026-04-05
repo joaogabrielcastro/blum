@@ -1,14 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const { sql } = require("../config/database");
-
-// Função para corrigir o admin
-exports.fixAdmin = async (req, res) => {
-  const saltRounds = 10;
-  const hash = await bcrypt.hash("123456", saltRounds);
-  await sql`UPDATE users SET password_hash = ${hash} WHERE username = 'admin'`;
-  res.send("Admin atualizado com hash gerado pelo servidor atual!");
-};
+const { getJwtSecret } = require("../config/env");
 
 exports.login = async (req, res) => {
   let { username, password } = req.body; // use let para permitir alteração
@@ -18,54 +11,30 @@ exports.login = async (req, res) => {
   password = password?.trim();
 
   try {
-    console.log("=== INICIANDO TENTATIVA DE LOGIN ===");
-    console.log(`Tentativa para o usuário: "${username}"`);
-    console.log(
-      `Senha recebida (tamanho): ${password ? password.length : 0} caracteres`,
-    );
-
     // Validação básica
     if (!username || !password) {
-      console.log("❌ ERRO: Usuário ou senha ausentes na requisição.");
       return res
         .status(400)
         .json({ error: "Usuário e senha são obrigatórios" });
     }
 
-    // Buscar usuário no banco
-    console.log("Executando query no banco de dados...");
     const users = await sql`
       SELECT id, username, password_hash, role, name 
       FROM users 
       WHERE username = ${username}
     `;
 
-    console.log("Retorno bruto da query 'users':", users);
-    console.log(
-      "Quantidade de registros encontrados:",
-      users ? users.length : "undefined/null",
-    );
-
     if (!users || users.length === 0) {
-      console.log("❌ ERRO: Usuário não encontrado no banco de dados.");
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
 
     const user = users[0];
-    console.log(`Usuário encontrado: ID ${user.id}, Nome: ${user.name}`);
-    console.log("Hash armazenado no banco:", user.password_hash);
 
-    // Verificar senha
-    console.log("Iniciando comparação do Bcrypt...");
     const validPassword = await bcrypt.compare(password, user.password_hash);
-    console.log(`Resultado do Bcrypt.compare: ${validPassword}`);
 
     if (!validPassword) {
-      console.log("❌ ERRO: Bcrypt rejeitou a senha (hash não bate).");
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
-
-    console.log("✅ Senha validada com sucesso! Gerando token JWT...");
 
     // Gerar token JWT
     const token = jwt.sign(
@@ -75,11 +44,10 @@ exports.login = async (req, res) => {
         role: user.role,
         name: user.name,
       },
-      process.env.JWT_SECRET || "blum-secret-key-change-in-production",
+      getJwtSecret(),
       { expiresIn: "8h" },
     );
 
-    console.log("✅ Login concluído. Respondendo ao cliente com sucesso.");
     res.json({
       token,
       user: {

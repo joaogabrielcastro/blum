@@ -30,18 +30,27 @@ const UploadSection = ({
             className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700"
           />
 
-          {brands && brands.length > 0 && (
+          <label className="mt-3 block text-sm font-medium text-gray-700">
+            Representada (marca da NF)
+          </label>
+          {brands && brands.length > 0 ? (
             <select
               value={selectedBrandId}
               onChange={onBrandChange}
-              className="mt-3 block w-full md:w-64 p-2 border border-gray-300 rounded"
+              className="mt-1 block w-full md:w-96 p-2 border border-gray-300 rounded"
             >
+              <option value="">Selecione a representada...</option>
               {brands.map((b) => (
-                <option key={b.id || b} value={b.id ?? b}>
+                <option key={b.id ?? b} value={b.id ?? b}>
                   {b.name || b.displayName || String(b)}
                 </option>
               ))}
             </select>
+          ) : (
+            <p className="mt-1 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              Nenhuma representada encontrada. Cadastre marcas em{" "}
+              <strong>Produtos</strong> antes de importar a NF.
+            </p>
           )}
 
           {error && (

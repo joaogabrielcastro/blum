@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import formatCurrency from "../utils/format";
 import SalesChart from "../components/SalesChart";
 
-const ReportsPage = ({ userRole, userId, reps = {} }) => {
+const ReportsPage = ({ userRole, userId }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState("all");
@@ -18,15 +17,11 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const ordersResponse = await fetch(
-          `${API_URL}/api/v1/orders?userRole=${userRole}&userId=${userId}`,
-        );
-        const ordersData = await ordersResponse.json();
-        const clientsResponse = await fetch(`${API_URL}/api/v1/clients`);
-        const clientsData = await clientsResponse.json();
+        const ordersData = await apiService.getOrders({});
+        const clientsData = await apiService.getClients();
         const clientsMap = {};
         clientsData.forEach((client) => {
-          clientsMap[client.id] = client.companyName;
+          clientsMap[client.id] = client.companyName || client.companyname;
         });
         setClients(clientsMap);
         const finishedOrders = ordersData.filter(
@@ -35,36 +30,54 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
         setAllOrders(finishedOrders);
         // Calcular vendas por representante
         const salesMap = finishedOrders.reduce((acc, order) => {
-          const repId = order.userid || "N/A";
+          const repId =
+            order.user_ref != null ? String(order.user_ref) : order.userid || "N/A";
           const total = parseFloat(order.totalprice) || 0;
           acc[repId] = (acc[repId] || 0) + total;
           return acc;
         }, {});
 
-        const salesByRepList = Object.keys(salesMap).map((repId) => ({
-          userId: repId,
-          totalSales: salesMap[repId],
-        }));
+        const salesByRepList = Object.keys(salesMap).map((repId) => {
+          const sample = finishedOrders.find(
+            (o) =>
+              (o.user_ref != null ? String(o.user_ref) : o.userid) === repId,
+          );
+          return {
+            userId: repId,
+            displayName: sample?.seller_name || repId,
+            totalSales: salesMap[repId],
+          };
+        });
         setSalesByRep(salesByRepList);
 
-        // Calcular comissões reais por representante
         const commissionsMap = finishedOrders.reduce((acc, order) => {
-          const repId = order.userid || "N/A";
+          const repId =
+            order.user_ref != null ? String(order.user_ref) : order.userid || "N/A";
           const commission = parseFloat(order.total_commission) || 0;
           acc[repId] = (acc[repId] || 0) + commission;
           return acc;
         }, {});
 
         const commissionsByRepList = Object.keys(commissionsMap).map(
-          (repId) => ({
-            userId: repId,
-            totalCommission: commissionsMap[repId],
-            totalSales: salesMap[repId] || 0,
-            commissionRate:
-              salesMap[repId] > 0
-                ? ((commissionsMap[repId] / salesMap[repId]) * 100).toFixed(2)
-                : "0.00",
-          }),
+          (repId) => {
+            const sample = finishedOrders.find(
+              (o) =>
+                (o.user_ref != null ? String(o.user_ref) : o.userid) === repId,
+            );
+            return {
+              userId: repId,
+              displayName: sample?.seller_name || repId,
+              totalCommission: commissionsMap[repId],
+              totalSales: salesMap[repId] || 0,
+              commissionRate:
+                salesMap[repId] > 0
+                  ? (
+                      (commissionsMap[repId] / salesMap[repId]) *
+                      100
+                    ).toFixed(2)
+                  : "0.00",
+            };
+          },
         );
         setCommissionsByRep(commissionsByRepList);
       } catch (error) {
@@ -157,8 +170,9 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
     0,
   );
 
-  const getRepName = (userId) => {
-    return reps[userId] || userId || "N/A";
+  const getRepName = (sale) => {
+    if (sale?.displayName) return sale.displayName;
+    return sale?.userId || "N/A";
   };
 
   if (loading)
@@ -349,7 +363,7 @@ const ReportsPage = ({ userRole, userId, reps = {} }) => {
                 {commissionsByRep.map((sale, index) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getRepName(sale.userId)}
+                      {getRepName(sale)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatCurrency(sale.totalSales)}

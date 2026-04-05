@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
-import { API_URL } from "../services/apiService";
+import apiService from "../services/apiService";
 
-const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
+const ClientHistoryPage = ({ clients }) => {
+  const { clientId } = useParams();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,29 +29,13 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
 
       console.log("Buscando dados para clientId:", clientId);
 
-      // Buscar dados do cliente
-      const clientResponse = await fetch(
-        `${API_URL}/api/v1/clients/${clientId}`,
-      );
-
-      if (!clientResponse.ok) {
-        throw new Error("Cliente não encontrado");
-      }
-
-      const clientData = await clientResponse.json();
-      console.log("Dados do cliente recebidos:", clientData);
-
-      // Buscar pedidos do cliente
-      const ordersResponse = await fetch(
-        `${API_URL}/api/v1/orders?clientid=${clientId}`,
-      );
+      const clientData = await apiService.getClientById(clientId);
 
       let ordersData = [];
-      if (ordersResponse.ok) {
-        ordersData = await ordersResponse.json();
-        console.log("Pedidos recebidos:", ordersData);
-      } else {
-        console.warn("Erro ao buscar pedidos, status:", ordersResponse.status);
+      try {
+        ordersData = await apiService.getOrders({ clientid: clientId });
+      } catch (e) {
+        console.warn("Erro ao buscar pedidos:", e);
       }
 
       setClient(clientData);
@@ -97,8 +84,10 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
     );
   };
 
-  const getSellerName = (sellerId) => {
-    return reps[sellerId] || sellerId || "Não informado";
+  const getSellerName = (order) => {
+    if (order?.seller_name) return order.seller_name;
+    const id = order?.user_ref ?? order?.userid;
+    return id != null ? String(id) : "Não informado";
   };
 
   const parseOrderItems = (order) => {
@@ -135,7 +124,8 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <button
-              onClick={onBack}
+              type="button"
+              onClick={() => navigate("/clients")}
               className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4"
             >
               <svg
@@ -246,7 +236,7 @@ const ClientHistoryPage = ({ clientId, onBack, reps, clients }) => {
                           {formatDate(order.createdat)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                          {getSellerName(order.userid)}
+                          {getSellerName(order)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-semibold">
                           {formatCurrency(order.totalprice)}
@@ -370,7 +360,7 @@ const OrderDetailsModal = ({
               </p>
               <p>
                 <span className="font-medium">Vendedor:</span>{" "}
-                {getSellerName(order.userid)}
+                {getSellerName(order)}
               </p>
               <p>
                 <span className="font-medium">Status:</span>

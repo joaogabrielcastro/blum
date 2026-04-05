@@ -15,7 +15,7 @@ const normalizeItems = (items) => {
   return [];
 };
 
-const PdfGenerator = ({ order, clients, reps, brands, onClose }) => {
+const PdfGenerator = ({ order, clients, brands, onClose }) => {
   const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
   const [headerImage, setHeaderImage] = useState(null);

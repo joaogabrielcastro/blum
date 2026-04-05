@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "![Status](https://img.shields.io/badge/status-active-success.svg)\r ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)\r ![License](https://img.shields.io/badge/license-MIT-blue.svg)",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "npm test --prefix blum_backend && npm run test:ci --prefix blum_frontend",
+    "test:backend": "npm test --prefix blum_backend",
+    "test:frontend": "npm run test:ci --prefix blum_frontend",
+    "build:frontend": "npm run build --prefix blum_frontend"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joaogabrielcastro/blum.git"

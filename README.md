@@ -14,6 +14,7 @@ Sistema completo de gestão comercial para atacado, desenvolvido com React e Nod
 - [Pré-requisitos](#pré-requisitos)
 - [Instalação](#instalação)
 - [Configuração](#configuração)
+- [Docker (teste local)](#docker-teste-local)
 - [Como Usar](#como-usar)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [API Endpoints](#api-endpoints)
@@ -118,9 +119,33 @@ DATABASE_URL=postgresql://user:password@host/database
 PORT=3000
 NODE_ENV=development
 
+# Obrigatório em produção (assinatura JWT)
+JWT_SECRET=uma_string_longa_e_aleatoria
+
+# Cache distribuído (opcional — sem isto, o cache de produtos fica em memória no processo)
+REDIS_URL=redis://127.0.0.1:6379
+# CACHE_TTL_SECONDS=300
+
+# Frontend (CORS)
+# FRONTEND_URL=https://seu-dominio.com
+
 # IA (Opcional - para importação inteligente)
 GEMINI_API_KEY=sua_chave_api_gemini
 ```
+
+### Migrações SQL
+
+Na subida, o backend aplica automaticamente os ficheiros `.sql` em `blum_backend/migrations/` (tabela `schema_migrations` evita repetir). O schema base está em `000_core_schema.sql`; extensões (`pg_trgm`), `order_items`, `user_ref`, `brand_id` e colunas de histórico de compras seguem nas migrações numeradas.
+
+Se `CREATE EXTENSION pg_trgm` falhar (permissões), um superutilizador da base pode executá-lo manualmente no console SQL e voltar a subir a API.
+
+### URLs do frontend (React Router)
+
+Com sessão iniciada, exemplos: `/dashboard`, `/orders`, `/clients`, `/clients/:id/history`, `/products`, `/reports`, `/purchases` (só admin). A rota `/login` redireciona para o painel se já estiver autenticado.
+
+### Produto / roadmap comercial
+
+Itens ainda não implementados no código (evolução do produto): **billing/planos**, **API pública versionada**, **exportação Excel** dos relatórios, **webhooks**. Podem ser priorizados conforme o go-to-market.
 
 2. Configure sua conexão com o **Neon Database**:
    - Acesse [neon.tech](https://neon.tech)
@@ -135,6 +160,26 @@ O frontend está configurado para se conectar ao backend em `http://localhost:30
 ```javascript
 // src/services/apiService.jsx
 const API_URL = "http://localhost:3000/api/v1";
+```
+
+## 🐳 Docker (teste local)
+
+Na raiz do repositório (Docker Desktop ou Engine instalado):
+
+```bash
+docker compose up --build
+```
+
+- **Frontend:** http://localhost:8080  
+- **API:** http://localhost:3011/api/v1  
+- **PostgreSQL** (opcional, cliente SQL): `localhost:5433` (utilizador `blum`, base `blum`; credenciais definidas no `docker-compose.yml`)
+
+Variáveis opcionais no ambiente do host: `JWT_SECRET`, `GEMINI_API_KEY`. Para Redis em cache distribuído, pode acrescentar um serviço Redis ao compose e definir `REDIS_URL` no serviço `backend`.
+
+Após o primeiro arranque, criar utilizadores iniciais (senhas no script — altere em produção):
+
+```bash
+docker compose exec backend node migrations/create-users.js
 ```
 
 ## 🎮 Como Usar
@@ -178,18 +223,18 @@ npm start
 
 A aplicação abrirá automaticamente em: `http://localhost:3001`
 
-### Primeiro Acesso
+### Primeiro acesso e utilizadores
 
-Use uma das credenciais padrão:
+Crie utilizadores com hashes seguros, por exemplo:
 
-| Usuário | Senha | Tipo | Acesso |
-|---------|-------|------|--------|
-| admin | 123 | Administrador | Completo |
-| siane | 123 | Vendedor | Limitado |
-| eduardo | 123 | Vendedor | Limitado |
-| vendedor | 123 | Vendedor | Limitado |
+```bash
+cd blum_backend
+node migrations/create-users.js
+```
 
-> ⚠️ **IMPORTANTE**: Altere as senhas padrão em produção!
+(Edite as senhas no script antes de executar em produção.) Não commite credenciais reais nem use palavras-passe de exemplo em ambientes expostos.
+
+> ⚠️ **Produção**: `JWT_SECRET` forte, HTTPS, e política de rotação de senhas definida pela equipa.
 
 ## 📁 Estrutura do Projeto
 

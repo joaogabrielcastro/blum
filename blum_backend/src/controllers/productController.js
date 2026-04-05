@@ -1,20 +1,10 @@
 const productService = require("../services/productService");
-const NodeCache = require("node-cache");
-
-// Cache com TTL de 5 minutos (300 segundos)
-const productsCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
-
-// Função auxiliar para gerar chave de cache
-const getCacheKey = (filters) => {
-  return `products_${JSON.stringify(filters || {})}`;
-};
-
-// Função para limpar todo o cache de produtos
-const clearProductsCache = () => {
-  const keys = productsCache.keys();
-  productsCache.del(keys);
-  console.log("🗑️ Cache de produtos limpo");
-};
+const {
+  cacheGet,
+  cacheSet,
+  invalidateProductsCache,
+  cacheKeyProducts,
+} = require("../config/cache");
 
 exports.getAll = async (req, res) => {
   try {
@@ -27,21 +17,15 @@ exports.getAll = async (req, res) => {
       limit = 50,
     } = req.query;
     const filters = { brand, productcode, subcode, name, page, limit };
-    const cacheKey = getCacheKey(filters);
+    const cacheKey = cacheKeyProducts(filters);
 
-    // Verificar se existe no cache
-    const cachedData = productsCache.get(cacheKey);
+    const cachedData = await cacheGet(cacheKey);
     if (cachedData) {
-      console.log("✅ Produtos recuperados do cache");
       return res.status(200).json(cachedData);
     }
 
-    // Se não existe, buscar do banco
     const result = await productService.findAll(filters);
-
-    // Salvar no cache
-    productsCache.set(cacheKey, result);
-    console.log("💾 Produtos salvos no cache");
+    await cacheSet(cacheKey, result);
 
     res.status(200).json(result);
   } catch (error) {
@@ -79,8 +63,7 @@ exports.create = async (req, res) => {
   try {
     const product = await productService.create(req.body);
 
-    // Limpar cache ao criar produto
-    clearProductsCache();
+    await invalidateProductsCache();
 
     res.status(201).json(product);
   } catch (error) {
@@ -94,8 +77,7 @@ exports.delete = async (req, res) => {
     const { id } = req.params;
     await productService.delete(id);
 
-    // Limpar cache ao deletar produto
-    clearProductsCache();
+    await invalidateProductsCache();
     res.status(204).end();
   } catch (error) {
     console.error("Erro ao excluir produto:", error);
@@ -109,8 +91,7 @@ exports.update = async (req, res) => {
     const { id } = req.params;
     const product = await productService.update(id, req.body);
 
-    // Limpar cache ao atualizar produto
-    clearProductsCache();
+    await invalidateProductsCache();
 
     res.status(200).json(product);
   } catch (error) {

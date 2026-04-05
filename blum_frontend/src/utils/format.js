@@ -13,17 +13,21 @@ const formatCurrency = (value) => {
 };
 
 export const formatOrderData = (order) => {
+  const sellerId = order.user_ref ?? order.userid;
+  const itemsLen = Array.isArray(order.items) ? order.items.length : 0;
   return {
     id: order.id,
     clientId: order.clientid,
-    userId: order.userid,
+    userId: sellerId,
+    sellerName: order.seller_name,
     description: order.description,
     items: order.items,
+    itemsCount: order.items_count ?? itemsLen,
     totalPrice: order.totalprice,
     discount: order.discount,
     status: order.status,
     createdAt: order.createdat,
-    finishedAt: order.finishedat // ← Garante consistência
+    finishedAt: order.finishedat,
   };
 };
 

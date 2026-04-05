@@ -57,9 +57,6 @@ const apiRequest = async (url, options = {}) => {
 
 // ==================== AUTHENTICATION ====================
 export const login = async (username, password) => {
-  console.log("🚀 [apiService] Função login acionada!");
-  console.log(`🔗 [apiService] Disparando POST para: ${API_URL}/auth/login`);
-  
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
@@ -133,7 +130,7 @@ const apiService = {
       id: order.id,
       orderNumber: order.id.toString(),
       orderDate: order.createdat,
-      seller: order.userid,
+      seller: order.user_ref ?? order.userid,
       status: order.status || "pending",
       totalAmount: order.totalprice || 0,
       discount: order.discount || 0,

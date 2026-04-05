@@ -21,61 +21,31 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
       try {
         setLoading(true);
 
-        const currentUserId = userId || username;
-
-        if (!currentUserId) {
-          console.error("UserId não disponível");
-          return;
-        }
-
-        console.log("Buscando dados para:", { currentUserId, userRole });
-
-        // Prepara os parâmetros base - DIFERENTES para admin vs vendedor
-        let ordersParams = {
-          limit: 50, // Aumentei para pegar mais pedidos para o gráfico
-          sort: "createdAt",
-          order: "desc",
-        };
-
-        let reportParams = {};
-
-        // SE FOR VENDEDOR: aplica filtro por usuário
-        if (userRole === "salesperson") {
-          ordersParams.userId = currentUserId;
-          ordersParams.userRole = "salesperson";
-          reportParams.userId = currentUserId;
-          reportParams.userRole = "salesperson";
-          console.log(
-            "🔍 Vendedor - Aplicando filtro por usuário:",
-            currentUserId,
-          );
-        }
-        // SE FOR ADMIN: NÃO aplica filtro (vê tudo)
-        else if (userRole === "admin") {
-          ordersParams.userRole = "admin";
-          console.log("👑 Admin - Sem filtro (vendo tudo)");
-        }
-
-        const [statusResponse, ordersResponse, salesResponse] =
+        // `/status` não traz contagens; `/status/details` é só admin.
+        // Usamos as mesmas APIs que o restante do app: clientes, total de produtos (paginação) e relatório.
+        const [clientsData, productsResponse, ordersResponse, salesResponse] =
           await Promise.all([
-            apiService.getStatus(),
-            apiService.getOrders(ordersParams),
-            apiService.getReportStats(reportParams),
+            apiService.getClients(),
+            apiService.getProducts("all", 1, 1),
+            apiService.getOrders({ limit: 50 }),
+            apiService.getReportStats({}),
           ]);
 
-        console.log("Status Response:", statusResponse);
-        console.log("Orders Response:", ordersResponse);
-        console.log("Sales Response:", salesResponse);
+        const clientsCount = Array.isArray(clientsData) ? clientsData.length : 0;
+        const productsCount =
+          productsResponse?.pagination?.total ??
+          (Array.isArray(productsResponse?.data)
+            ? productsResponse.data.length
+            : 0);
 
-        // CORREÇÃO: Usar os dados filtrados para os cards
         setStats({
-          clients: statusResponse.database.stats.clients,
-          products: statusResponse.database.stats.products,
-          orders: salesResponse?.totalOrders || 0,
-          revenue: salesResponse?.totalSales || 0,
+          clients: clientsCount,
+          products: productsCount,
+          orders: salesResponse?.totalOrders ?? 0,
+          revenue: salesResponse?.totalSales ?? 0,
         });
 
-        setRecentOrders(ordersResponse?.slice(0, 3) || []); // Apenas os 5 mais recentes
+        setRecentOrders(ordersResponse?.slice(0, 3) || []);
 
         // PREPARAR DADOS PARA O GRÁFICO (igual ao ReportsPage)
         const finishedOrders = ordersResponse.filter(
@@ -138,7 +108,7 @@ const Dashboard = ({ onNavigate, userId, username, userRole }) => {
 
     fetchDashboardData();
     formatDate();
-  }, [userId, username, userRole]);
+  }, [userId, userRole]);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat("pt-BR", {

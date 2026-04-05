@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const { getJwtSecret } = require("../config/env");
 
 // Middleware para verificar token JWT
 exports.authenticate = (req, res, next) => {
@@ -21,10 +22,7 @@ exports.authenticate = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "blum-secret-key-change-in-production"
-    );
+    const decoded = jwt.verify(token, getJwtSecret());
 
     // Adiciona informações do usuário ao request
     req.user = {
@@ -93,10 +91,7 @@ exports.optionalAuth = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "blum-secret-key-change-in-production"
-    );
+    const decoded = jwt.verify(token, getJwtSecret());
 
     req.user = {
       userId: decoded.userId,

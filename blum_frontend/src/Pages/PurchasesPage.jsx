@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import LoadingSpinner from "../components/LoadingSpinner";
 import VerificationTable from "../components/common/VerificationTable";
@@ -21,29 +20,39 @@ const usePurchaseLogic = () => {
     new Date().toISOString().split("T")[0],
   );
 
-  // Carrega dados iniciais
+  // Carrega produtos e representadas (usa apiService: URL correta + JWT)
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const [productsResponse, brandsData] = await Promise.all([
-          fetch(`${API_URL}/api/v1/products`),
-          fetch(`${API_URL}/api/v1/brands`),
+          apiService.getProducts("all", 1, 10000),
+          apiService.getBrands(),
         ]);
 
-        // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
-        const productsData = productsResponse?.data || productsResponse;
+        const productsData = Array.isArray(productsResponse?.data)
+          ? productsResponse.data
+          : Array.isArray(productsResponse)
+            ? productsResponse
+            : [];
+
+        const brandsList = Array.isArray(brandsData) ? brandsData : [];
 
         setUserProducts(productsData);
-        setBrands(brandsData);
+        setBrands(brandsList);
 
-        if (brandsData.length > 0) {
-          const firstBrand = brandsData[0];
-          if (firstBrand && firstBrand.id) {
+        if (brandsList.length > 0) {
+          const firstBrand = brandsList[0];
+          if (firstBrand?.id != null) {
             setSelectedBrandId(String(firstBrand.id));
           }
+        } else {
+          setSelectedBrandId("");
         }
       } catch (err) {
-        console.error("Erro ao buscar dados do usuário:", err);
+        console.error("Erro ao buscar produtos/representadas:", err);
+        setUserProducts([]);
+        setBrands([]);
+        setSelectedBrandId("");
       }
     };
     fetchUserData();
@@ -291,7 +300,9 @@ const CsvImportSection = ({ purchaseLogic }) => {
     const newProductsCount = parsedCsvItems.filter(
       (item) => item.isNewProduct,
     ).length;
-    const selectedBrand = brands.find((b) => b.id === selectedCsvBrandId);
+    const selectedBrand = brands.find(
+      (b) => String(b.id) === String(selectedCsvBrandId),
+    );
 
     if (newProductsCount > 0) {
       const confirmMessage =
@@ -460,7 +471,9 @@ const CsvImportSection = ({ purchaseLogic }) => {
 
           <NewProductsSummary
             items={parsedCsvItems}
-            selectedBrand={brands.find((b) => b.id === selectedCsvBrandId)}
+            selectedBrand={brands.find(
+              (b) => String(b.id) === String(selectedCsvBrandId),
+            )}
           />
 
           <VerificationTable
@@ -623,7 +636,9 @@ const PurchasesPage = () => {
     const newProductsCount = parsedItems.filter(
       (item) => item.isNewProduct,
     ).length;
-    const selectedBrand = brands.find((b) => b.id === selectedBrandId);
+    const selectedBrand = brands.find(
+      (b) => String(b.id) === String(selectedBrandId),
+    );
 
     if (newProductsCount > 0) {
       const confirmMessage =

@@ -19,8 +19,11 @@ exports.getSalesByRep = async (req, res) => {
 // GET REPORT STATS - Estatísticas do relatório
 exports.getReportStats = async (req, res) => {
   try {
-    const { period, userRole, userId } = req.query;
-    const stats = await reportService.getStats({ period, userRole, userId });
+    const { period } = req.query;
+    const stats = await reportService.getStats({
+      period,
+      authUser: { role: req.user.role, userId: req.user.userId },
+    });
     res.status(200).json(stats);
   } catch (error) {
     console.error("Erro ao buscar estatísticas do relatório:", error);
@@ -33,11 +36,15 @@ exports.getReportStats = async (req, res) => {
 // GET COMMISSION REPORT - Relatório de comissões
 exports.getCommissionReport = async (req, res) => {
   try {
-    const { startDate, endDate, userId } = req.query;
+    const { startDate, endDate } = req.query;
+    let userId = req.query.userId;
+    if (req.user.role === "salesperson") {
+      userId = req.user.userId;
+    }
     const results = await reportService.getCommissionReport({
       startDate,
       endDate,
-      userId,
+      userId: userId || undefined,
     });
     res.status(200).json(results);
   } catch (error) {

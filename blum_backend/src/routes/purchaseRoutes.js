@@ -49,8 +49,17 @@ router.get(
   purchaseController.getLastPurchasePrice
 );
 
-// Rotas de debug (apenas dev/admin)
-router.get("/test", ...adminOnly, purchaseController.testConnection);
-router.post("/debug-pdf", ...adminOnly, uploadPdf, purchaseController.debugPdf);
+if (
+  process.env.NODE_ENV !== "production" ||
+  process.env.ENABLE_PURCHASE_DEBUG === "true"
+) {
+  router.get("/test", ...adminOnly, purchaseController.testConnection);
+  router.post(
+    "/debug-pdf",
+    ...adminOnly,
+    uploadPdf,
+    purchaseController.debugPdf,
+  );
+}
 
 module.exports = router;

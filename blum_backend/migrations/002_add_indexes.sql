@@ -1,6 +1,20 @@
 -- Migration: Adicionar índices para melhorar performance das consultas
 -- Data: 2025-12-09
 
+-- Bases legadas: às vezes a coluna veio como company_name em vez de companyname
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'company_name'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'companyname'
+  ) THEN
+    ALTER TABLE clients RENAME COLUMN company_name TO companyname;
+  END IF;
+END $$;
+
 -- Índices na tabela products
 CREATE INDEX IF NOT EXISTS idx_products_productcode ON products(productcode);
 CREATE INDEX IF NOT EXISTS idx_products_subcode ON products(subcode);
@@ -14,6 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_clients_cnpj ON clients(cnpj);
 
 -- Índices na tabela orders (verificar nomes de colunas)
 CREATE INDEX IF NOT EXISTS idx_orders_clientid ON orders(clientid);
+CREATE INDEX IF NOT EXISTS idx_orders_userid ON orders(userid);
 CREATE INDEX IF NOT EXISTS idx_orders_createdat ON orders(createdat DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 

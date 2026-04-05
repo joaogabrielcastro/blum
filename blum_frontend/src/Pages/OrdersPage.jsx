@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import formatCurrency, { formatOrderData } from "../utils/format";
 
-const OrdersPage = ({ userId, userRole, reps, brands }) => {
+const OrdersPage = ({ userId, userRole, brands }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,25 +31,16 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
     try {
       setLoading(true);
       const [ordersData, clientsData] = await Promise.all([
-        fetch(`${API_URL}/api/v1/orders?userId=${userId}&userRole=${userRole}`),
-        fetch(`${API_URL}/api/v1/clients`),
+        apiService.getOrders({}),
+        apiService.getClients(),
       ]);
 
-      // DEBUG: Verificar dados brutos
-      console.log("DEBUG - Raw orders data:", ordersData);
-      console.log("DEBUG - Raw clients data:", clientsData);
-
-      // Formata os pedidos usando a função importada
       const formattedOrders = ordersData.map((order) => formatOrderData(order));
-
-      // DEBUG: Verificar dados formatados
-      console.log("DEBUG - Formatted orders:", formattedOrders);
-
       setOrders(formattedOrders);
 
       const clientsMap = {};
       clientsData.forEach((client) => {
-        clientsMap[client.id] = client.companyName;
+        clientsMap[client.id] = client.companyName || client.companyname;
       });
       setClients(clientsMap);
     } catch (error) {
@@ -94,7 +84,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
             } pedido. Tente novamente.`;
       alert(errorMessage);
       // Recarrega a lista em caso de erro
-      await fetchOrders();
+      await fetchData();
     } finally {
       setModalAction({ type: null, orderId: null });
     }
@@ -198,8 +188,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
         <PdfGenerator
           order={pdfOrder}
           clients={clients}
-          reps={reps}
-          brands={safeBrands} // ← Usando safeBrands validado
+          brands={safeBrands}
           onClose={() => setPdfOrder(null)}
         />
       )}
@@ -239,7 +228,7 @@ const OrdersPage = ({ userId, userRole, reps, brands }) => {
                     Cliente: {clients[order.clientId] || "N/A"}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    Itens: {order.items?.length || 0}
+                    Itens: {order.itemsCount ?? order.items?.length ?? 0}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
                     Descrição: {order.description || "N/A"}

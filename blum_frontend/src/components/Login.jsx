@@ -9,91 +9,43 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState("");
   const [isFormValid, setIsFormValid] = useState(false);
 
-  // Usuários de exemplo para login rápido (apenas UI)
-  const quickLoginUsers = [
-    { username: "admin", role: "admin", name: "Administrador" },
-    { username: "siane", role: "salesperson", name: "Siane" },
-    { username: "eduardo", role: "salesperson", name: "Eduardo" },
-    { username: "vendedor", role: "salesperson", name: "Vendedor" },
-  ];
-
-  // Validar formulário em tempo real
   useEffect(() => {
     setIsFormValid(username.trim() !== "" && password.trim() !== "");
-    setError(""); // Limpar erros quando o usuário digitar
+    setError("");
   }, [username, password]);
 
- const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
 
-    // --- NOVA LÓGICA DE LIMPEZA ---
     const cleanUsername = username.trim();
-    const cleanPassword = password.trim(); 
-
-    console.log(`[DEBUG] Enviando: "${cleanUsername}" | Senha: ${cleanPassword.length} chars`);
+    const cleanPassword = password.trim();
 
     if (!cleanUsername || !cleanPassword) {
       setError("Preencha usuário e senha");
       return;
     }
-    // ------------------------------
 
     setIsLoading(true);
 
     try {
-      // USAR AS VARIÁVEIS LIMPAS AQUI:
       const response = await login(cleanUsername, cleanPassword);
-      
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       onLogin(response.user.role, response.user.id, response.user);
     } catch (err) {
-      console.log(
-        "[DEBUG] Não foi possível importar API_URL do apiService:",
-        err,
-      );
-    }
-
-    if (!isFormValid) return;
-
-    setIsLoading(true);
-
-    try {
-      // Fazer requisição de login para o backend
-      console.log("[DEBUG] Chamando login() do apiService");
-      const response = await login(username, password);
-      console.log("[DEBUG] Resposta do login:", response);
-
-      // Salvar token e informações do usuário
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-      // Chamar callback de login com role e userId
-      onLogin(response.user.role, response.user.id, response.user);
-    } catch (err) {
-      console.error("Erro no login:", err);
       setError(err.message || "Usuário ou senha inválidos");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleQuickLogin = (user) => {
-    setUsername(user.username);
-    // Não preencher senha automaticamente por segurança
-    setError("");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-700 to-blue-600 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Elementos decorativos de fundo */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjgwIiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==')] opacity-20"></div>
 
       <div className="relative z-10 w-full max-w-md">
-        {/* Card principal */}
         <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/20">
-          {/* Logo e título - TAMANHO REDUZIDO */}
           <div className="text-center mb-6">
             <div>
               <img
@@ -108,7 +60,6 @@ const Login = ({ onLogin }) => {
             </p>
           </div>
 
-          {/* Mensagem de erro */}
           {error && (
             <div
               className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl flex items-center"
@@ -129,7 +80,6 @@ const Login = ({ onLogin }) => {
             </div>
           )}
 
-          {/* Formulário */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label
@@ -263,13 +213,12 @@ const Login = ({ onLogin }) => {
                   Entrando...
                 </>
               ) : (
-                "Entrar agora teste"
+                "Entrar"
               )}
             </button>
           </form>
         </div>
 
-        {/* Mensagem de boas-vindas */}
         <div className="text-center mt-4">
           <p className="text-white/80 text-xs">
             Bem-vindo ao sistema de gestão comercial
@@ -277,7 +226,6 @@ const Login = ({ onLogin }) => {
         </div>
       </div>
 
-      {/* Efeitos de fundo animados */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-4 -left-4 w-72 h-72 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-4 -right-4 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl animate-pulse delay-1000"></div>

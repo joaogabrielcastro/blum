@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import ClientsForm from "../components/ClientsForm";
@@ -6,7 +7,8 @@ import SearchBar from "../components/SearchBar";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
 
-const ClientsPage = ({ onNavigateToClientHistory }) => {
+const ClientsPage = () => {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [filteredClients, setFilteredClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -382,7 +384,7 @@ const ClientsPage = ({ onNavigateToClientHistory }) => {
                         {/* Ações */}
                         <div className="flex gap-2 pt-4 border-t border-gray-100">
                           <button
-                            onClick={() => onNavigateToClientHistory(client.id)}
+                            onClick={() => navigate(`/clients/${client.id}/history`)}
                             className="flex-1 bg-blue-50 text-blue-700 hover:bg-blue-100 py-2 px-3 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-1"
                           >
                             <svg

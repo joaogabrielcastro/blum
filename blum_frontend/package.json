@@ -7,15 +7,31 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:ci": "react-scripts test --watchAll=false",
     "eject": "react-scripts eject"
   },
   "dependencies": {
-    "jspdf": "^3.0.2",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.30.3",
     "react-scripts": "5.0.1",
     "recharts": "^3.1.2"
+  },
+  "overrides": {
+    "underscore": "1.13.8",
+    "nth-check": "2.1.1",
+    "@tootallnate/once": "3.0.1",
+    "serialize-javascript": "7.0.5",
+    "postcss": "8.4.49",
+    "webpack-dev-server": "5.2.2",
+    "rollup-plugin-terser": {
+      "serialize-javascript": "7.0.5"
+    },
+    "css-minimizer-webpack-plugin": {
+      "serialize-javascript": "7.0.5"
+    }
   },
   "browserslist": {
     "production": [
@@ -28,5 +44,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1"
   }
 }

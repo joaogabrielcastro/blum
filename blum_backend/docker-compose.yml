@@ -1,3 +1,5 @@
+# Preferir o stack completo na raiz do repositório: `docker compose up --build`
+# (PostgreSQL + API na 3011 + frontend na 8080).
 version: '3.8'
 
 services:

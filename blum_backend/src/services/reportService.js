@@ -1,48 +1,44 @@
 const { sql } = require("../config/database");
 
 class ReportService {
-  /**
-   * Busca vendas por representante
-   * @returns {Promise<Array>} Lista de vendas por representante
-   */
   async getSalesByRep() {
     return await sql`
-      SELECT userid, SUM(totalprice) AS "totalSales" 
-      FROM orders 
-      WHERE status = 'Entregue' 
-      GROUP BY userid 
+      SELECT
+        u.id AS "userId",
+        u.username,
+        u.name AS "sellerName",
+        SUM(o.totalprice) AS "totalSales"
+      FROM orders o
+      JOIN users u ON u.id = o.user_ref
+      WHERE o.status = 'Entregue'
+      GROUP BY u.id, u.username, u.name
       ORDER BY "totalSales" DESC
     `;
   }
 
-  /**
-   * Busca estatísticas do relatório
-   * @param {Object} filters - Filtros (period, userRole, userId)
-   * @returns {Promise<Object>} Estatísticas
-   */
   async getStats(filters = {}) {
-    const { period, userRole, userId } = filters;
+    const { period, authUser } = filters;
+    const userRole = authUser?.role;
+    const userId = authUser?.userId;
 
     let baseQuery = `
-      SELECT 
-        COALESCE(COUNT(id), 0) AS "totalOrders", 
-        COALESCE(SUM(totalprice), 0) AS "totalSales" 
-      FROM orders 
+      SELECT
+        COALESCE(COUNT(id), 0) AS "totalOrders",
+        COALESCE(SUM(totalprice), 0) AS "totalSales"
+      FROM orders
       WHERE status = 'Entregue'
     `;
     const params = [];
 
-    // Adiciona filtro de período
     if (period === "week") {
       baseQuery += ` AND createdat >= NOW() - INTERVAL '7 days'`;
     } else if (period === "month") {
       baseQuery += ` AND createdat >= NOW() - INTERVAL '30 days'`;
     }
 
-    // Adiciona filtro de usuário
-    if (userRole === "salesperson" && userId) {
+    if (userRole === "salesperson" && userId != null) {
       params.push(userId);
-      baseQuery += ` AND userid = $${params.length}`;
+      baseQuery += ` AND user_ref = $${params.length}`;
     }
 
     const result = await sql(baseQuery, params);
@@ -53,21 +49,19 @@ class ReportService {
     };
   }
 
-  /**
-   * Busca relatório de comissões
-   * @param {Object} filters - Filtros (startDate, endDate, userId)
-   * @returns {Promise<Array>} Relatório de comissões
-   */
   async getCommissionReport(filters = {}) {
     const { startDate, endDate, userId } = filters;
 
     let query = sql`
-      SELECT 
-        o.userid,
+      SELECT
+        o.user_ref,
+        u.username,
+        u.name AS seller_name,
         COUNT(o.id) as total_orders,
         SUM(o.totalprice) as total_sales,
         SUM(o.total_commission) as total_commission
       FROM orders o
+      JOIN users u ON u.id = o.user_ref
       WHERE o.status = 'Entregue'
     `;
 
@@ -77,24 +71,19 @@ class ReportService {
     if (endDate) {
       query = sql`${query} AND o.createdat <= ${endDate}`;
     }
-    if (userId) {
-      query = sql`${query} AND o.userid = ${userId}`;
+    if (userId != null && userId !== "") {
+      query = sql`${query} AND o.user_ref = ${Number(userId)}`;
     }
 
     query = sql`
       ${query}
-      GROUP BY o.userid
+      GROUP BY o.user_ref, u.username, u.name
       ORDER BY total_commission DESC
     `;
 
     return await query;
   }
 
-  /**
-   * Busca relatório de comissões detalhado por marca
-   * @param {Object} filters - Filtros (startDate, endDate, sellerId)
-   * @returns {Promise<Array>} Relatório detalhado
-   */
   async getCommissionByBrand(filters = {}) {
     const { startDate, endDate, sellerId } = filters;
 
@@ -109,22 +98,40 @@ class ReportService {
       params.push(endDate);
       conditions.push(`o.createdat <= $${params.length}`);
     }
-    if (sellerId) {
-      params.push(sellerId);
-      conditions.push(`o.userid = $${params.length}`);
+    if (sellerId != null && sellerId !== "") {
+      params.push(Number(sellerId));
+      conditions.push(`o.user_ref = $${params.length}`);
     }
 
     const whereClause = conditions.join(" AND ");
 
     const query = `
-      SELECT 
-        o.userid,
-        o.id as order_id,
+      SELECT
+        o.user_ref,
+        u.username AS seller_username,
+        u.name AS seller_name,
+        o.id AS order_id,
         o.createdat,
         o.totalprice,
         o.total_commission,
-        o.items
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'brand', oi.brand,
+                'quantity', oi.quantity,
+                'commission_amount', oi.commission_amount,
+                'unit_price', oi.unit_price,
+                'line_total', oi.line_total
+              ) ORDER BY oi.id
+            )
+            FROM order_items oi
+            WHERE oi.order_id = o.id
+          ),
+          '[]'::json
+        ) AS items
       FROM orders o
+      JOIN users u ON u.id = o.user_ref
       WHERE ${whereClause}
       ORDER BY o.createdat DESC
     `;
