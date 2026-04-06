@@ -4,6 +4,7 @@ import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import formatCurrency, { formatOrderData } from "../utils/format";
+import { getClientDisplayName } from "../utils/clients";
 
 const OrdersPage = ({ userId, userRole, brands }) => {
   const [orders, setOrders] = useState([]);
@@ -40,7 +41,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
       const clientsMap = {};
       clientsData.forEach((client) => {
-        clientsMap[client.id] = client.companyName || client.companyname;
+        clientsMap[client.id] = getClientDisplayName(client);
       });
       setClients(clientsMap);
     } catch (error) {

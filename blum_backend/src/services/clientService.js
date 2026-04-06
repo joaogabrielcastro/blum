@@ -6,10 +6,17 @@ function pickCreatedAt(row) {
   return row.createdat ?? row.createdAt ?? row.created_at;
 }
 
-/** Colunas de texto: aceita snake_case ou camelCase vindos do driver. */
+/** Colunas de texto: aceita snake_case, camelCase e legado (company_name / name). */
 function pickCompanyName(row) {
   if (!row) return undefined;
-  return row.companyname ?? row.companyName;
+  const v =
+    row.companyname ??
+    row.companyName ??
+    row.company_name ??
+    row.name;
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  return s === "" ? undefined : s;
 }
 
 function pickContactPerson(row) {

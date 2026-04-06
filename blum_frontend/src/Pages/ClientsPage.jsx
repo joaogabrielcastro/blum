@@ -6,6 +6,7 @@ import ClientsForm from "../components/ClientsForm";
 import SearchBar from "../components/SearchBar";
 import LoadingSpinner from "../components/LoadingSpinner";
 import EmptyState from "../components/EmptyState";
+import { getClientDisplayName } from "../utils/clients";
 
 const ClientsPage = () => {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ const ClientsPage = () => {
       const term = searchTerm.toLowerCase();
       const filtered = clients.filter(
         (client) =>
-          client.companyName?.toLowerCase().includes(term) ||
+          getClientDisplayName(client).toLowerCase().includes(term) ||
           client.contactPerson?.toLowerCase().includes(term) ||
           client.phone?.includes(term) ||
           client.region?.toLowerCase().includes(term) ||
@@ -279,11 +280,11 @@ const ClientsPage = () => {
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                              {client.companyName?.charAt(0) || "C"}
+                              {getClientDisplayName(client).charAt(0) || "C"}
                             </div>
                             <div className="min-w-0 flex-1">
                               <h3 className="font-bold text-gray-900 text-lg leading-tight break-words max-w-full whitespace-normal line-clamp-2">
-                                {client.companyName}
+                                {getClientDisplayName(client) || "—"}
                               </h3>
                               <p className="text-gray-500 text-sm font-mono truncate">
                                 {client.cnpj
@@ -478,7 +479,7 @@ const ClientsPage = () => {
 
             <p className="text-gray-600 mb-6">
               Tem certeza que deseja excluir o cliente{" "}
-              <strong>"{deleteConfirm.companyName}"</strong>?
+              <strong>"{getClientDisplayName(deleteConfirm)}"</strong>?
               {deleteConfirm.cnpj &&
                 ` (CNPJ: ${formatCNPJ(deleteConfirm.cnpj)})`}
               <br />

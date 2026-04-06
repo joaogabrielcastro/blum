@@ -16,6 +16,7 @@ import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import apiService from "./services/apiService";
+import { getClientDisplayName } from "./utils/clients";
 import { verifyToken } from "./services/apiService";
 
 const PAGE_PATH = {
@@ -53,7 +54,7 @@ function AppShell() {
       const clientsData = await apiService.getClients();
       const clientsMap = {};
       clientsData.forEach((client) => {
-        clientsMap[client.id] = client.companyName || client.companyname;
+        clientsMap[client.id] = getClientDisplayName(client);
       });
       setClients(clientsMap);
     } catch (error) {
