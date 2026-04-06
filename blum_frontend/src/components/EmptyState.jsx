@@ -1,4 +1,23 @@
-const EmptyState = ({ brandsCount, hasSearchTerm, selectedBrand }) => {
+const EmptyState = ({
+  brandsCount,
+  hasSearchTerm,
+  selectedBrand,
+  title,
+  message,
+  icon,
+}) => {
+  if (title != null || message != null) {
+    return (
+      <div className="col-span-full flex items-center justify-center py-12">
+        <div className="text-center text-gray-500">
+          {icon != null && <div className="text-4xl mb-4">{icon}</div>}
+          <h3 className="text-xl font-semibold">{title}</h3>
+          {message != null && <p className="mt-2">{message}</p>}
+        </div>
+      </div>
+    );
+  }
+
   if (hasSearchTerm) {
     return (
       <div className="col-span-full flex items-center justify-center py-12">

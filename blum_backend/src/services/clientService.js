@@ -1,13 +1,30 @@
 const { sql } = require("../config/database");
 
-/** Normaliza linha do PG (snake_case) para o contrato esperado pelo frontend. */
+/** Colunas de data: schema SQL usa createdat; algumas bases (Neon/import) têm "createdAt". */
+function pickCreatedAt(row) {
+  if (!row) return undefined;
+  return row.createdat ?? row.createdAt ?? row.created_at;
+}
+
+/** Colunas de texto: aceita snake_case ou camelCase vindos do driver. */
+function pickCompanyName(row) {
+  if (!row) return undefined;
+  return row.companyname ?? row.companyName;
+}
+
+function pickContactPerson(row) {
+  if (!row) return undefined;
+  return row.contactperson ?? row.contactPerson;
+}
+
+/** Normaliza linha do PG para o contrato esperado pelo frontend. */
 function mapClientRow(row) {
   if (!row) return row;
   return {
     ...row,
-    companyName: row.companyname,
-    contactPerson: row.contactperson,
-    createdAt: row.createdat,
+    companyName: pickCompanyName(row),
+    contactPerson: pickContactPerson(row),
+    createdAt: pickCreatedAt(row),
   };
 }
 
@@ -17,8 +34,8 @@ function mapClients(rows) {
 
 class ClientService {
   async findAll() {
-    const rows =
-      await sql`SELECT * FROM clients ORDER BY createdat DESC`;
+    // Evita ORDER BY createdat vs "createdAt" conforme a base; id é sempre válido.
+    const rows = await sql`SELECT * FROM clients ORDER BY id DESC`;
     return mapClients(rows);
   }
 
@@ -106,7 +123,7 @@ class ClientService {
 
   async findByRegion(region) {
     const rows =
-      await sql`SELECT * FROM clients WHERE region = ${region} ORDER BY companyname`;
+      await sql`SELECT * FROM clients WHERE region = ${region} ORDER BY id DESC`;
     return mapClients(rows);
   }
 
@@ -122,7 +139,7 @@ class ClientService {
         companyname ILIKE ${term} OR
         contactperson ILIKE ${term} OR
         cnpj ILIKE ${term}
-      ORDER BY companyname
+      ORDER BY id DESC
     `;
     return mapClients(rows);
   }
