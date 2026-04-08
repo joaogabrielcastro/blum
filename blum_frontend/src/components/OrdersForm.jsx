@@ -1,9 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import apiService from "../services/apiService";
+import {
+  getClientDisplayName,
+  normalizeClientsResponse,
+} from "../utils/clients";
 
 const OrdersForm = ({
   userId,
   clients,
+  clientsList = [],
   onOrderAdded,
   onCancel,
   brands,
@@ -208,12 +213,33 @@ const OrdersForm = ({
     setSearchResults([]);
   };
 
-  const clientOptions = Object.entries(clients || {})
-    .map(([id, name]) => ({
-      id: String(id),
-      label: name != null && String(name).trim() !== "" ? String(name) : `Cliente #${id}`,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  const clientOptions = useMemo(() => {
+    const list = normalizeClientsResponse(clientsList);
+    if (list.length > 0) {
+      return list
+        .map((c) => {
+          const id = c.id ?? c.Id;
+          if (id == null) return null;
+          const label =
+            getClientDisplayName(c) ||
+            (c.cnpj != null && String(c.cnpj).trim()
+              ? `CNPJ ${String(c.cnpj).trim()}`
+              : `Cliente #${id}`);
+          return { id: String(id), label };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+    }
+    return Object.entries(clients || {})
+      .map(([id, name]) => ({
+        id: String(id),
+        label:
+          name != null && String(name).trim() !== ""
+            ? String(name)
+            : `Cliente #${id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [clientsList, clients]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

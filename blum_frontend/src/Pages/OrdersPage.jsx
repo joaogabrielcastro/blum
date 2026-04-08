@@ -4,7 +4,10 @@ import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import formatCurrency, { formatOrderData } from "../utils/format";
-import { getClientDisplayName } from "../utils/clients";
+import {
+  getClientDisplayName,
+  normalizeClientsResponse,
+} from "../utils/clients";
 
 const OrdersPage = ({ userId, userRole, brands }) => {
   const [orders, setOrders] = useState([]);
@@ -12,6 +15,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [clients, setClients] = useState({});
+  const [clientsList, setClientsList] = useState([]);
   const [pdfOrder, setPdfOrder] = useState(null);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
 
@@ -39,9 +43,18 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       const formattedOrders = ordersData.map((order) => formatOrderData(order));
       setOrders(formattedOrders);
 
+      const list = normalizeClientsResponse(clientsData);
+      setClientsList(list);
+
       const clientsMap = {};
-      clientsData.forEach((client) => {
-        clientsMap[client.id] = getClientDisplayName(client);
+      list.forEach((client) => {
+        const id = client.id ?? client.Id;
+        if (id == null) return;
+        clientsMap[id] =
+          getClientDisplayName(client) ||
+          (client.cnpj != null && String(client.cnpj).trim()
+            ? `CNPJ ${String(client.cnpj).trim()}`
+            : "");
       });
       setClients(clientsMap);
     } catch (error) {
@@ -156,6 +169,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         <OrdersForm
           userId={userId}
           clients={clients}
+          clientsList={clientsList}
           brands={safeBrands} // ← Usando safeBrands validado
           editingOrder={editingOrder}
           onOrderAdded={() => {

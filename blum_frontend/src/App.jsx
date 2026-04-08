@@ -16,7 +16,10 @@ import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import apiService from "./services/apiService";
-import { getClientDisplayName } from "./utils/clients";
+import {
+  getClientDisplayName,
+  normalizeClientsResponse,
+} from "./utils/clients";
 import { verifyToken } from "./services/apiService";
 
 const PAGE_PATH = {
@@ -52,9 +55,16 @@ function AppShell() {
   const fetchClients = async () => {
     try {
       const clientsData = await apiService.getClients();
+      const list = normalizeClientsResponse(clientsData);
       const clientsMap = {};
-      clientsData.forEach((client) => {
-        clientsMap[client.id] = getClientDisplayName(client);
+      list.forEach((client) => {
+        const id = client.id ?? client.Id;
+        if (id == null) return;
+        clientsMap[id] =
+          getClientDisplayName(client) ||
+          (client.cnpj != null && String(client.cnpj).trim()
+            ? `CNPJ ${String(client.cnpj).trim()}`
+            : "");
       });
       setClients(clientsMap);
     } catch (error) {

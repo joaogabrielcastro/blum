@@ -147,11 +147,9 @@ Com sessão iniciada, exemplos: `/dashboard`, `/orders`, `/clients`, `/clients/:
 
 Itens ainda não implementados no código (evolução do produto): **billing/planos**, **API pública versionada**, **exportação Excel** dos relatórios, **webhooks**. Podem ser priorizados conforme o go-to-market.
 
-2. Configure sua conexão com o **Neon Database**:
-   - Acesse [neon.tech](https://neon.tech)
-   - Crie um novo projeto
-   - Copie a connection string
-   - Cole no `DATABASE_URL`
+2. **PostgreSQL:** preencha `DATABASE_URL` com a *connection string* completa (`postgresql://usuario:senha@host:porta/nome_da_base`). O projeto só usa o driver `pg` com essa URL — não está amarrado a um fornecedor específico.
+   - **Docker Compose na raiz** (`docker compose up`): a partir do seu PC, o Postgres do compose expõe a porta **5433** no host — exemplo: `postgresql://blum:blum_docker_dev@127.0.0.1:5433/blum` (credenciais em `docker-compose.yml`).
+   - **Produção (Coolify, VPS, etc.):** use o host e a porta que o seu ambiente define (muitas vezes `localhost` ou o nome do serviço na rede Docker). Se `getaddrinfo ENOTFOUND` aparecer, o *hostname* na URL está errado ou incompleto — copie de novo a string no painel do Postgres ou do compose.
 
 ### Frontend
 

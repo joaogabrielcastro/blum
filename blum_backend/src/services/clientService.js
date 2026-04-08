@@ -6,17 +6,28 @@ function pickCreatedAt(row) {
   return row.createdat ?? row.createdAt ?? row.created_at;
 }
 
-/** Colunas de texto: aceita snake_case, camelCase e legado (company_name / name). */
+/** Nome comercial / razão social (sem contato nem CNPJ — isso vai em displayName). */
 function pickCompanyName(row) {
   if (!row) return undefined;
-  const v =
-    row.companyname ??
-    row.companyName ??
-    row.company_name ??
-    row.name;
-  if (v == null) return undefined;
-  const s = String(v).trim();
-  return s === "" ? undefined : s;
+  const candidates = [
+    row.companyname,
+    row.companyName,
+    row.company_name,
+    row.name,
+    row.razao_social,
+    row.razaoSocial,
+    row.nome_fantasia,
+    row.nomeFantasia,
+    row.nome,
+    row.trade_name,
+    row.business_name,
+  ];
+  for (const v of candidates) {
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (s !== "") return s;
+  }
+  return undefined;
 }
 
 function pickContactPerson(row) {
@@ -27,11 +38,24 @@ function pickContactPerson(row) {
 /** Normaliza linha do PG para o contrato esperado pelo frontend. */
 function mapClientRow(row) {
   if (!row) return row;
+  const companyName = pickCompanyName(row);
+  const contactPerson = pickContactPerson(row);
+  const cnpj =
+    row.cnpj != null && String(row.cnpj).trim() !== ""
+      ? String(row.cnpj).trim()
+      : undefined;
+  const contactLabel =
+    contactPerson != null && String(contactPerson).trim() !== ""
+      ? String(contactPerson).trim()
+      : undefined;
+  const displayName =
+    companyName || contactLabel || (cnpj ? `CNPJ ${cnpj}` : undefined);
   return {
     ...row,
-    companyName: pickCompanyName(row),
-    contactPerson: pickContactPerson(row),
+    companyName,
+    contactPerson,
     createdAt: pickCreatedAt(row),
+    displayName,
   };
 }
 
