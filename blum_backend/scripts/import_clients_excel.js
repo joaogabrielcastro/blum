@@ -7,8 +7,10 @@
  *   node scripts/import_clients_excel.js "C:/Users/.../relatorio.xls"
  *   node scripts/import_clients_excel.js "./planilha.xlsx" --dry-run
  *   node scripts/import_clients_excel.js "./arquivo.xls" --sheet="Nome da aba"
+ *   node scripts/import_clients_excel.js "./rel.xls" --header-row=5
  *
  * Com --dry-run: não conecta ao PostgreSQL.
+ * --header-row=N (1-based): força a linha de cabeçalho (útil se a deteção automática falhar).
  * Sem --dry-run: DATABASE_URL no .env (igual ao backend — ver docker-compose.yml).
  */
 
@@ -61,8 +63,21 @@ function buildColumnMap(headerRow) {
       companyScore = 35;
     if (companyScore > 0) companyCandidates.push({ idx, score: companyScore });
 
-    if (/^cnpj$|^cpf$|^documento$/.test(k) || k.includes("cnpj") || k.includes("cpf"))
-      if (map.cnpj == null) map.cnpj = idx;
+    if (map.cnpj == null) {
+      const inscricaoEstadual =
+        k.includes("inscricao") && k.includes("estadual");
+      const hitCnpj =
+        !inscricaoEstadual &&
+        (/^cnpj$|^cpf$/.test(k) ||
+          k.includes("cnpj") ||
+          k.includes("cpf/cnpj") ||
+          k === "documento" ||
+          k === "inscricao" ||
+          k.includes("inscricao federal") ||
+          (k.includes("inscricao") && k.includes("federal")) ||
+          k.includes("cadastro nacional"));
+      if (hitCnpj) map.cnpj = idx;
+    }
     if (
       /^contato$|^responsavel/.test(k) ||
       (k.includes("contato") && !k.includes("telefone"))
@@ -70,8 +85,12 @@ function buildColumnMap(headerRow) {
       if (map.contactperson == null) map.contactperson = idx;
     if (/^tel|^fone|^cel|^whatsapp/.test(k) || k.includes("telefone"))
       if (map.phone == null) map.phone = idx;
-    if (/^uf$|^estado$|^regiao$|^cidade$/.test(k) || k.includes("regiao"))
-      if (map.region == null) map.region = idx;
+    if (k === "cidade" || (k.includes("municipio") && !k.includes("estadual")))
+      if (map.city == null) map.city = idx;
+    if (k === "estado" || k === "uf" || (k.includes("regiao") && !k.includes("cidade")))
+      if (map.state == null) map.state = idx;
+    if (k.includes("endereco") || k.includes("logradouro"))
+      if (map.address == null) map.address = idx;
     if (k.includes("email") || k.includes("e-mail"))
       if (map.email == null) map.email = idx;
   });
@@ -99,16 +118,85 @@ function pickField(row, colMap, key) {
   return String(v).trim();
 }
 
-function parseRows(sheet) {
+/**
+ * Junta endereço, cidade e UF no campo `region` (VARCHAR 255).
+ * Se `withAddress` for false, só cidade/UF (quando a tabela tem coluna de endereço separada).
+ */
+function composeRegionString(row, colMap, { withAddress = true } = {}) {
+  const addr = withAddress ? pickField(row, colMap, "address") : null;
+  const city = pickField(row, colMap, "city");
+  const state = pickField(row, colMap, "state");
+  const loc = [city, state].filter(Boolean).join(" / ");
+  const parts = [addr, loc].filter(Boolean);
+  if (!parts.length) return null;
+  const s = parts.join(" · ");
+  return s.length > 255 ? `${s.slice(0, 252)}...` : s;
+}
+
+function rowStrings(row) {
+  return row.map((c) => String(c ?? "").trim());
+}
+
+function headerRowScore(headerCells) {
+  const map = buildColumnMap(headerCells);
+  let score = 0;
+  if (map.companyname.length) score += 10;
+  if (map.cnpj != null) score += 10;
+  if (map.phone != null) score += 2;
+  if (map.city != null || map.state != null) score += 2;
+  if (map.address != null) score += 2;
+  const joined = normKey(headerCells.join(" "));
+  if (joined.includes("relatorio") && map.cnpj == null) score -= 8;
+  if (joined.includes("emitido em")) score -= 8;
+  return score;
+}
+
+function findHeaderRowIndex(rows, forced1Based) {
+  if (forced1Based != null && forced1Based >= 1) {
+    return Math.min(forced1Based - 1, Math.max(0, rows.length - 1));
+  }
+  let bestI = 0;
+  let bestS = -Infinity;
+  const limit = Math.min(rows.length, 100);
+  for (let i = 0; i < limit; i++) {
+    const cells = rowStrings(rows[i]);
+    if (!cells.some(Boolean)) continue;
+    const s = headerRowScore(cells);
+    if (s > bestS) {
+      bestS = s;
+      bestI = i;
+    }
+  }
+  if (bestS < 12) {
+    console.warn(
+      "Cabeçalho com baixa confiança; use --header-row=N (1-based) se o mapeamento vier errado.",
+    );
+  }
+  return bestI;
+}
+
+function isNoiseCompanyName(name) {
+  const k = normKey(name);
+  if (!k) return true;
+  if (k.startsWith("emitido em")) return true;
+  if (k.includes("relatorio de clientes")) return true;
+  if (k === "razao social" || k === "nome fantasia") return true;
+  return false;
+}
+
+function parseRows(sheet, headerRow1Based) {
   const rows = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
     defval: "",
     raw: false,
   });
-  if (!rows.length) return { header: [], data: [] };
-  const header = rows[0].map((c) => String(c ?? "").trim());
-  const data = rows.slice(1).filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
-  return { header, data };
+  if (!rows.length) return { header: [], data: [], headerRowIndex: 0 };
+  const headerRowIndex = findHeaderRowIndex(rows, headerRow1Based);
+  const header = rowStrings(rows[headerRowIndex]);
+  const data = rows
+    .slice(headerRowIndex + 1)
+    .filter((r) => r.some((c) => String(c ?? "").trim() !== ""));
+  return { header, data, headerRowIndex };
 }
 
 /** Mapa lowercase -> nome real da coluna (ex.: contactperson -> "contactPerson"). */
@@ -156,6 +244,7 @@ async function insertClientDynamic(db, lowerToActual, row) {
     { aliases: ["contactperson", "contact_person"], val: row.contactperson },
     { aliases: ["phone", "telefone"], val: row.phone },
     { aliases: ["region", "regiao", "estado"], val: row.region },
+    { aliases: ["address", "endereco", "street", "logradouro"], val: row.address },
     { aliases: ["cnpj"], val: row.cnpj },
     { aliases: ["email"], val: row.email },
   ];
@@ -192,18 +281,32 @@ function parseArgs(argv) {
   const dryRun = argv.includes("--dry-run");
   const sheetArg = argv.find((a) => a.startsWith("--sheet="));
   const sheetName = sheetArg ? sheetArg.slice("--sheet=".length).replace(/^"|"$/g, "") : null;
+  const headerArg = argv.find((a) => a.startsWith("--header-row="));
+  const headerRow1Based = headerArg
+    ? parseInt(headerArg.slice("--header-row=".length), 10)
+    : null;
   const positional = argv.filter(
-    (a) => a !== "--dry-run" && !a.startsWith("--sheet="),
+    (a) =>
+      a !== "--dry-run" &&
+      !a.startsWith("--sheet=") &&
+      !a.startsWith("--header-row="),
   );
-  return { dryRun, sheetName, filePath: positional[0] };
+  return {
+    dryRun,
+    sheetName,
+    headerRow1Based: Number.isFinite(headerRow1Based) ? headerRow1Based : null,
+    filePath: positional[0],
+  };
 }
 
 async function main() {
-  const { dryRun, sheetName, filePath } = parseArgs(process.argv.slice(2));
+  const { dryRun, sheetName, headerRow1Based, filePath } = parseArgs(
+    process.argv.slice(2),
+  );
 
   if (!filePath || !fs.existsSync(filePath)) {
     console.error(
-      "Uso: node scripts/import_clients_excel.js <arquivo.xls|.xlsx> [--dry-run] [--sheet=Nome]",
+      "Uso: node scripts/import_clients_excel.js <arquivo.xls|.xlsx> [--dry-run] [--sheet=Nome] [--header-row=N]",
     );
     process.exit(1);
   }
@@ -220,10 +323,10 @@ async function main() {
     chosenSheet = sheetName;
   }
   const sheet = wb.Sheets[chosenSheet];
-  const { header, data } = parseRows(sheet);
+  const { header, data, headerRowIndex } = parseRows(sheet, headerRow1Based);
 
   if (!header.length) {
-    console.error("Planilha vazia ou sem cabeçalho na primeira linha.");
+    console.error("Planilha vazia ou sem linha de cabeçalho reconhecida.");
     process.exit(1);
   }
 
@@ -241,7 +344,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Folha: "${chosenSheet}" | Linhas de dados: ${data.length}`);
+  console.log(
+    `Folha: "${chosenSheet}" | Cabeçalho na linha ${headerRowIndex + 1} (1-based) | Dados: ${data.length}`,
+  );
   console.log("Mapeamento de colunas (índice 0-based):", colMap);
 
   if (dryRun) {
@@ -260,23 +365,33 @@ async function main() {
   try {
     let lowerToActual = null;
     let cnpjCol = "cnpj";
+    let hasCnpjForDedup = false;
+    let hasAddressCol = false;
     if (!dryRun) {
       db = await pool.connect();
       lowerToActual = await fetchClientsColumnMap(db);
       const foundCnpj = pickDbColumn(lowerToActual, ["cnpj"]);
       if (!foundCnpj) {
-        console.error(
-          "Tabela clients sem coluna cnpj; não é possível deduplicar por CNPJ.",
+        console.warn(
+          "Tabela clients sem coluna cnpj: importação segue sem deduplicação por CNPJ.",
         );
-        process.exit(1);
+      } else {
+        hasCnpjForDedup = true;
       }
-      cnpjCol = foundCnpj;
+      cnpjCol = foundCnpj || "cnpj";
+      hasAddressCol = !!pickDbColumn(lowerToActual, [
+        "address",
+        "endereco",
+        "street",
+        "logradouro",
+      ]);
       console.log(
         "Colunas em clients:",
         [...lowerToActual.values()].sort().join(", "),
       );
     }
-    const cnpjSet = dryRun ? new Set() : await existingCnpjs(db, cnpjCol);
+    const cnpjSet =
+      dryRun || !hasCnpjForDedup ? new Set() : await existingCnpjs(db, cnpjCol);
 
     for (const row of data) {
       let companyname = pickCompany(row, colMap);
@@ -292,6 +407,11 @@ async function main() {
         companyname = `Cliente CNPJ ${cnpjDigits}`;
       }
 
+      if (isNoiseCompanyName(companyname)) {
+        skippedEmpty++;
+        continue;
+      }
+
       if (cnpjDigits && cnpjSet.has(cnpjDigits)) {
         skippedDup++;
         continue;
@@ -299,7 +419,10 @@ async function main() {
 
       const contactperson = pickField(row, colMap, "contactperson");
       const phone = pickField(row, colMap, "phone");
-      const region = pickField(row, colMap, "region");
+      const addressOnly = hasAddressCol ? pickField(row, colMap, "address") : null;
+      const regionStr = composeRegionString(row, colMap, {
+        withAddress: !hasAddressCol,
+      });
       const email = pickField(row, colMap, "email");
       const cnpjStore = cnpjRaw ? String(cnpjRaw).trim() : null;
 
@@ -308,6 +431,7 @@ async function main() {
           "[dry-run]",
           companyname.slice(0, 60),
           cnpjStore || "(sem cnpj)",
+          regionStr ? `| ${regionStr.slice(0, 40)}` : "",
         );
         inserted++;
         if (cnpjDigits) cnpjSet.add(cnpjDigits);
@@ -319,7 +443,8 @@ async function main() {
           companyname,
           contactperson: contactperson ? contactperson.slice(0, 255) : null,
           phone: phone ? phone.slice(0, 255) : null,
-          region: region ? region.slice(0, 255) : null,
+          region: regionStr,
+          address: addressOnly ? addressOnly.slice(0, 255) : null,
           cnpj: cnpjStore ? cnpjStore.slice(0, 255) : null,
           email: email ? email.slice(0, 255) : null,
         });
