@@ -111,9 +111,74 @@ function parseRows(sheet) {
   return { header, data };
 }
 
-async function existingCnpjs(client) {
+/** Mapa lowercase -> nome real da coluna (ex.: contactperson -> "contactPerson"). */
+async function fetchClientsColumnMap(client) {
+  const { rows } = await client.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'clients'
+  `);
+  const lowerToActual = new Map();
+  for (const { column_name } of rows) {
+    lowerToActual.set(String(column_name).toLowerCase(), column_name);
+  }
+  return lowerToActual;
+}
+
+function pickDbColumn(lowerToActual, aliases) {
+  for (const a of aliases) {
+    const act = lowerToActual.get(a.toLowerCase());
+    if (act) return act;
+  }
+  return null;
+}
+
+function quoteIdent(name) {
+  if (/^[a-z_][a-z0-9_]*$/i.test(name) && name === name.toLowerCase()) return name;
+  return `"${String(name).replace(/"/g, '""')}"`;
+}
+
+async function insertClientDynamic(db, lowerToActual, row) {
+  const companyCol = pickDbColumn(lowerToActual, [
+    "companyname",
+    "company_name",
+    "name",
+  ]);
+  if (!companyCol) {
+    throw new Error(
+      "Tabela clients sem coluna companyname / company_name / name",
+    );
+  }
+
+  const pairs = [{ col: companyCol, val: row.companyname.slice(0, 255) }];
+
+  const optional = [
+    { aliases: ["contactperson", "contact_person"], val: row.contactperson },
+    { aliases: ["phone", "telefone"], val: row.phone },
+    { aliases: ["region", "regiao", "estado"], val: row.region },
+    { aliases: ["cnpj"], val: row.cnpj },
+    { aliases: ["email"], val: row.email },
+  ];
+
+  for (const { aliases, val } of optional) {
+    if (val == null || String(val).trim() === "") continue;
+    const col = pickDbColumn(lowerToActual, aliases);
+    if (!col) continue;
+    pairs.push({ col, val: String(val).trim().slice(0, 255) });
+  }
+
+  const cols = pairs.map((p) => quoteIdent(p.col)).join(", ");
+  const nums = pairs.map((_, i) => `$${i + 1}`).join(", ");
+  await db.query(
+    `INSERT INTO clients (${cols}) VALUES (${nums})`,
+    pairs.map((p) => p.val),
+  );
+}
+
+async function existingCnpjs(client, cnpjColumn) {
+  const q = quoteIdent(cnpjColumn);
   const r = await client.query(
-    "SELECT cnpj FROM clients WHERE cnpj IS NOT NULL AND TRIM(cnpj) <> ''",
+    `SELECT ${q} AS cnpj FROM clients WHERE ${q} IS NOT NULL AND TRIM(${q}::text) <> ''`,
   );
   const set = new Set();
   for (const row of r.rows) {
@@ -193,10 +258,25 @@ async function main() {
   let errors = 0;
 
   try {
+    let lowerToActual = null;
+    let cnpjCol = "cnpj";
     if (!dryRun) {
       db = await pool.connect();
+      lowerToActual = await fetchClientsColumnMap(db);
+      const foundCnpj = pickDbColumn(lowerToActual, ["cnpj"]);
+      if (!foundCnpj) {
+        console.error(
+          "Tabela clients sem coluna cnpj; não é possível deduplicar por CNPJ.",
+        );
+        process.exit(1);
+      }
+      cnpjCol = foundCnpj;
+      console.log(
+        "Colunas em clients:",
+        [...lowerToActual.values()].sort().join(", "),
+      );
     }
-    const cnpjSet = dryRun ? new Set() : await existingCnpjs(db);
+    const cnpjSet = dryRun ? new Set() : await existingCnpjs(db, cnpjCol);
 
     for (const row of data) {
       let companyname = pickCompany(row, colMap);
@@ -235,18 +315,14 @@ async function main() {
       }
 
       try {
-        await db.query(
-          `INSERT INTO clients (companyname, contactperson, phone, region, cnpj, email)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            companyname.slice(0, 255),
-            contactperson ? contactperson.slice(0, 255) : null,
-            phone ? phone.slice(0, 255) : null,
-            region ? region.slice(0, 255) : null,
-            cnpjStore ? cnpjStore.slice(0, 255) : null,
-            email ? email.slice(0, 255) : null,
-          ],
-        );
+        await insertClientDynamic(db, lowerToActual, {
+          companyname,
+          contactperson: contactperson ? contactperson.slice(0, 255) : null,
+          phone: phone ? phone.slice(0, 255) : null,
+          region: region ? region.slice(0, 255) : null,
+          cnpj: cnpjStore ? cnpjStore.slice(0, 255) : null,
+          email: email ? email.slice(0, 255) : null,
+        });
         inserted++;
         if (cnpjDigits) cnpjSet.add(cnpjDigits);
       } catch (e) {
