@@ -226,25 +226,42 @@ function pickDbColumn(columnNames, aliases) {
   return null;
 }
 
+/** Todas as colunas da tabela que batem com os aliases (ex.: companyName + companyname). */
+function columnsMatchingAliases(columnNames, aliases) {
+  const out = [];
+  for (const col of columnNames) {
+    if (aliases.some((a) => col.toLowerCase() === a.toLowerCase())) {
+      out.push(col);
+    }
+  }
+  return [...new Set(out)];
+}
+
+const COMPANY_FIELD_ALIASES = [
+  "companyName",
+  "companyname",
+  "company_name",
+  "name",
+];
+
 function quoteIdent(name) {
   if (/^[a-z_][a-z0-9_]*$/i.test(name) && name === name.toLowerCase()) return name;
   return `"${String(name).replace(/"/g, '""')}"`;
 }
 
 async function insertClientDynamic(db, columnNames, row) {
-  const companyCol = pickDbColumn(columnNames, [
-    "companyName",
-    "companyname",
-    "company_name",
-    "name",
-  ]);
-  if (!companyCol) {
+  const companyCols = columnsMatchingAliases(
+    columnNames,
+    COMPANY_FIELD_ALIASES,
+  );
+  if (!companyCols.length) {
     throw new Error(
       "Tabela clients sem coluna companyName / companyname / company_name / name",
     );
   }
 
-  const pairs = [{ col: companyCol, val: row.companyname.slice(0, 255) }];
+  const companyVal = row.companyname.slice(0, 255);
+  const pairs = companyCols.map((col) => ({ col, val: companyVal }));
 
   const optional = [
     {
@@ -260,9 +277,11 @@ async function insertClientDynamic(db, columnNames, row) {
 
   for (const { aliases, val } of optional) {
     if (val == null || String(val).trim() === "") continue;
-    const col = pickDbColumn(columnNames, aliases);
-    if (!col) continue;
-    pairs.push({ col, val: String(val).trim().slice(0, 255) });
+    const cols = columnsMatchingAliases(columnNames, aliases);
+    const s = String(val).trim().slice(0, 255);
+    for (const col of cols) {
+      pairs.push({ col, val: s });
+    }
   }
 
   const cols = pairs.map((p) => quoteIdent(p.col)).join(", ");
