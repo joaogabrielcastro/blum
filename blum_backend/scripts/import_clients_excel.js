@@ -199,24 +199,29 @@ function parseRows(sheet, headerRow1Based) {
   return { header, data, headerRowIndex };
 }
 
-/** Mapa lowercase -> nome real da coluna (ex.: contactperson -> "contactPerson"). */
-async function fetchClientsColumnMap(client) {
+/** Nomes reais das colunas (preserva camelCase, ex.: "companyName"). */
+async function fetchClientsColumnNames(client) {
   const { rows } = await client.query(`
     SELECT column_name
     FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'clients'
   `);
-  const lowerToActual = new Map();
-  for (const { column_name } of rows) {
-    lowerToActual.set(String(column_name).toLowerCase(), column_name);
-  }
-  return lowerToActual;
+  return rows.map(({ column_name }) => String(column_name));
 }
 
-function pickDbColumn(lowerToActual, aliases) {
+/**
+ * Escolhe coluna por aliases. Se existirem duas colunas com o mesmo nome em minúsculas
+ * (ex.: companyname e "companyName"), prioriza o alias com casing exato.
+ */
+function pickDbColumn(columnNames, aliases) {
   for (const a of aliases) {
-    const act = lowerToActual.get(a.toLowerCase());
-    if (act) return act;
+    const matches = columnNames.filter(
+      (c) => c.toLowerCase() === a.toLowerCase(),
+    );
+    if (!matches.length) continue;
+    const exact = matches.find((c) => c === a);
+    if (exact) return exact;
+    return matches[0];
   }
   return null;
 }
@@ -226,22 +231,26 @@ function quoteIdent(name) {
   return `"${String(name).replace(/"/g, '""')}"`;
 }
 
-async function insertClientDynamic(db, lowerToActual, row) {
-  const companyCol = pickDbColumn(lowerToActual, [
+async function insertClientDynamic(db, columnNames, row) {
+  const companyCol = pickDbColumn(columnNames, [
+    "companyName",
     "companyname",
     "company_name",
     "name",
   ]);
   if (!companyCol) {
     throw new Error(
-      "Tabela clients sem coluna companyname / company_name / name",
+      "Tabela clients sem coluna companyName / companyname / company_name / name",
     );
   }
 
   const pairs = [{ col: companyCol, val: row.companyname.slice(0, 255) }];
 
   const optional = [
-    { aliases: ["contactperson", "contact_person"], val: row.contactperson },
+    {
+      aliases: ["contactPerson", "contactperson", "contact_person"],
+      val: row.contactperson,
+    },
     { aliases: ["phone", "telefone"], val: row.phone },
     { aliases: ["region", "regiao", "estado"], val: row.region },
     { aliases: ["address", "endereco", "street", "logradouro"], val: row.address },
@@ -251,7 +260,7 @@ async function insertClientDynamic(db, lowerToActual, row) {
 
   for (const { aliases, val } of optional) {
     if (val == null || String(val).trim() === "") continue;
-    const col = pickDbColumn(lowerToActual, aliases);
+    const col = pickDbColumn(columnNames, aliases);
     if (!col) continue;
     pairs.push({ col, val: String(val).trim().slice(0, 255) });
   }
@@ -363,14 +372,14 @@ async function main() {
   let errors = 0;
 
   try {
-    let lowerToActual = null;
+    let columnNames = null;
     let cnpjCol = "cnpj";
     let hasCnpjForDedup = false;
     let hasAddressCol = false;
     if (!dryRun) {
       db = await pool.connect();
-      lowerToActual = await fetchClientsColumnMap(db);
-      const foundCnpj = pickDbColumn(lowerToActual, ["cnpj"]);
+      columnNames = await fetchClientsColumnNames(db);
+      const foundCnpj = pickDbColumn(columnNames, ["cnpj"]);
       if (!foundCnpj) {
         console.warn(
           "Tabela clients sem coluna cnpj: importação segue sem deduplicação por CNPJ.",
@@ -379,16 +388,13 @@ async function main() {
         hasCnpjForDedup = true;
       }
       cnpjCol = foundCnpj || "cnpj";
-      hasAddressCol = !!pickDbColumn(lowerToActual, [
+      hasAddressCol = !!pickDbColumn(columnNames, [
         "address",
         "endereco",
         "street",
         "logradouro",
       ]);
-      console.log(
-        "Colunas em clients:",
-        [...lowerToActual.values()].sort().join(", "),
-      );
+      console.log("Colunas em clients:", [...columnNames].sort().join(", "));
     }
     const cnpjSet =
       dryRun || !hasCnpjForDedup ? new Set() : await existingCnpjs(db, cnpjCol);
@@ -439,7 +445,7 @@ async function main() {
       }
 
       try {
-        await insertClientDynamic(db, lowerToActual, {
+        await insertClientDynamic(db, columnNames, {
           companyname,
           contactperson: contactperson ? contactperson.slice(0, 255) : null,
           phone: phone ? phone.slice(0, 255) : null,
