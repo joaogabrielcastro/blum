@@ -1,4 +1,4 @@
-import formatCurrency, { formatOrderData } from "./format";
+import formatCurrency, { formatOrderData, normalizeOrderLineItems } from "./format";
 
 describe("formatCurrency", () => {
   it("formata número em BRL", () => {
@@ -47,5 +47,38 @@ describe("formatOrderData", () => {
       finishedat: null,
     });
     expect(out.userId).toBe("5");
+  });
+
+  it("normaliza itens em snake_case vindos da API", () => {
+    const out = formatOrderData({
+      id: 83,
+      clientid: 10,
+      user_ref: 1,
+      items: [
+        {
+          product_id: 5,
+          product_name: "Produto A",
+          brand: "Marca X",
+          quantity: 2,
+          unit_price: "10.5",
+        },
+      ],
+      totalprice: 21,
+      discount: 0,
+      status: "Em aberto",
+      createdat: null,
+      finishedat: null,
+    });
+    expect(out.items).toHaveLength(1);
+    expect(out.items[0].productName).toBe("Produto A");
+    expect(out.items[0].productId).toBe(5);
+    expect(out.items[0].price).toBe(10.5);
+    expect(out.items[0].quantity).toBe(2);
+  });
+});
+
+describe("normalizeOrderLineItems", () => {
+  it("retorna [] para null", () => {
+    expect(normalizeOrderLineItems(null)).toEqual([]);
   });
 });

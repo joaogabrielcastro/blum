@@ -19,6 +19,37 @@ const handleAuthError = (status) => {
   }
 };
 
+const pickServerMessage = (payload) => {
+  if (payload == null || typeof payload !== "object") return null;
+  const tryString = (v) =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+
+  return (
+    tryString(payload.error) ||
+    tryString(payload.message) ||
+    (payload.error &&
+      typeof payload.error === "object" &&
+      tryString(payload.error.message)) ||
+    null
+  );
+};
+
+const formatValidationDetails = (details) => {
+  if (!Array.isArray(details) || details.length === 0) return "";
+  return details
+    .map((err) => {
+      if (err == null) return "";
+      const loc = err.path ?? err.param ?? err.type ?? "campo";
+      const msg =
+        err.msg ||
+        err.message ||
+        (typeof err === "string" ? err : JSON.stringify(err));
+      return `${loc}: ${msg}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+};
+
 const apiRequest = async (url, options = {}) => {
   const response = await fetch(url, {
     ...options,
@@ -30,24 +61,37 @@ const apiRequest = async (url, options = {}) => {
 
   if (!response.ok) {
     handleAuthError(response.status);
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Erro desconhecido" }));
+    const rawText = await response.text();
+    let error = {};
+    try {
+      error = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      error = {
+        message: rawText
+          ? rawText.slice(0, 500)
+          : "Resposta inválida do servidor",
+      };
+    }
 
-    // Se houver detalhes de validação, formata a mensagem
-    if (error.details && Array.isArray(error.details)) {
-      const errorMessages = error.details
-        .map((err) => err.msg || err.message)
-        .join(", ");
+    const serverText = pickServerMessage(error);
+    const detailText = formatValidationDetails(error.details);
+
+    if (error.details && Array.isArray(error.details) && error.details.length) {
       const customError = new Error(
-        errorMessages || error.message || `Erro: ${response.status}`
+        detailText || serverText || `Erro: ${response.status}`
       );
       customError.details = error.details;
       customError.status = response.status;
       throw customError;
     }
 
-    const customError = new Error(error.message || `Erro: ${response.status}`);
+    const customError = new Error(
+      serverText ||
+        (rawText && !serverText && rawText.length < 400
+          ? rawText.trim()
+          : null) ||
+        `Erro HTTP ${response.status}`
+    );
     customError.status = response.status;
     throw customError;
   }
@@ -195,6 +239,10 @@ const apiService = {
   getOrders: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return apiRequest(`${API_URL}/orders?${query}`);
+  },
+
+  getOrderById: async (orderId) => {
+    return apiRequest(`${API_URL}/orders/${orderId}`);
   },
 
   createOrder: async (newOrderData) => {
