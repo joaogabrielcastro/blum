@@ -1,0 +1,61 @@
+# Teste local (pré-produção): PostgreSQL + API + frontend estático (Nginx).
+# Uso: na raiz do repositório →  docker compose up --build
+#
+# Produção: modelo com segredos obrigatórios → docker-compose.prod.yml
+#   (veja env.production.example e blum_backend/.env.example)
+#
+# Abra: http://localhost:8080  (frontend)
+# API:  http://localhost:3011/api/v1
+#
+# Criar utilizadores após o primeiro arranque:
+#   docker compose exec backend node migrations/create-users.js
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: blum
+      POSTGRES_PASSWORD: blum_docker_dev
+      POSTGRES_DB: blum
+    volumes:
+      - blum_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blum -d blum"]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+
+  backend:
+    build:
+      context: ./blum_backend
+      dockerfile: Dockerfile
+    ports:
+      - "3011:3011"
+    environment:
+      NODE_ENV: development
+      PORT: "3011"
+      DATABASE_URL: postgresql://blum:blum_docker_dev@postgres:5432/blum
+      JWT_SECRET: ${JWT_SECRET:-blum_docker_jwt_change_before_production}
+      FRONTEND_URL: http://localhost:8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./blum_frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:3011/api/v1
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  blum_pgdata:

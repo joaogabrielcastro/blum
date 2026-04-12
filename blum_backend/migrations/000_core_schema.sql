@@ -1,0 +1,68 @@
+-- Schema base (equivalente ao antigo setupDatabase em index.js). Idempotente.
+
+CREATE TABLE IF NOT EXISTS clients (
+  id SERIAL PRIMARY KEY,
+  companyname VARCHAR(255) NOT NULL,
+  contactperson VARCHAR(255),
+  phone VARCHAR(255),
+  region VARCHAR(255),
+  cnpj VARCHAR(255),
+  createdat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS products (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  productcode VARCHAR(255),
+  subcode VARCHAR(255),
+  price DECIMAL(10,2) NOT NULL,
+  stock INTEGER NOT NULL,
+  brand VARCHAR(255),
+  minstock INTEGER DEFAULT 0,
+  createdat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id SERIAL PRIMARY KEY,
+  clientid INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  userid VARCHAR(255) NOT NULL,
+  items JSONB,
+  totalprice DECIMAL(10,2) NOT NULL,
+  status VARCHAR(50) DEFAULT 'Em aberto',
+  description TEXT,
+  createdat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  finishedat TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS brands (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) UNIQUE NOT NULL,
+  commission_rate DECIMAL(5,2) DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'salesperson')),
+  name VARCHAR(255),
+  createdat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+CREATE TABLE IF NOT EXISTS price_history (
+  id SERIAL PRIMARY KEY,
+  productid INTEGER REFERENCES products(id) ON DELETE CASCADE,
+  old_price DECIMAL(10,2),
+  new_price DECIMAL(10,2),
+  changed_by VARCHAR(255),
+  changedat TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount DECIMAL(10, 2) DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS minstock INTEGER DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS subcode VARCHAR(255);
+ALTER TABLE brands ADD COLUMN IF NOT EXISTS commission_rate DECIMAL(5,2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_commission DECIMAL(12,2) DEFAULT 0;

@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            blum_backend/package-lock.json
+            blum_frontend/package-lock.json
+
+      - name: Backend — install & test
+        working-directory: blum_backend
+        run: |
+          npm ci
+          npm test
+
+      - name: Frontend — install, test & build
+        working-directory: blum_frontend
+        run: |
+          npm ci
+          npm run test:ci
+          npm run build
