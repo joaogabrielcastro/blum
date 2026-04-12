@@ -124,6 +124,21 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const buildClientPayload = () => {
+    const phone = String(formData.phone || "")
+      .replace(/[^\d\s\-()+]/g, "")
+      .trim();
+    const email = String(formData.email || "").trim();
+    return {
+      companyName: String(formData.companyName || "").trim(),
+      contactPerson: String(formData.contactPerson || "").trim(),
+      phone,
+      region: String(formData.region || "").trim(),
+      cnpj: String(formData.cnpj || "").replace(/\D/g, ""),
+      email,
+    };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -131,11 +146,12 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
 
     setLoading(true);
     try {
+      const payload = buildClientPayload();
       if (isEditing) {
-        await apiService.updateClient(client.id, formData);
+        await apiService.updateClient(client.id, payload);
         alert("Cliente atualizado com sucesso!");
       } else {
-        await apiService.createClient(formData);
+        await apiService.createClient(payload);
         alert("Cliente salvo com sucesso!");
       }
       onClientAdded();

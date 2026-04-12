@@ -32,7 +32,33 @@ function pickCompanyName(row) {
 
 function pickContactPerson(row) {
   if (!row) return undefined;
-  return row.contactperson ?? row.contactPerson;
+  return row.contactperson ?? row.contactPerson ?? row.contact_person;
+}
+
+/** Normaliza corpo da API (camelCase, snake_case, nomes de import). */
+function normalizeClientBody(raw) {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Dados do cliente inválidos");
+  }
+
+  const companyName = pickCompanyName(raw);
+  const contactPerson = pickContactPerson(raw);
+  const phone = raw.phone ?? raw.telefone ?? "";
+  const region = raw.region ?? raw.regiao ?? raw.estado ?? "";
+  const email = raw.email != null ? String(raw.email).trim() : "";
+  const cnpj = String(raw.cnpj ?? "").replace(/\D/g, "");
+
+  return {
+    companyName: companyName != null ? String(companyName).trim() : "",
+    contactPerson:
+      contactPerson != null && String(contactPerson).trim() !== ""
+        ? String(contactPerson).trim()
+        : "",
+    phone: phone != null ? String(phone).trim() : "",
+    region: region != null ? String(region).trim() : "",
+    cnpj,
+    email,
+  };
 }
 
 /** Normaliza linha do PG para o contrato esperado pelo frontend. */
@@ -91,7 +117,7 @@ class ClientService {
 
   async create(clientData) {
     const { companyName, contactPerson, phone, region, cnpj, email } =
-      clientData;
+      normalizeClientBody(clientData);
 
     if (!companyName || !cnpj) {
       throw new Error("Nome da empresa e CNPJ são obrigatórios");
@@ -121,7 +147,7 @@ class ClientService {
 
   async update(id, clientData) {
     const { companyName, contactPerson, phone, region, cnpj, email } =
-      clientData;
+      normalizeClientBody(clientData);
 
     if (!companyName) {
       throw new Error("Nome da empresa é obrigatório");

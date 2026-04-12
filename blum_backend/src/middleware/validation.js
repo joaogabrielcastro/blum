@@ -85,15 +85,15 @@ exports.validateClient = [
     .isLength({ min: 3, max: 255 })
     .withMessage("Nome deve ter entre 3 e 255 caracteres"),
 
-  body("contactPerson").optional().trim(),
+  body("contactPerson").optional({ values: "falsy" }).trim(),
 
   body("phone")
-    .optional()
+    .optional({ values: "falsy" })
     .trim()
     .matches(/^[0-9\s\-\(\)\+]+$/)
     .withMessage("Telefone inválido"),
 
-  body("region").optional().trim(),
+  body("region").optional({ values: "falsy" }).trim(),
 
   body("cnpj")
     .trim()
@@ -104,7 +104,11 @@ exports.validateClient = [
       "CNPJ inválido - deve ter 14 dígitos ou estar formatado corretamente"
     ),
 
-  body("email").optional().trim().isEmail().withMessage("E-mail inválido"),
+  body("email")
+    .optional({ values: "falsy" })
+    .trim()
+    .isEmail()
+    .withMessage("E-mail inválido"),
 
   handleValidationErrors,
 ];

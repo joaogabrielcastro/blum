@@ -7,6 +7,8 @@ Ordem das migrações (ficheiros .sql por nome):
   006_orders_seller_and_line_items_cleanup.sql
   007_align_legacy_clients_columns.sql
   008_add_clients_email.sql
+  009_add_clients_contact_email.sql
+  010_clients_unify_companyname_column.sql   (remove coluna duplicada "companyName" em PRD legado)
 
 Antes do deploy em produção: execute scripts/preflight_check.sql (só leitura) e guarde o resultado.
 Utilizadores: 006 falha se users estiver vazia — crie contas (create-users.js) antes se for necessário.

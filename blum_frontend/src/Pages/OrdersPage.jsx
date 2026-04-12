@@ -12,6 +12,7 @@ import {
 const OrdersPage = ({ userId, userRole, brands }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingLoading, setEditingLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [clients, setClients] = useState({});
@@ -104,28 +105,38 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     }
   };
 
+  const handleEditOrder = async (orderId) => {
+    try {
+      setEditingLoading(true);
+      const orderDetails = await apiService.getOrderById(orderId);
+      setEditingOrder(formatOrderData(orderDetails));
+      setShowForm(true);
+    } catch (error) {
+      console.error("Erro ao carregar pedido para edição:", error);
+      alert(
+        error?.message ||
+          "Não foi possível carregar os itens do pedido para edição.",
+      );
+    } finally {
+      setEditingLoading(false);
+    }
+  };
+
   const renderOrderActions = (order) => {
     const isDelivered = order.status === "Entregue";
 
     return (
-      <div
-        className={`flex flex-wrap gap-4 items-center ${
-          isDelivered ? "max-[450px]:justify-between max-[450px]:w-full" : ""
-        }`}
-      >
+      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 items-center w-full sm:w-auto">
         {isDelivered && (
-          <span className="inline-block px-3 py-1 text-sm font-semibold text-green-800 bg-green-100 rounded-full shadow-sm">
+          <span className="inline-block col-span-2 sm:col-span-1 px-3 py-1.5 text-sm font-semibold text-green-800 bg-green-100 rounded-full shadow-sm text-center">
             Entregue
           </span>
         )}
         {!isDelivered && (
           <>
             <button
-              onClick={() => {
-                setEditingOrder(order);
-                setShowForm(true);
-              }}
-              className="px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+              onClick={() => handleEditOrder(order.id)}
+              className="min-h-10 px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
             >
               Editar
             </button>
@@ -133,7 +144,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
               onClick={() =>
                 setModalAction({ type: "finalize", orderId: order.id })
               }
-              className="px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
+              className="min-h-10 px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
             >
               Finalizar
             </button>
@@ -141,14 +152,14 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         )}
         <button
           onClick={() => setModalAction({ type: "delete", orderId: order.id })}
-          className="px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
+          className="min-h-10 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
         >
           Excluir
         </button>
         {isDelivered && (
           <button
             onClick={() => setPdfOrder(order)}
-            className="px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
+            className="min-h-10 px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
           >
             Gerar PDF
           </button>
@@ -157,15 +168,17 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     );
   };
 
-  if (loading) {
+  if (loading || editingLoading) {
     return (
-      <div className="p-8 text-center text-gray-500">Carregando pedidos...</div>
+      <div className="p-8 text-center text-gray-500">
+        {editingLoading ? "Carregando pedido para edição..." : "Carregando pedidos..."}
+      </div>
     );
   }
 
   if (showForm) {
     return (
-      <div className="p-8">
+      <div className="w-full -mx-2 sm:-mx-4 md:-mx-6 px-0 sm:px-4 md:px-6 lg:px-8 overflow-x-hidden">
         <OrdersForm
           userId={userId}
           clients={clients}
@@ -187,7 +200,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-3 sm:p-6 md:p-8">
       <ConfirmationModal
         show={!!modalAction.orderId}
         onConfirm={handleAction}
@@ -208,8 +221,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         />
       )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
           Gerenciamento de Pedidos
         </h1>
         <button
@@ -217,7 +230,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
             setShowForm(true);
             setEditingOrder(null);
           }}
-          className="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
+          className="hidden sm:inline-flex sm:items-center sm:justify-center min-h-11 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
         >
           + Criar Pedido
         </button>
@@ -227,13 +240,13 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         Acompanhe o status e histórico de pedidos.
       </p>
 
-      <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
+      <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
         {orders.length > 0 ? (
           <ul className="divide-y divide-gray-200">
             {orders.map((order) => (
               <li
                 key={order.id}
-                className="py-6 flex flex-row justify-between items-start gap-4 max-[450px]:flex-col"
+                className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
               >
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-gray-800">
@@ -255,9 +268,9 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                       : "N/A"}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-3 text-right w-fit max-[450px]:w-full max-[450px]:items-start max-[450px]:text-left">
-                  <div className="flex flex-col items-end gap-2 max-[450px]:flex-row max-[450px]:justify-between max-[450px]:items-center max-[450px]:w-full">
-                    <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-fit">
+                <div className="flex flex-col items-start sm:items-end gap-3 text-left sm:text-right w-full sm:w-fit">
+                  <div className="flex flex-col items-start sm:items-end gap-2 w-full">
+                    <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-full sm:w-fit">
                       <p className="text-base font-bold text-gray-800">
                         Total: {formatCurrency(order.totalPrice)}
                       </p>
@@ -282,6 +295,22 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           </div>
         )}
       </div>
+
+      <button
+        type="button"
+        aria-label="Criar novo pedido"
+        className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white shadow-lg hover:bg-blue-700 sm:hidden"
+        style={{
+          bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))",
+          right: "max(1.25rem, env(safe-area-inset-right, 0px))",
+        }}
+        onClick={() => {
+          setShowForm(true);
+          setEditingOrder(null);
+        }}
+      >
+        +
+      </button>
     </div>
   );
 };
