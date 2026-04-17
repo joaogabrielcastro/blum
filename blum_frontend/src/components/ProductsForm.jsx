@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 
-const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
+const ProductsForm = ({
+  product,
+  brands,
+  onSubmit,
+  onCancel,
+  defaultBrand = "",
+}) => {
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
@@ -27,18 +33,18 @@ const ProductsForm = ({ product, brands, onSubmit, onCancel }) => {
         minstock: product.minstock?.toString() || "0",
       });
     } else {
-      // Modo adição - limpa o formulário
+      // Modo adição — representada atual do catálogo quando houver
       setFormData({
         name: "",
         productcode: "",
         subcode: "",
         price: "",
-        brand: "",
+        brand: defaultBrand || "",
         stock: "",
         minstock: "",
       });
     }
-  }, [product]);
+  }, [product, defaultBrand]);
 
   const validateForm = () => {
     const newErrors = {};

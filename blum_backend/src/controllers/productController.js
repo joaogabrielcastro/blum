@@ -13,10 +13,11 @@ exports.getAll = async (req, res) => {
       productcode,
       subcode,
       name,
+      q,
       page = 1,
       limit = 50,
     } = req.query;
-    const filters = { brand, productcode, subcode, name, page, limit };
+    const filters = { brand, productcode, subcode, name, q, page, limit };
     const cacheKey = cacheKeyProducts(filters);
 
     const cachedData = await cacheGet(cacheKey);

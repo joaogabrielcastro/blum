@@ -25,8 +25,14 @@ const defaultUsers = [
     name: "Eduardo",
   },
   {
-    username: "vendedor",
-    password: "Vendedor2025!", // ALTERE ESTA SENHA EM PRODUÇÃO
+    username: "Antonio",
+    password: "123456", // ALTERE ESTA SENHA EM PRODUÇÃO
+    role: "salesperson",
+    name: "Vendedor",
+  },
+  {
+    username: "Ricardo",
+    password: "123456!", // ALTERE ESTA SENHA EM PRODUÇÃO
     role: "salesperson",
     name: "Vendedor",
   },

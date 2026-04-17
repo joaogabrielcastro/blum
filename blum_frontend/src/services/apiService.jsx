@@ -185,11 +185,13 @@ const apiService = {
   },
 
   // ==================== PRODUCTS ====================
-  getProducts: async (brand = "all", page = 1, limit = 50) => {
+  getProducts: async (brand = "all", page = 1, limit = 50, q = "") => {
     const params = new URLSearchParams();
-    if (brand !== "all") params.append("brand", brand);
+    if (brand && brand !== "all") params.append("brand", brand);
     params.append("page", page);
     params.append("limit", limit);
+    const qt = typeof q === "string" ? q.trim() : "";
+    if (qt) params.append("q", qt);
 
     return apiRequest(`${API_URL}/products?${params.toString()}`);
   },

@@ -1,47 +1,5 @@
-import { useState } from "react";
-
-// Função para corrigir problemas de encoding
-const fixEncoding = (str) => {
-  if (!str || typeof str !== "string") return "";
-
-  try {
-    return decodeURIComponent(escape(str));
-  } catch (e) {
-    return str;
-  }
-};
-
-// Função para normalizar dados da marca
-const normalizeBrand = (brand) => {
-  // Extrai nome normalizado
-  const displayName =
-    typeof brand?.name === "string"
-      ? brand.name
-      : brand?.name && typeof brand.name === "object"
-      ? brand.name.label || brand.name.value || "Nome inválido"
-      : String(brand?.name || "Sem nome");
-
-  // Extrai comissão normalizada
-  const commissionValue =
-    typeof brand?.commission_rate === "number"
-      ? brand.commission_rate
-      : typeof brand?.commission_rate === "string"
-      ? parseFloat(brand.commission_rate) || 0
-      : brand?.commission_rate && typeof brand.commission_rate === "object"
-      ? parseFloat(brand.commission_rate.value || brand.commission_rate.rate) ||
-        0
-      : 0;
-
-  // ID único para a marca
-  const brandId = brand?.id || displayName;
-
-  return {
-    id: brandId,
-    displayName: fixEncoding(displayName),
-    commission: commissionValue,
-    raw: brand, // Mantém dados originais se necessário
-  };
-};
+import { useState, useMemo } from "react";
+import { normalizeBrand } from "../utils/brandUtils";
 
 const FilterBar = ({
   brands = [],
@@ -59,6 +17,7 @@ const FilterBar = ({
   userRole,
 }) => {
   const [showAllBrands, setShowAllBrands] = useState(false);
+  const [brandSearch, setBrandSearch] = useState("");
   const [editingBrand, setEditingBrand] = useState(null);
   const [editCommission, setEditCommission] = useState("");
 
@@ -68,10 +27,20 @@ const FilterBar = ({
   // Normaliza todas as marcas
   const normalizedBrands = brands ? brands.map(normalizeBrand) : [];
 
-  // Limitar a exibição de Representadas a 5 inicialmente
-  const displayedBrands = showAllBrands
-    ? normalizedBrands
-    : normalizedBrands.slice(0, 5);
+  const brandsMatchingSearch = useMemo(() => {
+    const q = brandSearch.trim().toLowerCase();
+    if (!q) return normalizedBrands;
+    return normalizedBrands.filter((b) =>
+      b.displayName.toLowerCase().includes(q),
+    );
+  }, [normalizedBrands, brandSearch]);
+
+  // Com busca ativa, lista todas as correspondentes; senão, limita a 5 + "ver todas"
+  const displayedBrands = brandSearch.trim()
+    ? brandsMatchingSearch
+    : showAllBrands
+      ? normalizedBrands
+      : normalizedBrands.slice(0, 5);
 
   const handleEditClick = (brand, e) => {
     e.stopPropagation();
@@ -149,7 +118,7 @@ const FilterBar = ({
               id="search"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Buscar por nome, código, subcódigo ou Representada..."
+              placeholder="Buscar por nome, código ou subcódigo…"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {searchTerm && (
@@ -175,14 +144,15 @@ const FilterBar = ({
         </div>
 
         <div className="flex-1">
-          <div className="flex justify-between items-center mb-1">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
             <h2 className="font-semibold text-gray-700">
-              Filtrar por Representada:
+              Trocar representada:
             </h2>
-            {normalizedBrands.length > 5 && (
+            {!brandSearch.trim() && normalizedBrands.length > 5 && (
               <button
+                type="button"
                 onClick={() => setShowAllBrands(!showAllBrands)}
-                className="text-xs text-blue-600 hover:text-blue-800"
+                className="text-xs text-blue-600 hover:text-blue-800 self-start sm:self-auto"
               >
                 {showAllBrands
                   ? "Mostrar menos"
@@ -190,22 +160,32 @@ const FilterBar = ({
               </button>
             )}
           </div>
+          <label htmlFor="filter-brand-search" className="sr-only">
+            Buscar representada pelo nome
+          </label>
+          <input
+            id="filter-brand-search"
+            type="search"
+            value={brandSearch}
+            onChange={(e) => setBrandSearch(e.target.value)}
+            placeholder="Buscar representada pelo nome…"
+            className="w-full mb-3 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoComplete="off"
+          />
           <div className="flex flex-wrap gap-2 items-center">
-            <button
-              onClick={() => onBrandSelect("all")}
-              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-                selectedBrand === "all"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Todas
-            </button>
-
-            {normalizedBrands.length > 0 ? (
+            {normalizedBrands.length === 0 ? (
+              <span className="text-gray-500 text-sm ml-2">
+                Nenhuma Representada cadastrada
+              </span>
+            ) : displayedBrands.length === 0 ? (
+              <span className="text-gray-500 text-sm">
+                Nenhuma representada encontrada com esse nome.
+              </span>
+            ) : (
               displayedBrands.map((brand) => (
                 <div key={brand.id} className="relative group">
                   <button
+                    type="button"
                     onClick={() => onBrandSelect(brand.displayName)}
                     className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-200 relative ${
                       selectedBrand === brand.displayName
@@ -299,10 +279,6 @@ const FilterBar = ({
                   )}
                 </div>
               ))
-            ) : (
-              <span className="text-gray-500 text-sm ml-2">
-                Nenhuma Representada cadastrada
-              </span>
             )}
           </div>
 

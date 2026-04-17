@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { API_URL } from "../services/apiService";
+import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import ProductRow from "../components/ProductRow";
 import ProductsForm from "../components/ProductsForm";
 import BrandForm from "../components/BrandForm";
 import FilterBar from "../components/FilterBar";
-import LoadingSpinner from "../components/LoadingSpinner";
+import RepresentadaPicker from "../components/RepresentadaPicker";
 import ErrorMessage from "../components/ErrorMessage";
 import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
@@ -13,16 +12,19 @@ import Pagination from "../components/Pagination";
 const ProductsPage = ({ userRole }) => {
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [showBrandForm, setShowBrandForm] = useState(false);
   const [showProductForm, setShowProductForm] = useState(false);
-  const [selectedBrand, setSelectedBrand] = useState("all");
+  /** Nome da representada selecionada, ou null antes da escolha inicial */
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
   const [deleteType, setDeleteType] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -31,94 +33,83 @@ const ProductsPage = ({ userRole }) => {
   });
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ✅ VERIFICA SE É ADMIN
   const isAdmin = userRole === "admin";
 
-  // Carregar dados iniciais
   useEffect(() => {
-    fetchData();
+    const t = setTimeout(
+      () => setDebouncedSearch(searchTerm.trim()),
+      400,
+    );
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
-    // Exemplo de fetch centralizado:
-    // const response = await fetch(`${API_URL}/api/v1/products`);
-  }, [selectedBrand, currentPage]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setBrandsLoading(true);
+        const brandsData = await apiService.getBrands();
+        if (!cancelled) setBrands(brandsData);
+      } catch (err) {
+        console.error("Erro ao buscar Representadas:", err);
+        if (!cancelled) {
+          setError("Erro ao carregar representadas. Tente novamente.");
+        }
+      } finally {
+        if (!cancelled) setBrandsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Função para buscar dados com paginação
-  const fetchData = useCallback(async () => {
+  const fetchProducts = useCallback(async () => {
+    if (!selectedBrand) {
+      setProducts([]);
+      setPagination({
+        total: 0,
+        page: 1,
+        limit: 50,
+        totalPages: 0,
+      });
+      return;
+    }
+
     try {
-      setLoading(true);
+      setProductsLoading(true);
       setError(null);
 
-      // Buscar produtos com filtro de Representada e paginação
       const response = await apiService.getProducts(
-        selectedBrand !== "all" ? selectedBrand : "all",
+        selectedBrand,
         currentPage,
         50,
+        debouncedSearch,
       );
 
-      // Se a resposta tem estrutura de paginação
       if (response.data && response.pagination) {
         setProducts(response.data);
         setPagination(response.pagination);
       } else {
-        // Fallback para API antiga sem paginação
-        setProducts(response);
+        setProducts(Array.isArray(response) ? response : []);
         setPagination({
-          total: response.length,
+          total: Array.isArray(response) ? response.length : 0,
           page: 1,
           limit: 50,
           totalPages: 1,
         });
       }
-
-      // Buscar Representadas apenas se necessário
-      if (brands.length === 0) {
-        const brandsData = await apiService.getBrands();
-        setBrands(brandsData);
-      }
     } catch (err) {
       setError("Erro ao carregar dados. Tente novamente.");
-      console.error("Erro ao buscar dados:", err);
+      console.error("Erro ao buscar produtos:", err);
     } finally {
-      setLoading(false);
+      setProductsLoading(false);
     }
-  }, [selectedBrand, currentPage, brands.length]);
+  }, [selectedBrand, currentPage, debouncedSearch]);
 
-  // Carregar Representadas separadamente
   useEffect(() => {
-    const fetchBrands = async () => {
-      try {
-        const brandsData = await apiService.getBrands();
-        setBrands(brandsData);
-      } catch (err) {
-        console.error("Erro ao buscar Representadas:", err);
-      }
-    };
-
-    fetchBrands();
-  }, []);
-
-  // Filtrar produtos com useMemo para otimização
-  const filteredProducts = useMemo(() => {
-    let filtered =
-      selectedBrand === "all"
-        ? products
-        : products.filter((product) => product.brand === selectedBrand);
-
-    // Aplicar filtro de busca se houver termo
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (product) =>
-          product.name.toLowerCase().includes(term) ||
-          (product.productcode &&
-            product.productcode.toLowerCase().includes(term)) ||
-          (product.subcode && product.subcode.toLowerCase().includes(term)) ||
-          product.brand.toLowerCase().includes(term),
-      );
-    }
-
-    return filtered;
-  }, [products, selectedBrand, searchTerm]);
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleAddBrand = async (brandData) => {
     if (brandData.name && brandData.name.trim()) {
@@ -127,7 +118,6 @@ const ProductsPage = ({ userRole }) => {
         await apiService.createBrand(brandData);
         setShowBrandForm(false);
 
-        // Recarregar Representadas
         const brandsData = await apiService.getBrands();
         setBrands(brandsData);
       } catch (err) {
@@ -142,17 +132,14 @@ const ProductsPage = ({ userRole }) => {
       setError(null);
 
       if (editingProduct) {
-        // Editar produto existente
         await apiService.updateProduct(editingProduct.id, productData);
       } else {
-        // Adicionar novo produto
         await apiService.createProduct(productData);
       }
 
-      // Limpar formulário e recarregar dados
       setEditingProduct(null);
       setShowProductForm(false);
-      await fetchData();
+      await fetchProducts();
     } catch (err) {
       setError("Erro ao salvar produto. Tente novamente.");
       console.error("Erro ao salvar produto:", err);
@@ -168,7 +155,7 @@ const ProductsPage = ({ userRole }) => {
     try {
       setError(null);
       await apiService.deleteProduct(productId);
-      await fetchData();
+      await fetchProducts();
       setDeleteType(null);
       setDeleteId(null);
     } catch (err) {
@@ -178,8 +165,7 @@ const ProductsPage = ({ userRole }) => {
           : "Erro ao excluir produto. Tente novamente.";
       setError(errorMessage);
       console.error("Erro ao excluir produto:", err);
-      // Atualiza a lista mesmo com erro para remover produtos inexistentes
-      await fetchData();
+      await fetchProducts();
     }
   };
 
@@ -188,7 +174,6 @@ const ProductsPage = ({ userRole }) => {
       setError(null);
       await apiService.updateBrand(brandName, brandData);
 
-      // Recarregar Representadas
       const brandsData = await apiService.getBrands();
       setBrands(brandsData);
     } catch (err) {
@@ -205,17 +190,16 @@ const ProductsPage = ({ userRole }) => {
       setDeleteType(null);
       setDeleteId(null);
 
-      // Recarregar marcas imediatamente após deletar
       const brandsData = await apiService.getBrands();
       setBrands(brandsData);
 
-      // Se a Representada selecionada foi deletada, voltar para "Todas"
       if (selectedBrand === brandId) {
-        setSelectedBrand("all");
+        setSelectedBrand(null);
+        setSearchTerm("");
+        setCurrentPage(1);
+      } else {
+        await fetchProducts();
       }
-
-      // Recarregar produtos
-      await fetchData();
     } catch (err) {
       setError(err.message || "Erro ao excluir Representada. Tente novamente.");
       console.error("Erro ao excluir Representada:", err);
@@ -227,7 +211,6 @@ const ProductsPage = ({ userRole }) => {
     setDeleteId(id);
     setConfirmDelete(name);
 
-    // Resetar a confirmação após 5 segundos
     setTimeout(() => {
       setConfirmDelete(null);
       setDeleteType(null);
@@ -239,63 +222,128 @@ const ProductsPage = ({ userRole }) => {
     setEditingProduct(null);
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
+  const openCatalogForBrand = (brandName) => {
+    setSelectedBrand(brandName);
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
+
+  const headerBlock = (
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-4">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+          Catálogo de Produtos
+        </h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
+          {selectedBrand
+            ? `Representada: ${selectedBrand}`
+            : "Escolha uma representada para ver e filtrar o catálogo"}
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
+        {selectedBrand && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedBrand(null);
+              setSearchTerm("");
+              setCurrentPage(1);
+              setProducts([]);
+            }}
+            className="bg-gray-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm md:text-base"
+          >
+            Trocar representada
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowBrandForm(true)}
+            className="bg-purple-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
+          >
+            <span>+</span>
+            <span>Adicionar Representada</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            resetForms();
+            setShowProductForm(true);
+          }}
+          className="bg-blue-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
+        >
+          <span>+</span>
+          <span>Adicionar Produto</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!selectedBrand) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-2 sm:p-4 flex flex-col">
+        {headerBlock}
+        {error && (
+          <ErrorMessage message={error} onClose={() => setError(null)} />
+        )}
+        <RepresentadaPicker
+          brands={brands}
+          loading={brandsLoading}
+          onSelect={openCatalogForBrand}
+        />
+
+        {showProductForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-md my-8 max-h-[90vh] overflow-y-auto">
+              <ProductsForm
+                product={editingProduct}
+                brands={brands}
+                defaultBrand=""
+                onSubmit={handleSaveProduct}
+                onCancel={() => {
+                  setShowProductForm(false);
+                  setEditingProduct(null);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {isAdmin && showBrandForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-md">
+              <BrandForm
+                onSubmit={handleAddBrand}
+                onCancel={() => setShowBrandForm(false)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 p-2 sm:p-4 flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-            Catálogo de Produtos
-          </h1>
-          <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
-            Gerencie seu inventário de produtos e Representadas
-          </p>
-        </div>
-
-        {/* ✅ BOTÕES CONDICIONAIS - RESPONSIVOS */}
-        <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
-          {/* Botão Adicionar Representada - APENAS ADMIN */}
-          {isAdmin && (
-            <button
-              onClick={() => setShowBrandForm(true)}
-              className="bg-purple-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
-            >
-              <span>+</span>
-              <span>Adicionar Representada</span>
-            </button>
-          )}
-
-          {/* Botão Adicionar Produto - TODOS OS USUÁRIOS */}
-          <button
-            onClick={() => {
-              resetForms();
-              setShowProductForm(true);
-            }}
-            className="bg-blue-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
-          >
-            <span>+</span>
-            <span>Adicionar Produto</span>
-          </button>
-        </div>
-      </div>
+      {headerBlock}
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
-      {/* Barra de filtros e busca */}
       <FilterBar
         brands={brands}
         selectedBrand={selectedBrand}
         onBrandSelect={(brand) => {
           setSelectedBrand(brand);
-          setCurrentPage(1); // Reset para página 1 ao trocar filtro
+          setSearchTerm("");
+          setCurrentPage(1);
         }}
         searchTerm={searchTerm}
         onSearchChange={(term) => {
           setSearchTerm(term);
-          setCurrentPage(1); // Reset para página 1 ao buscar
+          setCurrentPage(1);
         }}
         onDeleteBrand={confirmDeleteAction}
         onEditBrand={handleEditBrand}
@@ -315,11 +363,18 @@ const ProductsPage = ({ userRole }) => {
         userRole={userRole}
       />
 
-      {/* ✅ LISTA DE PRODUTOS - RESPONSIVA */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow">
-        {filteredProducts.length > 0 ? (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow relative min-h-[200px]">
+        {productsLoading && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10">
+            <div className="text-center px-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto" />
+              <p className="mt-3 text-sm text-gray-600">Carregando produtos…</p>
+            </div>
+          </div>
+        )}
+
+        {products.length > 0 ? (
           <>
-            {/* Tabela Desktop - Esconde em mobile */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -342,7 +397,7 @@ const ProductsPage = ({ userRole }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <ProductRow
                       key={product.id}
                       product={product}
@@ -364,9 +419,8 @@ const ProductsPage = ({ userRole }) => {
               </table>
             </div>
 
-            {/* Cards Mobile - Mostra apenas em mobile */}
             <div className="md:hidden divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <div
                   key={product.id}
                   className="p-4 hover:bg-gray-50 transition-colors"
@@ -404,6 +458,7 @@ const ProductsPage = ({ userRole }) => {
 
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => handleEditProduct(product)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Editar"
@@ -425,6 +480,7 @@ const ProductsPage = ({ userRole }) => {
 
                       {isAdmin && (
                         <button
+                          type="button"
                           onClick={() =>
                             confirmDeleteAction("product", product.id)
                           }
@@ -453,17 +509,18 @@ const ProductsPage = ({ userRole }) => {
             </div>
           </>
         ) : (
-          <div className="p-8">
-            <EmptyState
-              brandsCount={brands.length}
-              hasSearchTerm={!!searchTerm}
-              selectedBrand={selectedBrand}
-            />
-          </div>
+          !productsLoading && (
+            <div className="p-8">
+              <EmptyState
+                brandsCount={brands.length}
+                hasSearchTerm={!!debouncedSearch}
+                selectedBrand={selectedBrand}
+              />
+            </div>
+          )
         )}
 
-        {/* Componente de Paginação */}
-        {filteredProducts.length > 0 && pagination.totalPages > 1 && (
+        {products.length > 0 && pagination.totalPages > 1 && (
           <Pagination
             currentPage={pagination.page}
             totalPages={pagination.totalPages}
@@ -474,13 +531,13 @@ const ProductsPage = ({ userRole }) => {
         )}
       </div>
 
-      {/* Modal para adicionar/editar produto - Responsivo */}
       {showProductForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-md my-8 max-h-[90vh] overflow-y-auto">
             <ProductsForm
               product={editingProduct}
               brands={brands}
+              defaultBrand={selectedBrand || ""}
               onSubmit={handleSaveProduct}
               onCancel={() => {
                 setShowProductForm(false);
@@ -491,7 +548,6 @@ const ProductsPage = ({ userRole }) => {
         </div>
       )}
 
-      {/* Modal para adicionar Representada - APENAS ADMIN - Responsivo */}
       {isAdmin && showBrandForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-md">

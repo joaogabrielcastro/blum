@@ -7,11 +7,22 @@ class ProductService {
    * @returns {Promise<Object>} Objeto com data, total, page, totalPages
    */
   async findAll(filters = {}) {
-    const { brand, productcode, subcode, name, page = 1, limit = 50 } = filters;
+    const {
+      brand,
+      productcode,
+      subcode,
+      name,
+      q,
+      page = 1,
+      limit = 50,
+    } = filters;
     const offset = (page - 1) * limit;
 
     let query;
     let countQuery;
+
+    const qTrim = q != null && String(q).trim() !== "" ? String(q).trim() : "";
+    const searchPattern = qTrim ? `%${qTrim}%` : "";
 
     // Busca por SUBCODE (prioridade máxima)
     if (subcode) {
@@ -35,6 +46,27 @@ class ProductService {
       countQuery = await sql`SELECT COUNT(*) FROM products WHERE name ILIKE ${
         "%" + name + "%"
       }`;
+    }
+    // Representada + termo livre (nome, código, subcódigo)
+    else if (brand && brand !== "all" && qTrim) {
+      query = await sql`
+        SELECT * FROM products
+        WHERE brand = ${brand}
+          AND (
+            name ILIKE ${searchPattern}
+            OR productcode ILIKE ${searchPattern}
+            OR subcode ILIKE ${searchPattern}
+          )
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = await sql`
+        SELECT COUNT(*) FROM products
+        WHERE brand = ${brand}
+          AND (
+            name ILIKE ${searchPattern}
+            OR productcode ILIKE ${searchPattern}
+            OR subcode ILIKE ${searchPattern}
+          )`;
     }
     // Busca por BRAND
     else if (brand && brand !== "all") {
