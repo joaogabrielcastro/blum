@@ -235,3 +235,25 @@ exports.validateSearchQuery = [
 
   handleValidationErrors,
 ];
+
+exports.validateUserIdParam = [
+  param("userId").isInt({ min: 1 }).withMessage("ID de usuário inválido"),
+  handleValidationErrors,
+];
+
+exports.validateUserAllowedBrandsBody = [
+  param("userId").isInt({ min: 1 }).withMessage("ID de usuário inválido"),
+  body("brandIds").isArray().withMessage("brandIds deve ser um array"),
+  body("brandIds.*").optional().isInt({ min: 1 }),
+  handleValidationErrors,
+];
+
+exports.validateAdminResetUserPassword = [
+  param("userId").isInt({ min: 1 }).withMessage("ID de usuário inválido"),
+  body("newPassword")
+    .notEmpty()
+    .withMessage("Nova senha é obrigatória")
+    .isLength({ min: 6 })
+    .withMessage("Nova senha deve ter no mínimo 6 caracteres"),
+  handleValidationErrors,
+];

@@ -1,10 +1,24 @@
 const { sql } = require("../config/database");
+const brandAccessService = require("../services/brandAccessService");
 
 // ✅ CORRIGIDO: Agora retorna o ID também
 exports.getBrands = async (req, res) => {
   try {
-    const brands =
-      await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
+    const { userId, role } = req.user;
+    const restricted =
+      await brandAccessService.getRestrictedBrandNamesOrNull(userId, role);
+
+    let brands;
+    if (!restricted) {
+      brands =
+        await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
+    } else {
+      brands = await sql`
+        SELECT id, name, commission_rate FROM brands
+        WHERE name = ANY(${restricted})
+        ORDER BY name ASC
+      `;
+    }
     res.status(200).json(brands);
   } catch (error) {
     console.error("Erro ao buscar marcas:", error);

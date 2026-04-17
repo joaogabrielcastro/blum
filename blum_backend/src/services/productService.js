@@ -1,9 +1,21 @@
 const { sql } = require("../config/database");
 
+/** Restrição opcional por representada (vendedor). Fragmento vazio = sem filtro extra. */
+function brandSql(names) {
+  if (!Array.isArray(names) || names.length === 0) {
+    return { __isSqlFragment: true, text: "", values: [] };
+  }
+  return {
+    __isSqlFragment: true,
+    text: " AND brand = ANY($1)",
+    values: [names],
+  };
+}
+
 class ProductService {
   /**
    * Busca produtos com filtros opcionais e paginação
-   * @param {Object} filters - Filtros de busca (brand, productcode, subcode, name, page, limit)
+   * @param {Object} filters - Filtros de busca (brand, productcode, subcode, name, page, limit, allowedBrandNames)
    * @returns {Promise<Object>} Objeto com data, total, page, totalPages
    */
   async findAll(filters = {}) {
@@ -15,8 +27,10 @@ class ProductService {
       q,
       page = 1,
       limit = 50,
+      allowedBrandNames,
     } = filters;
     const offset = (page - 1) * limit;
+    const bc = brandSql(allowedBrandNames);
 
     let query;
     let countQuery;
@@ -26,26 +40,33 @@ class ProductService {
 
     // Busca por SUBCODE (prioridade máxima)
     if (subcode) {
-      query =
-        await sql`SELECT * FROM products WHERE subcode = ${subcode} ORDER BY createdat DESC LIMIT ${limit} OFFSET ${offset}`;
+      query = await sql`
+        SELECT * FROM products
+        WHERE subcode = ${subcode} ${bc}
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
       countQuery =
-        await sql`SELECT COUNT(*) FROM products WHERE subcode = ${subcode}`;
+        await sql`SELECT COUNT(*) as count FROM products WHERE subcode = ${subcode} ${bc}`;
     }
     // Busca por PRODUCTCODE
     else if (productcode) {
-      query =
-        await sql`SELECT * FROM products WHERE productcode = ${productcode} ORDER BY createdat DESC LIMIT ${limit} OFFSET ${offset}`;
-      countQuery =
-        await sql`SELECT COUNT(*) FROM products WHERE productcode = ${productcode}`;
+      query = await sql`
+        SELECT * FROM products
+        WHERE productcode = ${productcode} ${bc}
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = await sql`
+        SELECT COUNT(*) as count FROM products WHERE productcode = ${productcode} ${bc}`;
     }
     // Busca por NOME (aproximada)
     else if (name) {
-      query = await sql`SELECT * FROM products WHERE name ILIKE ${
-        "%" + name + "%"
-      } ORDER BY createdat DESC LIMIT ${limit} OFFSET ${offset}`;
-      countQuery = await sql`SELECT COUNT(*) FROM products WHERE name ILIKE ${
-        "%" + name + "%"
-      }`;
+      query = await sql`
+        SELECT * FROM products
+        WHERE name ILIKE ${"%" + name + "%"} ${bc}
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = await sql`
+        SELECT COUNT(*) as count FROM products WHERE name ILIKE ${"%" + name + "%"} ${bc}`;
     }
     // Representada + termo livre (nome, código, subcódigo)
     else if (brand && brand !== "all" && qTrim) {
@@ -57,32 +78,40 @@ class ProductService {
             OR productcode ILIKE ${searchPattern}
             OR subcode ILIKE ${searchPattern}
           )
+          ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
       countQuery = await sql`
-        SELECT COUNT(*) FROM products
+        SELECT COUNT(*) as count FROM products
         WHERE brand = ${brand}
           AND (
             name ILIKE ${searchPattern}
             OR productcode ILIKE ${searchPattern}
             OR subcode ILIKE ${searchPattern}
-          )`;
+          )
+          ${bc}`;
     }
     // Busca por BRAND
     else if (brand && brand !== "all") {
-      query =
-        await sql`SELECT * FROM products WHERE brand = ${brand} ORDER BY createdat DESC LIMIT ${limit} OFFSET ${offset}`;
+      query = await sql`
+        SELECT * FROM products
+        WHERE brand = ${brand} ${bc}
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
       countQuery =
-        await sql`SELECT COUNT(*) FROM products WHERE brand = ${brand}`;
+        await sql`SELECT COUNT(*) as count FROM products WHERE brand = ${brand} ${bc}`;
     }
     // Busca TODOS
     else {
-      query =
-        await sql`SELECT * FROM products ORDER BY createdat DESC LIMIT ${limit} OFFSET ${offset}`;
-      countQuery = await sql`SELECT COUNT(*) FROM products`;
+      query = await sql`
+        SELECT * FROM products
+        WHERE 1=1 ${bc}
+        ORDER BY createdat DESC
+        LIMIT ${limit} OFFSET ${offset}`;
+      countQuery = await sql`SELECT COUNT(*) as count FROM products WHERE 1=1 ${bc}`;
     }
 
-    const total = parseInt(countQuery[0].count);
+    const total = parseInt(countQuery[0].count, 10);
     const totalPages = Math.ceil(total / limit);
 
     return {
@@ -102,17 +131,22 @@ class ProductService {
    * @param {number} limit - Limite de resultados
    * @returns {Promise<Array>} Lista de produtos
    */
-  async search(searchTerm, limit = 20) {
+  async search(searchTerm, limit = 20, allowedBrandNames = null) {
     if (!searchTerm || searchTerm.trim() === "") {
       throw new Error("Termo de busca é obrigatório");
     }
 
+    const bc = brandSql(allowedBrandNames);
+
     return await sql`
       SELECT * FROM products 
       WHERE 
+        (
         name ILIKE ${"%" + searchTerm + "%"} OR
         productcode ILIKE ${"%" + searchTerm + "%"} OR
         subcode ILIKE ${"%" + searchTerm + "%"}
+        )
+        ${bc}
       ORDER BY 
         CASE 
           WHEN name ILIKE ${searchTerm + "%"} THEN 1

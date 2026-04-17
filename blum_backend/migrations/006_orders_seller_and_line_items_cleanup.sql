@@ -1,10 +1,13 @@
 -- Vendedor único: user_ref (FK users). Linhas de pedido só em order_items.
 -- Remove colunas legadas orders.userid (texto) e orders.items (JSONB duplicado).
 
+-- Base nova: users pode estar vazia se não houver pedidos a migrar.
+-- Só exigimos utilizadores quando existem pedidos com user_ref por preencher.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM users LIMIT 1) THEN
-    RAISE EXCEPTION 'Migração 006: users está vazia. Crie pelo menos um utilizador (ex.: node migrations/create-users.js) antes desta migração.';
+  IF EXISTS (SELECT 1 FROM orders WHERE user_ref IS NULL LIMIT 1)
+     AND NOT EXISTS (SELECT 1 FROM users LIMIT 1) THEN
+    RAISE EXCEPTION 'Migração 006: existem pedidos sem user_ref mas users está vazia. Execute node migrations/create-users.js (ou crie um admin) antes de continuar.';
   END IF;
 END $$;
 

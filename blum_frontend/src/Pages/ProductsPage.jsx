@@ -232,13 +232,13 @@ const ProductsPage = ({ userRole }) => {
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-3 md:gap-4">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-          Catálogo de Produtos
+          {selectedBrand ? "Catálogo de produtos" : "Produtos"}
         </h1>
-        <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
-          {selectedBrand
-            ? `Representada: ${selectedBrand}`
-            : "Escolha uma representada para ver e filtrar o catálogo"}
-        </p>
+        {selectedBrand && (
+          <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
+            {`Itens da representada: ${selectedBrand}`}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
@@ -256,7 +256,7 @@ const ProductsPage = ({ userRole }) => {
             Trocar representada
           </button>
         )}
-        {isAdmin && (
+        {isAdmin && selectedBrand && (
           <button
             type="button"
             onClick={() => setShowBrandForm(true)}
@@ -267,17 +267,19 @@ const ProductsPage = ({ userRole }) => {
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={() => {
-            resetForms();
-            setShowProductForm(true);
-          }}
-          className="bg-blue-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
-        >
-          <span>+</span>
-          <span>Adicionar Produto</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => {
+              resetForms();
+              setShowProductForm(true);
+            }}
+            className="bg-blue-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base"
+          >
+            <span>+</span>
+            <span>Adicionar Produto</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -291,8 +293,27 @@ const ProductsPage = ({ userRole }) => {
         )}
         <RepresentadaPicker
           brands={brands}
+          brandsRaw={brands}
           loading={brandsLoading}
           onSelect={openCatalogForBrand}
+          onCadastrar={() => setShowBrandForm(true)}
+          userRole={userRole}
+          onEditBrand={handleEditBrand}
+          onRequestDeleteBrand={(name) =>
+            confirmDeleteAction("brand", name, name)
+          }
+          confirmDelete={confirmDelete}
+          deleteType={deleteType}
+          onConfirmDelete={() => {
+            if (deleteType === "brand") {
+              handleDeleteBrand(deleteId);
+            }
+          }}
+          onCancelDelete={() => {
+            setConfirmDelete(null);
+            setDeleteType(null);
+            setDeleteId(null);
+          }}
         />
 
         {showProductForm && (
@@ -333,34 +354,11 @@ const ProductsPage = ({ userRole }) => {
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
       <FilterBar
-        brands={brands}
-        selectedBrand={selectedBrand}
-        onBrandSelect={(brand) => {
-          setSelectedBrand(brand);
-          setSearchTerm("");
-          setCurrentPage(1);
-        }}
         searchTerm={searchTerm}
         onSearchChange={(term) => {
           setSearchTerm(term);
           setCurrentPage(1);
         }}
-        onDeleteBrand={confirmDeleteAction}
-        onEditBrand={handleEditBrand}
-        confirmDelete={confirmDelete}
-        deleteType={deleteType}
-        deleteId={deleteId}
-        onConfirmDelete={() => {
-          if (deleteType === "brand") {
-            handleDeleteBrand(deleteId);
-          }
-        }}
-        onCancelDelete={() => {
-          setConfirmDelete(null);
-          setDeleteType(null);
-          setDeleteId(null);
-        }}
-        userRole={userRole}
       />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-grow relative min-h-[200px]">

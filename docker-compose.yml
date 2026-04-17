@@ -7,8 +7,10 @@
 # Abra: http://localhost:8080  (frontend)
 # API:  http://localhost:3011/api/v1
 #
-# Criar utilizadores após o primeiro arranque:
+# Utilizadores iniciais: criados automaticamente na primeira subida (base vazia).
+# Opcional — sincronizar só os que faltam da lista padrão:
 #   docker compose exec backend node migrations/create-users.js
+# Novos vendedores: pela app (admin → Equipe), não pelo script.
 
 services:
   postgres:

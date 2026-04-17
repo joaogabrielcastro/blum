@@ -1,4 +1,4 @@
-require("dotenv").config();
+require("dotenv").config({ override: false });
 const { assertProductionConfig } = require("./src/config/env");
 assertProductionConfig();
 
@@ -9,6 +9,7 @@ const rateLimit = require("express-rate-limit");
 const purchaseRoutes = require("./src/routes/purchaseRoutes");
 const { sql } = require("./src/config/database");
 const { runMigrations } = require("./src/db/migrate");
+const { seedDefaultUsers } = require("./src/bootstrap/seedDefaultUsers");
 const { authenticate, authorize } = require("./src/middleware/authMiddleware");
 
 const app = express();
@@ -175,6 +176,7 @@ const setupDatabase = async () => {
     console.log("Conectando ao banco de dados PostgreSQL...");
     await runMigrations();
     console.log("Migrações aplicadas.");
+    await seedDefaultUsers({ onlyIfDatabaseEmpty: true });
   } catch (error) {
     console.error("Erro ao configurar o banco de dados:", error);
     process.exit(1);

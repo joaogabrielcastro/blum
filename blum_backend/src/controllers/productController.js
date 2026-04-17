@@ -1,4 +1,5 @@
 const productService = require("../services/productService");
+const brandAccessService = require("../services/brandAccessService");
 const {
   cacheGet,
   cacheSet,
@@ -17,8 +18,38 @@ exports.getAll = async (req, res) => {
       page = 1,
       limit = 50,
     } = req.query;
-    const filters = { brand, productcode, subcode, name, q, page, limit };
-    const cacheKey = cacheKeyProducts(filters);
+
+    const allowedBrandNames =
+      await brandAccessService.getRestrictedBrandNamesOrNull(
+        req.user.userId,
+        req.user.role,
+      );
+
+    if (
+      allowedBrandNames &&
+      brand &&
+      brand !== "all" &&
+      !allowedBrandNames.includes(brand)
+    ) {
+      return res.status(403).json({
+        error: "Sem permissão para consultar produtos desta representada",
+      });
+    }
+
+    const filters = {
+      brand,
+      productcode,
+      subcode,
+      name,
+      q,
+      page,
+      limit,
+      allowedBrandNames,
+    };
+    const cacheKey = cacheKeyProducts({
+      ...filters,
+      _access: req.user.userId,
+    });
 
     const cachedData = await cacheGet(cacheKey);
     if (cachedData) {
@@ -40,7 +71,12 @@ exports.getAll = async (req, res) => {
 exports.search = async (req, res) => {
   try {
     const { q } = req.query;
-    const products = await productService.search(q);
+    const allowedBrandNames =
+      await brandAccessService.getRestrictedBrandNamesOrNull(
+        req.user.userId,
+        req.user.role,
+      );
+    const products = await productService.search(q, 20, allowedBrandNames);
     res.status(200).json(products);
   } catch (error) {
     console.error("Erro na busca de produtos:", error);
@@ -52,6 +88,18 @@ exports.getById = async (req, res) => {
   try {
     const { id } = req.params;
     const product = await productService.findById(id);
+    const allowedBrandNames =
+      await brandAccessService.getRestrictedBrandNamesOrNull(
+        req.user.userId,
+        req.user.role,
+      );
+    if (
+      allowedBrandNames &&
+      product.brand &&
+      !allowedBrandNames.includes(product.brand)
+    ) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
     res.status(200).json(product);
   } catch (error) {
     console.error("Erro ao buscar produto:", error);

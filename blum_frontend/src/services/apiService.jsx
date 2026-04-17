@@ -75,6 +75,10 @@ const apiRequest = async (url, options = {}) => {
 
     const serverText = pickServerMessage(error);
     const detailText = formatValidationDetails(error.details);
+    const stringDetails =
+      typeof error.details === "string" && error.details.trim() !== ""
+        ? error.details.trim()
+        : "";
 
     if (error.details && Array.isArray(error.details) && error.details.length) {
       const customError = new Error(
@@ -85,8 +89,13 @@ const apiRequest = async (url, options = {}) => {
       throw customError;
     }
 
+    const messageWithDetails =
+      serverText && stringDetails && !serverText.includes(stringDetails)
+        ? `${serverText} ${stringDetails}`
+        : serverText || (stringDetails ? `Erro: ${stringDetails}` : null);
+
     const customError = new Error(
-      serverText ||
+      messageWithDetails ||
         (rawText && !serverText && rawText.length < 400
           ? rawText.trim()
           : null) ||
@@ -110,10 +119,16 @@ export const login = async (username, password) => {
   });
 
   if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Credenciais inválidas" }));
-    throw new Error(error.message || "Credenciais inválidas");
+    const error = await response.json().catch(() => ({}));
+    const fromServer =
+      (typeof error.error === "string" && error.error.trim()) ||
+      (typeof error.message === "string" && error.message.trim()) ||
+      "";
+    const fallback429 =
+      response.status === 429
+        ? "Muitas tentativas de login. Aguarde alguns minutos e tente novamente."
+        : "";
+    throw new Error(fromServer || fallback429 || "Credenciais inválidas");
   }
 
   return response.json();
@@ -411,6 +426,36 @@ const apiService = {
       }
       throw error;
     }
+  },
+
+  // ==================== TEAM / USERS (admin) ====================
+  getUsers: async () => {
+    return apiRequest(`${API_URL}/auth/users`);
+  },
+
+  createUser: async (payload) => {
+    return apiRequest(`${API_URL}/auth/users`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  getUserAllowedBrands: async (userId) => {
+    return apiRequest(`${API_URL}/auth/users/${userId}/allowed-brands`);
+  },
+
+  setUserAllowedBrands: async (userId, brandIds) => {
+    return apiRequest(`${API_URL}/auth/users/${userId}/allowed-brands`, {
+      method: "PUT",
+      body: JSON.stringify({ brandIds }),
+    });
+  },
+
+  adminResetUserPassword: async (userId, newPassword) => {
+    return apiRequest(`${API_URL}/auth/users/${userId}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ newPassword }),
+    });
   },
 
   // ==================== REPORTS ====================

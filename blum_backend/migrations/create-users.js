@@ -1,97 +1,45 @@
-// Script para criar usuários iniciais com senhas hashadas
-// Execute: node blum_backend/migrations/create-users.js
+// Script opcional: cria utilizadores da lista DEFAULT que ainda não existem.
+// No arranque normal da API o seed corre sozinho se a tabela users estiver vazia.
+//
+// Uso manual: node blum_backend/migrations/create-users.js
+//   (ou: docker compose exec backend node migrations/create-users.js)
+//
+// Novos vendedores: admin → Equipe (POST /api/v1/auth/users) — não edite este ficheiro.
 
 require("dotenv").config();
-const bcrypt = require("bcrypt");
 const { sql } = require("../src/config/database");
+const { seedDefaultUsers } = require("../src/bootstrap/seedDefaultUsers");
 
-const defaultUsers = [
-  {
-    username: "admin",
-    password: "BlumAdmin2025!", // ALTERE ESTA SENHA EM PRODUÇÃO
-    role: "admin",
-    name: "Administrador",
-  },
-  {
-    username: "siane",
-    password: "Siane2025!", // ALTERE ESTA SENHA EM PRODUÇÃO
-    role: "salesperson",
-    name: "Siane",
-  },
-  {
-    username: "eduardo",
-    password: "Eduardo2025!", // ALTERE ESTA SENHA EM PRODUÇÃO
-    role: "salesperson",
-    name: "Eduardo",
-  },
-  {
-    username: "Antonio",
-    password: "123456", // ALTERE ESTA SENHA EM PRODUÇÃO
-    role: "salesperson",
-    name: "Vendedor",
-  },
-  {
-    username: "Ricardo",
-    password: "123456!", // ALTERE ESTA SENHA EM PRODUÇÃO
-    role: "salesperson",
-    name: "Vendedor",
-  },
-];
-
-async function createUsers() {
-  console.log("🔐 Criando usuários padrão...\n");
+async function main() {
+  console.log("🔐 Sincronizar utilizadores padrão (só os que faltam)…\n");
 
   try {
-    for (const user of defaultUsers) {
-      console.log(`📝 Processando usuário: ${user.username}`);
+    const result = await seedDefaultUsers({
+      onlyIfDatabaseEmpty: false,
+      verbose: true,
+    });
 
-      // Verificar se usuário já existe
-      const existing = await sql`
-        SELECT id FROM users WHERE username = ${user.username}
-      `;
-
-      if (existing.length > 0) {
-        console.log(`⚠️  Usuário ${user.username} já existe, pulando...\n`);
-        continue;
-      }
-
-      // Hash da senha
-      const saltRounds = 10;
-      const password_hash = await bcrypt.hash(user.password, saltRounds);
-
-      // Inserir usuário
-      await sql`
-        INSERT INTO users (username, password_hash, role, name)
-        VALUES (${user.username}, ${password_hash}, ${user.role}, ${user.name})
-      `;
-
-      console.log(`✅ Usuário ${user.username} criado com sucesso!`);
-      console.log(`   Username: ${user.username}`);
-      console.log(`   Senha temporária: ${user.password}`);
-      console.log(`   Role: ${user.role}\n`);
+    if (result.skipped && result.reason === "env") {
+      process.exit(0);
+      return;
     }
 
-    console.log("✨ Processo concluído!\n");
-    console.log(
-      "⚠️  IMPORTANTE: Altere todas as senhas após o primeiro login!\n",
-    );
-
-    // Listar usuários criados
     const allUsers = await sql`
-      SELECT id, username, role, name, createdat 
-      FROM users 
+      SELECT id, username, role, name, createdat
+      FROM users
       ORDER BY id
     `;
 
-    console.log("📋 Usuários cadastrados:");
+    console.log("\n📋 Utilizadores na base:");
     console.table(allUsers);
+    console.log(
+      `\n✨ Concluído (${result.created ?? 0} novo(s) nesta execução). Altere senhas após o primeiro login.\n`,
+    );
+    process.exit(0);
   } catch (error) {
-    console.error("❌ Erro ao criar usuários:", error);
+    console.error("❌ Erro:", error);
     process.exit(1);
   }
-
-  process.exit(0);
 }
 
-// Executar
-createUsers();
+main();

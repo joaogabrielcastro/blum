@@ -1,7 +1,33 @@
+const fs = require("fs");
 const { Pool } = require("pg");
 
+/**
+ * Dentro do Docker, DATABASE_URL vinda do .env local (127.0.0.1 / localhost :5433)
+ * aponta para o próprio container — o Postgres do compose é o serviço «postgres» na 5432.
+ */
+function resolveDatabaseUrl() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return raw;
+  const inDocker = fs.existsSync("/.dockerenv");
+  if (!inDocker) return raw;
+  try {
+    const u = new URL(raw);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+      console.warn(
+        "[database] DATABASE_URL usa localhost dentro do container; a usar host postgres:5432.",
+      );
+      u.hostname = "postgres";
+      u.port = "5432";
+      return u.toString();
+    }
+  } catch {
+    return raw;
+  }
+  return raw;
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: resolveDatabaseUrl(),
 });
 
 function shiftPlaceholders(queryText, offset) {

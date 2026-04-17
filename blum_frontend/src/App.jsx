@@ -15,6 +15,7 @@ import OrdersPage from "./Pages/OrdersPage";
 import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
+import TeamPage from "./Pages/TeamPage";
 import apiService from "./services/apiService";
 import {
   getClientDisplayName,
@@ -29,6 +30,7 @@ const PAGE_PATH = {
   orders: "/orders",
   reports: "/reports",
   purchases: "/purchases",
+  team: "/team",
 };
 
 function AppShell() {
@@ -241,6 +243,16 @@ function AppShell() {
                   )
                 }
               />
+              <Route
+                path="/team"
+                element={
+                  userRole === "admin" ? (
+                    <TeamPage />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
               <Route path="/clients" element={<ClientsPage />} />
               <Route
                 path="/clients/:clientId/history"
@@ -251,11 +263,7 @@ function AppShell() {
               <Route
                 path="/products"
                 element={
-                  <ProductsPage
-                    userRole={userRole}
-                    brands={brands}
-                    setBrands={setBrands}
-                  />
+                  <ProductsPage userRole={userRole} />
                 }
               />
               <Route

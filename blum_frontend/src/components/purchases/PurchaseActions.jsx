@@ -3,15 +3,28 @@ const PurchaseActions = ({
   onConfirm,
   isLoading,
   confirmLabel = "Confirmar",
+  secondaryAction,
 }) => (
-  <div className="flex justify-end gap-3 mt-6">
+  <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:items-center gap-3 mt-6">
+    {secondaryAction && (
+      <button
+        type="button"
+        onClick={secondaryAction.onClick}
+        disabled={isLoading || secondaryAction.disabled}
+        className="px-5 py-2.5 border border-amber-400 text-amber-900 font-medium rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-sm sm:mr-auto"
+      >
+        {secondaryAction.label}
+      </button>
+    )}
     <button
+      type="button"
       onClick={onCancel}
       className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
     >
       Cancelar
     </button>
     <button
+      type="button"
       onClick={onConfirm}
       disabled={isLoading}
       className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white font-medium rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 flex items-center"

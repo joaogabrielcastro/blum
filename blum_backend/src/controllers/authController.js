@@ -21,7 +21,7 @@ exports.login = async (req, res) => {
     const users = await sql`
       SELECT id, username, password_hash, role, name 
       FROM users 
-      WHERE username = ${username}
+      WHERE LOWER(TRIM(username)) = LOWER(${username})
     `;
 
     if (!users || users.length === 0) {
@@ -84,11 +84,13 @@ exports.verifyToken = async (req, res) => {
 
 // Criar novo usuário (apenas admin)
 exports.createUser = async (req, res) => {
-  const { username, password, role, name } = req.body;
+  const usernameRaw = String(req.body.username || "").trim();
+  const passwordRaw = String(req.body.password || "").trim();
+  const { role, name } = req.body;
 
   try {
     // Validação
-    if (!username || !password || !role) {
+    if (!usernameRaw || !passwordRaw || !role) {
       return res
         .status(400)
         .json({ error: "Usuário, senha e role são obrigatórios" });
@@ -98,23 +100,23 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ error: "Role inválida" });
     }
 
-    // Verificar se usuário já existe
+    // Mesmo login independente de maiúsculas (evita duplicata antonio/Antonio)
     const existingUsers = await sql`
-      SELECT id FROM users WHERE username = ${username}
+      SELECT id FROM users WHERE LOWER(TRIM(username)) = LOWER(${usernameRaw})
     `;
 
     if (existingUsers.length > 0) {
       return res.status(409).json({ error: "Usuário já existe" });
     }
 
-    // Hash da senha
+    // Hash da senha (alinhado ao trim do login)
     const saltRounds = 10;
-    const password_hash = await bcrypt.hash(password, saltRounds);
+    const password_hash = await bcrypt.hash(passwordRaw, saltRounds);
 
     // Inserir usuário
     const result = await sql`
       INSERT INTO users (username, password_hash, role, name)
-      VALUES (${username}, ${password_hash}, ${role}, ${name || username})
+      VALUES (${usernameRaw}, ${password_hash}, ${role}, ${name || usernameRaw})
       RETURNING id, username, role, name, createdat
     `;
 
@@ -141,6 +143,39 @@ exports.getUsers = async (req, res) => {
   } catch (error) {
     console.error("Erro ao buscar usuários:", error);
     res.status(500).json({ error: "Erro ao buscar usuários" });
+  }
+};
+
+/** Admin redefine senha de outro usuário (ex.: vendedor criado com hash errado). */
+exports.adminResetUserPassword = async (req, res) => {
+  const targetId = parseInt(req.params.userId, 10);
+  const newPassword = String(req.body.newPassword || "").trim();
+
+  try {
+    if (!Number.isInteger(targetId) || targetId < 1) {
+      return res.status(400).json({ error: "ID de usuário inválido" });
+    }
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Nova senha deve ter no mínimo 6 caracteres" });
+    }
+
+    const rows = await sql`SELECT id, role FROM users WHERE id = ${targetId}`;
+    if (!rows.length) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    const saltRounds = 10;
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+    await sql`
+      UPDATE users SET password_hash = ${password_hash} WHERE id = ${targetId}
+    `;
+
+    res.json({ message: "Senha atualizada com sucesso" });
+  } catch (error) {
+    console.error("adminResetUserPassword:", error);
+    res.status(500).json({ error: "Erro ao redefinir senha" });
   }
 };
 
