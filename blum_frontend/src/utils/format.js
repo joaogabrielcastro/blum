@@ -60,6 +60,8 @@ export const formatOrderData = (order) => {
   const sellerId = order.user_ref ?? order.userid ?? order.userId;
   const items = normalizeOrderLineItems(order.items);
   const itemsLen = items.length;
+  const documentType =
+    order.document_type ?? order.documentType ?? "pedido";
   return {
     id: order.id,
     clientId: order.clientid ?? order.clientId ?? order.client_id,
@@ -73,6 +75,10 @@ export const formatOrderData = (order) => {
     status: order.status,
     createdAt: order.createdat ?? order.createdAt,
     finishedAt: order.finishedat ?? order.finishedAt,
+    documentType: documentType === "orcamento" ? "orcamento" : "pedido",
+    paymentMethod: order.payment_method ?? order.paymentMethod ?? null,
+    representadas:
+      order.representadas ?? order.representedBrands ?? "",
   };
 };
 

@@ -11,6 +11,32 @@ function normalizeSubcode(value) {
   return String(value ?? "").trim();
 }
 
+/** Comparação estável do código de produto (CSV vs catálogo). */
+function normalizeProductCode(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function findCatalogProductByCode(products, rawCode) {
+  const want = normalizeProductCode(rawCode);
+  if (!want) return null;
+  return (
+    products.find(
+      (p) =>
+        p.productcode && normalizeProductCode(p.productcode) === want,
+    ) || null
+  );
+}
+
+async function fetchCatalogForPurchases() {
+  const productsResponse = await apiService.getProducts("all", 1, 10000);
+  const list = Array.isArray(productsResponse?.data)
+    ? productsResponse.data
+    : Array.isArray(productsResponse)
+      ? productsResponse
+      : [];
+  return list;
+}
+
 /** Subcódigos repetidos na lista (trim), sem duplicar na resposta. */
 function getDuplicateSubcodesFromItems(items) {
   const subcodes = (items || [])
@@ -233,6 +259,9 @@ const CsvImportSection = ({ purchaseLogic }) => {
         throw new Error("Nenhum dado válido retornado do servidor");
       }
 
+      const catalog = await fetchCatalogForPurchases();
+      setUserProducts(catalog);
+
       const preMappedItems = itemsFromAI.map((item, index) => {
         // Garantir campos mínimos
         const safeItem = {
@@ -247,13 +276,9 @@ const CsvImportSection = ({ purchaseLogic }) => {
 
         let foundProduct = null;
 
-        // 1. Busca por PRODUCTCODE (mais confiável)
+        // 1. Busca por PRODUCTCODE (mais confiável; ignora maiúsculas/minúsculas)
         if (safeItem.productCode && safeItem.productCode.trim() !== "") {
-          foundProduct = userProducts.find(
-            (p) =>
-              p.productcode &&
-              p.productcode.trim() === safeItem.productCode.trim(),
-          );
+          foundProduct = findCatalogProductByCode(catalog, safeItem.productCode);
         }
 
         // 2. Busca por NOME (backup)
@@ -261,7 +286,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
           const searchName = safeItem.description
             .toLowerCase()
             .substring(0, 25);
-          foundProduct = userProducts.find(
+          foundProduct = catalog.find(
             (p) => p.name && p.name.toLowerCase().includes(searchName),
           );
         }
@@ -415,9 +440,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
       setParsedCsvItems([]);
       setCsvFile(null);
 
-      // Recarrega produtos
-      const productsResponse = await apiService.getProducts();
-      const updatedProducts = productsResponse?.data || productsResponse;
+      const updatedProducts = await fetchCatalogForPurchases();
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao confirmar importação CSV:", err);
@@ -660,15 +683,22 @@ const PurchasesPage = () => {
 
       const itemsFromAI = await apiService.processPurchasePdf(formData);
 
+      const catalog = await fetchCatalogForPurchases();
+      setUserProducts(catalog);
+
       // Pré-mapeia os produtos existentes
       const preMappedItems = itemsFromAI.map((item, index) => {
-        const foundProduct = userProducts.find(
-          (p) =>
-            p.productcode === item.productCode ||
-            p.name
-              .toLowerCase()
-              .includes(item.description.toLowerCase().substring(0, 15)),
-        );
+        let foundProduct = findCatalogProductByCode(catalog, item.productCode);
+        if (
+          !foundProduct &&
+          item.description &&
+          String(item.description).trim() !== ""
+        ) {
+          const sn = item.description.toLowerCase().substring(0, 15);
+          foundProduct = catalog.find(
+            (p) => p.name && p.name.toLowerCase().includes(sn),
+          );
+        }
         return {
           ...item,
           mappedProductId: foundProduct ? foundProduct.id : "",
@@ -791,9 +821,7 @@ const PurchasesPage = () => {
       setParsedItems([]);
       setSelectedFile(null);
 
-      // Recarrega produtos
-      const productsResponse = await apiService.getProducts();
-      const updatedProducts = productsResponse?.data || productsResponse;
+      const updatedProducts = await fetchCatalogForPurchases();
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao processar PDF:", err);

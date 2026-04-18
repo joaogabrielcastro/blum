@@ -72,6 +72,29 @@ exports.create = async (req, res) => {
   }
 };
 
+// Converter orçamento em pedido
+exports.convertToPedido = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await orderService.findById(id);
+    assertOrderAccess(req, existing);
+    const order = await orderService.convertToPedido(id);
+    res.status(200).json(order);
+  } catch (error) {
+    console.error("Erro ao converter orçamento:", error);
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message === "Pedido não encontrado") {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Erro ao converter orçamento." });
+  }
+};
+
 // UPDATE - Atualizar um pedido
 exports.update = async (req, res) => {
   try {
@@ -148,6 +171,9 @@ exports.finalize = async (req, res) => {
     }
     if (error.statusCode === 409) {
       return res.status(409).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
     }
     if (error.message === "Pedido não encontrado") {
       return res.status(404).json({ error: error.message });

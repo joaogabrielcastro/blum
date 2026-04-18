@@ -10,6 +10,30 @@ function enrichOrder(row) {
   };
 }
 
+/** DISTINCT representadas das linhas (detalhe do pedido). */
+function representadasFromItems(items) {
+  const set = new Set();
+  for (const it of items || []) {
+    const b = String(it.brand ?? "").trim();
+    if (b) set.add(b);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR")).join(", ");
+}
+
+const REPRESENTADAS_SQL = `(
+  SELECT COALESCE(string_agg(s.b, ', ' ORDER BY s.b), '')
+  FROM (
+    SELECT DISTINCT trim(oi.brand) AS b FROM order_items oi
+    WHERE oi.order_id = o.id AND trim(COALESCE(oi.brand, '')) <> ''
+  ) s
+) AS representadas`;
+
+const REPRESENTADAS_FRAGMENT = {
+  __isSqlFragment: true,
+  text: REPRESENTADAS_SQL,
+  values: [],
+};
+
 class OrderService {
   async loadCommissionRatesByBrandNames(brandNames) {
     const unique = [...new Set((brandNames || []).filter(Boolean))];
@@ -125,7 +149,8 @@ class OrderService {
       if (clientid) {
         rows = await sql(
           `SELECT o.*, u.name AS seller_name, u.username AS seller_username,
-            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count
+            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
+            ${REPRESENTADAS_SQL}
            FROM orders o
            LEFT JOIN users u ON u.id = o.user_ref
            WHERE o.clientid = $1
@@ -135,7 +160,8 @@ class OrderService {
       } else {
         rows = await sql(
           `SELECT o.*, u.name AS seller_name, u.username AS seller_username,
-            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count
+            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
+            ${REPRESENTADAS_SQL}
            FROM orders o
            LEFT JOIN users u ON u.id = o.user_ref
            ORDER BY o.createdat DESC`,
@@ -149,7 +175,8 @@ class OrderService {
       if (clientid) {
         const rows = await sql`
           SELECT o.*, u.name AS seller_name, u.username AS seller_username,
-            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count
+            (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
+            ${REPRESENTADAS_FRAGMENT}
           FROM orders o
           LEFT JOIN users u ON u.id = o.user_ref
           WHERE o.user_ref = ${uid} AND o.clientid = ${clientid}
@@ -159,7 +186,8 @@ class OrderService {
       }
       const rows = await sql`
         SELECT o.*, u.name AS seller_name, u.username AS seller_username,
-          (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count
+          (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
+          ${REPRESENTADAS_FRAGMENT}
         FROM orders o
         LEFT JOIN users u ON u.id = o.user_ref
         WHERE o.user_ref = ${uid}
@@ -197,18 +225,41 @@ class OrderService {
       commission_amount: parseFloat(r.commission_amount) || 0,
     }));
 
+    order.representadas = representadasFromItems(order.items);
+
     return enrichOrder(order);
   }
 
   async findBySeller(userId) {
     const rows = await sql`
-      SELECT o.*, u.name AS seller_name, u.username AS seller_username
+      SELECT o.*, u.name AS seller_name, u.username AS seller_username,
+        (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
+        ${REPRESENTADAS_FRAGMENT}
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_ref
       WHERE o.user_ref = ${userId}
       ORDER BY o.createdat DESC
     `;
     return rows.map(enrichOrder);
+  }
+
+  normalizeDocumentAndPayment(orderData, existing = null) {
+    let docType;
+    if (orderData.document_type != null) {
+      docType = orderData.document_type === "pedido" ? "pedido" : "orcamento";
+    } else if (existing != null && existing.document_type != null) {
+      docType = existing.document_type === "pedido" ? "pedido" : "orcamento";
+    } else {
+      docType = "orcamento";
+    }
+    const allowed = ["carteira", "boleto", "pix", "cheque", "dinheiro"];
+    let payment =
+      orderData.payment_method !== undefined
+        ? orderData.payment_method || null
+        : existing?.payment_method ?? null;
+    if (payment && !allowed.includes(payment)) payment = null;
+    if (docType === "orcamento") payment = null;
+    return { docType, payment };
   }
 
   resolveSellerUserId(orderData, authUser) {
@@ -225,6 +276,7 @@ class OrderService {
 
   async create(orderData, authUser) {
     const { clientid, description, items, discount } = orderData;
+    const { docType, payment } = this.normalizeDocumentAndPayment(orderData);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
 
@@ -272,11 +324,11 @@ class OrderService {
 
     const result = await sql`
       INSERT INTO orders
-        (clientid, user_ref, description, discount, totalprice, total_commission, status, createdat)
+        (clientid, user_ref, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
       VALUES
         (${clientid}, ${sellerUserId}, ${description || ""},
          ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', NOW())
+         'Em aberto', NOW(), ${docType}, ${payment})
       RETURNING *
     `;
 
@@ -286,7 +338,12 @@ class OrderService {
   }
 
   async update(id, orderData, authUser) {
+    const existing = await this.findById(id);
     const { clientid, description, items, discount } = orderData;
+    const { docType, payment } = this.normalizeDocumentAndPayment(
+      orderData,
+      existing,
+    );
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
 
@@ -334,7 +391,9 @@ class OrderService {
           description = ${description || ""},
           discount = ${discount || 0},
           totalprice = ${calculated.finalTotal},
-          total_commission = ${calculated.totalCommission}
+          total_commission = ${calculated.totalCommission},
+          document_type = ${docType},
+          payment_method = ${payment}
       WHERE id = ${id}
       RETURNING *
     `;
@@ -345,6 +404,26 @@ class OrderService {
 
     await this.persistOrderItems(id, calculated.items);
 
+    return this.findById(id);
+  }
+
+  async convertToPedido(id) {
+    const order = await this.findById(id);
+    if (order.document_type !== "orcamento") {
+      const err = new Error(
+        "Apenas orçamentos podem ser convertidos em pedido.",
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    if (order.status === "Entregue") {
+      const err = new Error("Orçamento já finalizado.");
+      err.statusCode = 400;
+      throw err;
+    }
+    await sql`
+      UPDATE orders SET document_type = 'pedido' WHERE id = ${id}
+    `;
     return this.findById(id);
   }
 
@@ -376,7 +455,14 @@ class OrderService {
   }
 
   async finalize(id) {
-    await this.findById(id);
+    const current = await this.findById(id);
+    if (current.document_type !== "pedido") {
+      const err = new Error(
+        "Converta o orçamento em pedido antes de finalizar a entrega.",
+      );
+      err.statusCode = 400;
+      throw err;
+    }
 
     const updated = await sql`
       UPDATE orders

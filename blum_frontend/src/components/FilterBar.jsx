@@ -30,7 +30,7 @@ const FilterBar = ({ searchTerm, onSearchChange = () => {} }) => {
           id="search"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Nome, código ou subcódigo…"
+          placeholder="Várias palavras; não precisa igual ao cadastro (ex.: lamp 9w)"
           className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         {searchTerm && (

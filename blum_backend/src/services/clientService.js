@@ -48,6 +48,14 @@ function normalizeClientBody(raw) {
   const email = raw.email != null ? String(raw.email).trim() : "";
   const cnpj = String(raw.cnpj ?? "").replace(/\D/g, "");
 
+  const street =
+    raw.street ?? raw.logradouro ?? raw.address ?? raw.endereco ?? "";
+  const number = raw.number ?? raw.numero ?? "";
+  const complement = raw.complement ?? raw.complemento ?? "";
+  const neighborhood = raw.neighborhood ?? raw.bairro ?? "";
+  const city = raw.city ?? raw.cidade ?? raw.municipio ?? "";
+  const zipRaw = raw.zipcode ?? raw.cep ?? raw.zip ?? "";
+
   return {
     companyName: companyName != null ? String(companyName).trim() : "",
     contactPerson:
@@ -58,6 +66,12 @@ function normalizeClientBody(raw) {
     region: region != null ? String(region).trim() : "",
     cnpj,
     email,
+    street: street != null ? String(street).trim() : "",
+    number: number != null ? String(number).trim() : "",
+    complement: complement != null ? String(complement).trim() : "",
+    neighborhood: neighborhood != null ? String(neighborhood).trim() : "",
+    city: city != null ? String(city).trim() : "",
+    zipcode: zipRaw != null ? String(zipRaw).trim() : "",
   };
 }
 
@@ -80,6 +94,12 @@ function mapClientRow(row) {
     ...row,
     companyName,
     contactPerson,
+    street: row.street ?? row.logradouro,
+    number: row.number ?? row.numero,
+    complement: row.complement ?? row.complemento,
+    neighborhood: row.neighborhood ?? row.bairro,
+    city: row.city ?? row.cidade,
+    zipcode: row.zipcode ?? row.cep,
     createdAt: pickCreatedAt(row),
     displayName,
   };
@@ -116,8 +136,20 @@ class ClientService {
   }
 
   async create(clientData) {
-    const { companyName, contactPerson, phone, region, cnpj, email } =
-      normalizeClientBody(clientData);
+    const {
+      companyName,
+      contactPerson,
+      phone,
+      region,
+      cnpj,
+      email,
+      street,
+      number,
+      complement,
+      neighborhood,
+      city,
+      zipcode,
+    } = normalizeClientBody(clientData);
 
     if (!companyName || !cnpj) {
       throw new Error("Nome da empresa e CNPJ são obrigatórios");
@@ -129,8 +161,11 @@ class ClientService {
     }
 
     const result = await sql(
-      `INSERT INTO clients (companyname, contactperson, phone, region, cnpj, email)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO clients (
+        companyname, contactperson, phone, region, cnpj, email,
+        street, number, complement, neighborhood, city, zipcode
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         companyName,
@@ -139,6 +174,12 @@ class ClientService {
         region,
         cnpj,
         email || null,
+        street || null,
+        number || null,
+        complement || null,
+        neighborhood || null,
+        city || null,
+        zipcode || null,
       ],
     );
 
@@ -146,8 +187,20 @@ class ClientService {
   }
 
   async update(id, clientData) {
-    const { companyName, contactPerson, phone, region, cnpj, email } =
-      normalizeClientBody(clientData);
+    const {
+      companyName,
+      contactPerson,
+      phone,
+      region,
+      cnpj,
+      email,
+      street,
+      number,
+      complement,
+      neighborhood,
+      city,
+      zipcode,
+    } = normalizeClientBody(clientData);
 
     if (!companyName) {
       throw new Error("Nome da empresa é obrigatório");
@@ -157,10 +210,25 @@ class ClientService {
 
     const result = await sql(
       `UPDATE clients
-       SET companyname = $1, contactperson = $2, phone = $3, region = $4, cnpj = $5, email = $6
-       WHERE id = $7
+       SET companyname = $1, contactperson = $2, phone = $3, region = $4, cnpj = $5, email = $6,
+           street = $7, number = $8, complement = $9, neighborhood = $10, city = $11, zipcode = $12
+       WHERE id = $13
        RETURNING *`,
-      [companyName, contactPerson, phone, region, cnpj, email || null, id],
+      [
+        companyName,
+        contactPerson,
+        phone,
+        region,
+        cnpj,
+        email || null,
+        street || null,
+        number || null,
+        complement || null,
+        neighborhood || null,
+        city || null,
+        zipcode || null,
+        id,
+      ],
     );
 
     return mapClientRow(result[0]);

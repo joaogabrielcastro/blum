@@ -9,6 +9,24 @@ import {
   normalizeClientsResponse,
 } from "../utils/clients";
 
+const PAYMENT_LABELS = {
+  carteira: "Carteira (em aberto)",
+  boleto: "Boleto",
+  pix: "PIX",
+  cheque: "Cheque",
+  dinheiro: "Dinheiro",
+};
+
+function formatOpenDays(createdAt, status) {
+  if (!createdAt || status === "Entregue") return null;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(
+    0,
+    Math.floor((Date.now() - d.getTime()) / 86400000),
+  );
+}
+
 const OrdersPage = ({ userId, userRole, brands }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +123,22 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     }
   };
 
+  const handleConvertToPedido = async (orderId) => {
+    if (
+      !window.confirm(
+        "Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega.",
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiService.convertOrderToPedido(orderId);
+      await fetchData();
+    } catch (error) {
+      alert(error?.message || "Não foi possível converter o orçamento.");
+    }
+  };
+
   const handleEditOrder = async (orderId) => {
     try {
       setEditingLoading(true);
@@ -124,6 +158,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
   const renderOrderActions = (order) => {
     const isDelivered = order.status === "Entregue";
+    const isQuote = order.documentType === "orcamento";
 
     return (
       <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 items-center w-full sm:w-auto">
@@ -140,14 +175,24 @@ const OrdersPage = ({ userId, userRole, brands }) => {
             >
               Editar
             </button>
-            <button
-              onClick={() =>
-                setModalAction({ type: "finalize", orderId: order.id })
-              }
-              className="min-h-10 px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
-            >
-              Finalizar
-            </button>
+            {isQuote ? (
+              <button
+                type="button"
+                onClick={() => handleConvertToPedido(order.id)}
+                className="min-h-10 px-3 py-1 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+              >
+                Virar pedido
+              </button>
+            ) : (
+              <button
+                onClick={() =>
+                  setModalAction({ type: "finalize", orderId: order.id })
+                }
+                className="min-h-10 px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
+              >
+                Finalizar entrega
+              </button>
+            )}
           </>
         )}
         <button
@@ -208,7 +253,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         message={
           modalAction.type === "delete"
             ? "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
-            : "Tem certeza que deseja finalizar este pedido? Esta ação não pode ser desfeita."
+            : "Confirmar finalização da entrega? O estoque será baixado e o status ficará como Entregue."
         }
       />
 
@@ -232,7 +277,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           }}
           className="hidden sm:inline-flex sm:items-center sm:justify-center min-h-11 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
         >
-          + Criar Pedido
+          + Novo orçamento
         </button>
       </div>
 
@@ -243,21 +288,49 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
         {orders.length > 0 ? (
           <ul className="divide-y divide-gray-200">
-            {orders.map((order) => (
+            {orders.map((order) => {
+              const openDays = formatOpenDays(order.createdAt, order.status);
+              return (
               <li
                 key={order.id}
                 className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
               >
                 <div className="flex-1">
                   <h2 className="text-lg font-semibold text-gray-800">
-                    Pedido #{order.id}
+                    {order.documentType === "orcamento"
+                      ? "Orçamento"
+                      : "Pedido"}{" "}
+                    #{order.id}
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs font-medium text-indigo-700 mt-0.5">
+                    {order.documentType === "orcamento"
+                      ? "Status: orçamento (aguardando virar pedido)"
+                      : order.paymentMethod
+                        ? `Pedido • Pagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}`
+                        : "Pedido • Pagamento não informado"}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
                     Cliente: {clients[order.clientId] || "N/A"}
                   </p>
+                  {order.representadas ? (
+                    <p className="text-sm text-gray-700 mt-1 font-medium">
+                      Representada: {order.representadas}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-gray-500 mt-1">
                     Itens: {order.itemsCount ?? order.items?.length ?? 0}
                   </p>
+                  {order.createdAt ? (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Criado em:{" "}
+                      {new Date(order.createdAt).toLocaleDateString("pt-BR")}
+                      {openDays != null ? (
+                        <span className="ml-2 text-amber-800 font-medium">
+                          • há {openDays} dia{openDays === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : null}
                   <p className="text-sm text-gray-500 mt-1">
                     Descrição: {order.description || "N/A"}
                   </p>
@@ -265,7 +338,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                     Finalizado em:{" "}
                     {order.finishedAt
                       ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
-                      : "N/A"}
+                      : "—"}
                   </p>
                 </div>
                 <div className="flex flex-col items-start sm:items-end gap-3 text-left sm:text-right w-full sm:w-fit">
@@ -287,7 +360,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                   </div>
                 </div>
               </li>
-            ))}
+            );
+            })}
           </ul>
         ) : (
           <div className="text-center text-gray-500">
@@ -298,7 +372,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
       <button
         type="button"
-        aria-label="Criar novo pedido"
+        aria-label="Novo orçamento"
         className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white shadow-lg hover:bg-blue-700 sm:hidden"
         style={{
           bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))",

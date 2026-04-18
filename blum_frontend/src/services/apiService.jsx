@@ -288,6 +288,12 @@ const apiService = {
     });
   },
 
+  convertOrderToPedido: async (orderId) => {
+    return apiRequest(`${API_URL}/orders/${orderId}/convert-to-pedido`, {
+      method: "PUT",
+    });
+  },
+
   getOrdersBySeller: async (userId, params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`${API_URL}/orders/seller/${userId}?${queryString}`);

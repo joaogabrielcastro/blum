@@ -150,6 +150,11 @@ exports.validateOrder = [
 
   body("description").optional().trim(),
 
+  body("document_type")
+    .optional()
+    .isIn(["orcamento", "pedido"])
+    .withMessage("Tipo de documento inválido"),
+
   handleValidationErrors,
 ];
 

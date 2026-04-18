@@ -8,7 +8,8 @@
     "dev": "nodemon index.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "import:clients": "node scripts/import_clients_excel.js"
+    "import:clients": "node scripts/import_clients_excel.js",
+    "update:client-addresses": "node scripts/update_clients_address_from_excel.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

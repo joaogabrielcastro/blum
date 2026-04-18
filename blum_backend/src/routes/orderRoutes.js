@@ -16,6 +16,12 @@ router.get(
 router.get("/:id", authenticate, validateId, ordersController.getById);
 router.post("/", authenticate, validateOrder, ordersController.create);
 router.put(
+  "/:id/convert-to-pedido",
+  authenticate,
+  validateId,
+  ordersController.convertToPedido
+);
+router.put(
   "/:id/finalize",
   authenticate,
   validateId,

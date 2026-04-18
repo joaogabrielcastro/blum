@@ -1,4 +1,4 @@
-const { sql } = require("../config/database");
+const { sql, pool } = require("../config/database");
 
 /** Restrição opcional por representada (vendedor). Fragmento vazio = sem filtro extra. */
 function brandSql(names) {
@@ -37,6 +37,9 @@ class ProductService {
 
     const qTrim = q != null && String(q).trim() !== "" ? String(q).trim() : "";
     const searchPattern = qTrim ? `%${qTrim}%` : "";
+    const qTokens = qTrim
+      ? qTrim.split(/\s+/).map((t) => t.trim()).filter(Boolean)
+      : [];
 
     // Busca por SUBCODE (prioridade máxima)
     if (subcode) {
@@ -68,28 +71,17 @@ class ProductService {
       countQuery = await sql`
         SELECT COUNT(*) as count FROM products WHERE name ILIKE ${"%" + name + "%"} ${bc}`;
     }
-    // Representada + termo livre (nome, código, subcódigo)
+    // Representada + termo livre (várias palavras, sem acento — ver findAllByBrandFlexibleQ)
     else if (brand && brand !== "all" && qTrim) {
-      query = await sql`
-        SELECT * FROM products
-        WHERE brand = ${brand}
-          AND (
-            name ILIKE ${searchPattern}
-            OR productcode ILIKE ${searchPattern}
-            OR subcode ILIKE ${searchPattern}
-          )
-          ${bc}
-        ORDER BY createdat DESC
-        LIMIT ${limit} OFFSET ${offset}`;
-      countQuery = await sql`
-        SELECT COUNT(*) as count FROM products
-        WHERE brand = ${brand}
-          AND (
-            name ILIKE ${searchPattern}
-            OR productcode ILIKE ${searchPattern}
-            OR subcode ILIKE ${searchPattern}
-          )
-          ${bc}`;
+      const flex = await this.findAllByBrandFlexibleQ({
+        brand,
+        tokens: qTokens.length ? qTokens : [qTrim],
+        limit,
+        offset,
+        allowedBrandNames,
+      });
+      query = flex.data;
+      countQuery = flex.countRows;
     }
     // Busca por BRAND
     else if (brand && brand !== "all") {
@@ -126,6 +118,82 @@ class ProductService {
   }
 
   /**
+   * WHERE por tokens (cada token em nome OU código OU subcódigo), com unaccent.
+   */
+  _tokenWhereUnaccent(tokens, paramStart) {
+    const parts = [];
+    let p = paramStart;
+    for (let i = 0; i < tokens.length; i++) {
+      parts.push(`(
+        unaccent(lower(COALESCE(name::text, ''))) LIKE '%' || unaccent(lower($${p}::text)) || '%'
+        OR unaccent(lower(COALESCE(productcode::text, ''))) LIKE '%' || unaccent(lower($${p}::text)) || '%'
+        OR unaccent(lower(COALESCE(subcode::text, ''))) LIKE '%' || unaccent(lower($${p}::text)) || '%'
+      )`);
+      p++;
+    }
+    return { sql: parts.join(" AND "), nextParam: p };
+  }
+
+  /** Fallback sem extensão unaccent (acentos podem não bater). */
+  _tokenWhereIlike(tokens, paramStart) {
+    const parts = [];
+    let p = paramStart;
+    for (let i = 0; i < tokens.length; i++) {
+      parts.push(`(
+        name ILIKE '%' || $${p}::text || '%'
+        OR productcode ILIKE '%' || $${p}::text || '%'
+        OR subcode ILIKE '%' || $${p}::text || '%'
+      )`);
+      p++;
+    }
+    return { sql: parts.join(" AND "), nextParam: p };
+  }
+
+  async findAllByBrandFlexibleQ({
+    brand,
+    tokens,
+    limit,
+    offset,
+    allowedBrandNames,
+  }) {
+    const run = async (tokenSqlFn) => {
+      const tw = tokenSqlFn(tokens, 2);
+      const vals = [brand, ...tokens];
+      let w = `brand = $1 AND (${tw.sql})`;
+      let nextP = tw.nextParam;
+      if (allowedBrandNames && allowedBrandNames.length) {
+        vals.push(allowedBrandNames);
+        w += ` AND brand = ANY($${nextP})`;
+        nextP++;
+      }
+      const countSql = `SELECT COUNT(*)::bigint as count FROM products WHERE ${w}`;
+      const countRes = await pool.query(countSql, vals);
+      const limP = nextP;
+      const offP = nextP + 1;
+      const dataSql = `SELECT * FROM products WHERE ${w} ORDER BY createdat DESC LIMIT $${limP} OFFSET $${offP}`;
+      const dataRes = await pool.query(dataSql, [...vals, limit, offset]);
+      return {
+        data: dataRes.rows,
+        countRows: [{ count: String(countRes.rows[0].count) }],
+      };
+    };
+
+    try {
+      return await run((t, s) => this._tokenWhereUnaccent(t, s));
+    } catch (e) {
+      const msg = String(e.message || "");
+      if (
+        msg.includes("unaccent") ||
+        msg.includes("function unaccent") ||
+        e.code === "42883"
+      ) {
+        return await run((t, s) => this._tokenWhereIlike(t, s));
+      }
+      throw e;
+    }
+  }
+
+  /**
    * Busca produtos por termo (múltiplos campos)
    * @param {string} searchTerm - Termo de busca
    * @param {number} limit - Limite de resultados
@@ -136,27 +204,48 @@ class ProductService {
       throw new Error("Termo de busca é obrigatório");
     }
 
-    const bc = brandSql(allowedBrandNames);
+    const tokens = searchTerm
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (!tokens.length) {
+      throw new Error("Termo de busca é obrigatório");
+    }
 
-    return await sql`
-      SELECT * FROM products 
-      WHERE 
-        (
-        name ILIKE ${"%" + searchTerm + "%"} OR
-        productcode ILIKE ${"%" + searchTerm + "%"} OR
-        subcode ILIKE ${"%" + searchTerm + "%"}
-        )
-        ${bc}
-      ORDER BY 
-        CASE 
-          WHEN name ILIKE ${searchTerm + "%"} THEN 1
-          WHEN productcode ILIKE ${searchTerm + "%"} THEN 2
-          WHEN subcode ILIKE ${searchTerm + "%"} THEN 3
-          ELSE 4
-        END,
-        name
-      LIMIT ${limit}
-    `;
+    const trySearch = async (tokenFn) => {
+      const t = tokenFn(tokens, 1);
+      let w = `(${t.sql})`;
+      const v = [...tokens];
+      let np = t.nextParam;
+      if (allowedBrandNames && allowedBrandNames.length) {
+        v.push(allowedBrandNames);
+        w += ` AND brand = ANY($${np})`;
+        np++;
+      }
+      const sqlText = `
+        SELECT * FROM products
+        WHERE ${w}
+        ORDER BY name
+        LIMIT $${np}
+      `;
+      const r = await pool.query(sqlText, [...v, limit]);
+      return r.rows;
+    };
+
+    try {
+      return await trySearch((tok, start) => this._tokenWhereUnaccent(tok, start));
+    } catch (e) {
+      const msg = String(e.message || "");
+      if (
+        msg.includes("unaccent") ||
+        msg.includes("function unaccent") ||
+        e.code === "42883"
+      ) {
+        return await trySearch((tok, start) => this._tokenWhereIlike(tok, start));
+      }
+      throw e;
+    }
   }
 
   /**

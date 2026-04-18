@@ -101,6 +101,11 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
   const handleGeneratePdf = async () => {
     if (!order) return;
 
+    const pdfDocType =
+      order.documentType === "orcamento" ? "Orçamento" : "Pedido";
+    const filePrefix =
+      order.documentType === "orcamento" ? "orcamento" : "pedido";
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -149,18 +154,23 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
         console.log(`📐 Imagem redimensionada: ${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}mm`);
       } catch (error) {
         console.error("Erro ao adicionar imagem:", error);
-        createDefaultHeader(doc, pageWidth, order.id);
+        createDefaultHeader(doc, pageWidth, order.id, pdfDocType);
         yPosition = 35; // ✅ Header padrão também mais compacto
       }
     } else {
-      createDefaultHeader(doc, pageWidth, order.id);
+      createDefaultHeader(doc, pageWidth, order.id, pdfDocType);
       yPosition = 35; // ✅ Header padrão mais compacto
     }
 
     // ✅ CORREÇÃO: Número do pedido mais destacado
     doc.setFontSize(12);
     doc.setFont(undefined, "bold");
-    doc.text(`Pedido Nº ${order.id}`, pageWidth / 2, yPosition, { align: "center" });
+    doc.text(
+      `${pdfDocType} Nº ${order.id}`,
+      pageWidth / 2,
+      yPosition,
+      { align: "center" },
+    );
     yPosition += 8;
 
     // Informações do cliente
@@ -304,11 +314,11 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     doc.text("Agradecemos pela preferência! • Este documento não tem valor fiscal", 
              pageWidth / 2, footerY, { align: "center" });
 
-    doc.save(`pedido-${order.id}.pdf`);
+    doc.save(`${filePrefix}-${order.id}.pdf`);
     onClose();
   };
 
-  const createDefaultHeader = (doc, pageWidth, orderId) => {
+  const createDefaultHeader = (doc, pageWidth, orderId, titleDoc = "Pedido") => {
     // ✅ Header padrão também mais compacto
     doc.setFillColor(61, 101, 155);
     doc.rect(0, 0, pageWidth, 20, 'F'); // ✅ Altura reduzida
@@ -319,7 +329,7 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     doc.text("VENDAS", pageWidth / 2, 8, { align: "center" });
     
     doc.setFontSize(11); // ✅ Fonte menor
-    doc.text(`Pedido Nº ${orderId}`, pageWidth / 2, 15, { align: "center" });
+    doc.text(`${titleDoc} Nº ${orderId}`, pageWidth / 2, 15, { align: "center" });
     
     doc.setTextColor(0, 0, 0);
   };
@@ -327,7 +337,9 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <h3 className="text-xl font-bold mb-4 text-center">Gerar PDF do Pedido</h3>
+        <h3 className="text-xl font-bold mb-4 text-center">
+          Gerar PDF ({order?.documentType === "orcamento" ? "Orçamento" : "Pedido"})
+        </h3>
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">

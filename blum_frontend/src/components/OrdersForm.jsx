@@ -5,6 +5,7 @@ import {
   normalizeClientsResponse,
 } from "../utils/clients";
 import { normalizeOrderLineItems } from "../utils/format";
+import { productMatchesFlexible } from "../utils/productSearch";
 
 const OrdersForm = ({
   userId,
@@ -28,6 +29,7 @@ const OrdersForm = ({
   const [mobileProductPickerOpen, setMobileProductPickerOpen] =
     useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
 
   // Função segura para toFixed
   const safeToFixed = (value, decimals = 2) => {
@@ -58,6 +60,7 @@ const OrdersForm = ({
       setTotalPrice(editingOrder.totalPrice ?? editingOrder.totalprice ?? 0);
       const firstBrand = lines.find((i) => i.brand)?.brand;
       if (firstBrand) setSelectedBrand(firstBrand);
+      setPaymentMethod(editingOrder.paymentMethod || "");
     } else {
       setClientId("");
       setClientSearchTerm("");
@@ -68,6 +71,7 @@ const OrdersForm = ({
       setTotalPrice(0);
       setProductSearch("");
       setSearchResults([]);
+      setPaymentMethod("");
     }
   }, [editingOrder, brands, clients]);
 
@@ -136,37 +140,33 @@ const OrdersForm = ({
           return;
         }
 
-        // ✅ BUSCA AVANÇADA: Por nome, código ou subcódigo
-        const searchTerm = productSearch.toLowerCase().trim();
-
-        const filtered = products.filter(
-          (product) =>
-            // Filtra primeiro pela marca selecionada
-            product.brand === selectedBrand &&
-            // Busca por NOME
-            (product.name.toLowerCase().includes(searchTerm) ||
-              // Busca por CÓDIGO DO PRODUTO
-              (product.productcode &&
-                product.productcode.toLowerCase().includes(searchTerm)) ||
-              // ✅ BUSCA POR SUBCÓDIGO
-              (product.subcode &&
-                product.subcode.toLowerCase().includes(searchTerm))),
+        const filtered = products.filter((product) =>
+          productMatchesFlexible(product, productSearch, selectedBrand),
         );
 
-        // ✅ ORDENA POR RELEVÂNCIA
-        const sortedResults = filtered.sort((a, b) => {
-          const aNameMatch = a.name.toLowerCase().includes(searchTerm);
-          const bNameMatch = b.name.toLowerCase().includes(searchTerm);
-          const aCodeMatch =
-            a.productcode && a.productcode.toLowerCase().includes(searchTerm);
-          const bCodeMatch =
-            b.productcode && b.productcode.toLowerCase().includes(searchTerm);
-          const aSubcodeMatch =
-            a.subcode && a.subcode.toLowerCase().includes(searchTerm);
-          const bSubcodeMatch =
-            b.subcode && b.subcode.toLowerCase().includes(searchTerm);
+        const firstTok =
+          productSearch.toLowerCase().trim().split(/\s+/)[0] || "";
 
-          // Prioridade: subcódigo > código > nome
+        const sortedResults = filtered.sort((a, b) => {
+          const aNameMatch = firstTok && a.name.toLowerCase().includes(firstTok);
+          const bNameMatch = firstTok && b.name.toLowerCase().includes(firstTok);
+          const aCodeMatch =
+            firstTok &&
+            a.productcode &&
+            a.productcode.toLowerCase().includes(firstTok);
+          const bCodeMatch =
+            firstTok &&
+            b.productcode &&
+            b.productcode.toLowerCase().includes(firstTok);
+          const aSubcodeMatch =
+            firstTok &&
+            a.subcode &&
+            a.subcode.toLowerCase().includes(firstTok);
+          const bSubcodeMatch =
+            firstTok &&
+            b.subcode &&
+            b.subcode.toLowerCase().includes(firstTok);
+
           if (aSubcodeMatch && !bSubcodeMatch) return -1;
           if (!aSubcodeMatch && bSubcodeMatch) return 1;
           if (aCodeMatch && !bCodeMatch) return -1;
@@ -232,7 +232,10 @@ const OrdersForm = ({
   const handleProductSelect = (product) => {
     if (product) {
       const existingItem = items.find(
-        (item) => item.productName === product.name,
+        (item) =>
+          (item.productId != null &&
+            String(item.productId) === String(product.id)) ||
+          (!item.productId && item.productName === product.name),
       );
       if (!existingItem) {
         // Verifica se há estoque disponível
@@ -378,7 +381,16 @@ const OrdersForm = ({
         })),
         discount: parseFloat(discount) || 0,
         totalprice: parseFloat(netTotal) || 0,
+        document_type: editingOrder
+          ? editingOrder.documentType === "pedido"
+            ? "pedido"
+            : "orcamento"
+          : "orcamento",
       };
+
+      if (editingOrder?.documentType === "pedido") {
+        orderData.payment_method = paymentMethod || null;
+      }
 
       if (editingOrder) {
         await apiService.updateOrder(editingOrder.id, orderData);
@@ -462,7 +474,11 @@ const OrdersForm = ({
     <>
       <div className="w-full max-w-none md:max-w-4xl md:mx-auto px-0 sm:px-0 md:px-4 lg:px-8">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-8 px-3 md:px-0 pt-1 md:pt-0">
-          {editingOrder ? "Editar Pedido" : "Criar Novo Pedido"}
+          {editingOrder
+            ? editingOrder.documentType === "orcamento"
+              ? "Editar orçamento"
+              : "Editar pedido"
+            : "Novo orçamento"}
         </h2>
         <div className="w-full">
           <form
@@ -538,8 +554,33 @@ const OrdersForm = ({
             </div>
           </div>
 
-          {/* --- Descrição e Desconto --- */}
+          {/* --- Descrição, pagamento (pedido) e Desconto --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {editingOrder?.documentType === "pedido" && (
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Forma de pagamento / faturamento
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione (opcional)</option>
+                  <option value="carteira">
+                    Carteira (não pago / em aberto)
+                  </option>
+                  <option value="boleto">Pagamento em boleto</option>
+                  <option value="pix">Pagamento via PIX</option>
+                  <option value="cheque">Pagamento via cheque</option>
+                  <option value="dinheiro">Pagamento em dinheiro</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Equivale ao controle de “faturado” no Mercos: use para saber
+                  como foi quitado.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Descrição
@@ -576,7 +617,7 @@ const OrdersForm = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Buscar produto (nome, codigo ou subcodigo)
+                Buscar produto (várias palavras, sem precisar igual ao cadastro)
               </label>
 
               <button

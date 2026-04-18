@@ -11,6 +11,12 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
     region: client?.region || "",
     cnpj: client?.cnpj || "",
     email: client?.email || "",
+    street: client?.street || "",
+    number: client?.number || "",
+    complement: client?.complement || "",
+    neighborhood: client?.neighborhood || "",
+    city: client?.city || "",
+    zipcode: client?.zipcode || "",
   });
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -136,6 +142,12 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
       region: String(formData.region || "").trim(),
       cnpj: String(formData.cnpj || "").replace(/\D/g, ""),
       email,
+      street: String(formData.street || "").trim(),
+      number: String(formData.number || "").trim(),
+      complement: String(formData.complement || "").trim(),
+      neighborhood: String(formData.neighborhood || "").trim(),
+      city: String(formData.city || "").trim(),
+      zipcode: String(formData.zipcode || "").trim(),
     };
   };
 
@@ -302,8 +314,94 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                   name="region"
                   value={formData.region}
                   onChange={handleChange}
-                  placeholder="UF"
+                  placeholder="UF (ex.: PR)"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2">
+                  Endereço
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Para clientes da base PR (Paraná / PRL), preencha logradouro,
+                  cidade e CEP para entregas e documentos.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Logradouro
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="street"
+                      value={formData.street}
+                      onChange={handleChange}
+                      placeholder="Rua, avenida…"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Número
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="number"
+                      value={formData.number}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Complemento
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="complement"
+                      value={formData.complement}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Bairro
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="neighborhood"
+                      value={formData.neighborhood}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      Cidade
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                      CEP
+                    </label>
+                    <input
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      type="text"
+                      name="zipcode"
+                      value={formData.zipcode}
+                      onChange={handleChange}
+                      placeholder="00000-000"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
