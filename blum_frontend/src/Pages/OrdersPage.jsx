@@ -73,6 +73,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [clients, setClients] = useState({});
   const [clientsList, setClientsList] = useState([]);
   const [pdfOrder, setPdfOrder] = useState(null);
+  const [pdfLoadingOrderId, setPdfLoadingOrderId] = useState(null);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
 
   // Validar e transformar brands para garantir segurança
@@ -193,6 +194,28 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     }
   };
 
+  const handleOpenPdf = async (order) => {
+    try {
+      setPdfLoadingOrderId(order.id);
+      const orderDetails = await apiService.getOrderById(order.id);
+      const detailedOrder = formatOrderData(orderDetails);
+      setPdfOrder({
+        ...order,
+        ...detailedOrder,
+      });
+    } catch (error) {
+      console.error("Erro ao carregar pedido completo para PDF:", error);
+      setPdfOrder(order);
+      if (!order.items || order.items.length === 0) {
+        alert(
+          "Não foi possível carregar os itens completos do pedido. Tente novamente.",
+        );
+      }
+    } finally {
+      setPdfLoadingOrderId(null);
+    }
+  };
+
   const renderOrderActions = (order) => {
     const isDelivered = order.status === "Entregue";
     const isQuote = order.documentType === "orcamento";
@@ -240,10 +263,11 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         </button>
         {isDelivered && (
           <button
-            onClick={() => setPdfOrder(order)}
+            onClick={() => handleOpenPdf(order)}
+            disabled={pdfLoadingOrderId === order.id}
             className="min-h-10 px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
           >
-            Gerar PDF
+            {pdfLoadingOrderId === order.id ? "Carregando..." : "Gerar PDF"}
           </button>
         )}
       </div>
