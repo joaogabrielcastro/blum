@@ -50,35 +50,53 @@ class OrderService {
     return map;
   }
 
+  lineDiscountPct(item) {
+    const raw =
+      item.lineDiscount ??
+      item.line_discount ??
+      item.lineDiscountPercent ??
+      0;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.min(100, Math.max(0, n));
+  }
+
   async calculateItemsCommission(items, discount = 0) {
     const rateMap = await this.loadCommissionRatesByBrandNames(
       items.map((i) => i.brand),
     );
-    let subtotal = 0;
+    const orderDiscPct = parseFloat(discount) || 0;
+    const orderFactor = 1 - orderDiscPct / 100;
+
+    let subtotalAfterLineDiscounts = 0;
 
     const itemsWithCommission = items.map((item) => {
       const price = parseFloat(item.price) || 0;
       const quantity = parseInt(item.quantity, 10) || 1;
-      const itemTotal = price * quantity;
-      subtotal += itemTotal;
+      const lineDiscPct = this.lineDiscountPct(item);
+      const lineFactor = 1 - lineDiscPct / 100;
+      const grossLine = price * quantity;
+      const afterLineDiscount = grossLine * lineFactor;
+      subtotalAfterLineDiscounts += afterLineDiscount;
 
       const commissionRate = rateMap.get(item.brand) ?? 0;
-      const discountFactor = 1 - parseFloat(discount) / 100;
-      const itemTotalAfterDiscount = itemTotal * discountFactor;
+      const itemTotalAfterOrderDiscount = afterLineDiscount * orderFactor;
       const commissionAmount =
-        (itemTotalAfterDiscount * commissionRate) / 100;
+        (itemTotalAfterOrderDiscount * commissionRate) / 100;
 
       return {
         ...item,
         price,
         quantity,
+        line_discount: lineDiscPct,
         commission_rate: commissionRate,
         commission_amount: parseFloat(commissionAmount.toFixed(2)),
       };
     });
 
-    const discountAmount = subtotal * (parseFloat(discount) / 100);
-    const finalTotal = subtotal - discountAmount;
+    const discountAmount =
+      subtotalAfterLineDiscounts * (orderDiscPct / 100);
+    const finalTotal = subtotalAfterLineDiscounts - discountAmount;
     const totalCommission = itemsWithCommission.reduce(
       (total, item) => total + (item.commission_amount || 0),
       0,
@@ -86,7 +104,7 @@ class OrderService {
 
     return {
       items: itemsWithCommission,
-      subtotal,
+      subtotal: subtotalAfterLineDiscounts,
       discountAmount,
       finalTotal,
       totalCommission,
@@ -107,13 +125,15 @@ class OrderService {
       const insertSql = `
         INSERT INTO order_items (
           order_id, product_id, product_name, brand, quantity, unit_price,
-          commission_rate, commission_amount, line_total
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          line_discount, commission_rate, commission_amount, line_total
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
       for (const it of calculatedItems) {
         const qty = parseInt(it.quantity, 10) || 1;
         const price = parseFloat(it.price) || 0;
-        const lineTotal = qty * price;
+        const lineDisc = parseFloat(it.line_discount) || 0;
+        const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
+        const lineTotal = qty * price * lineFactor;
         await client.query(insertSql, [
           orderId,
           it.productId != null ? it.productId : null,
@@ -121,6 +141,7 @@ class OrderService {
           it.brand || "",
           qty,
           price,
+          lineDisc,
           it.commission_rate || 0,
           it.commission_amount || 0,
           lineTotal,
@@ -221,6 +242,7 @@ class OrderService {
       brand: r.brand,
       quantity: r.quantity,
       price: parseFloat(r.unit_price),
+      lineDiscount: parseFloat(r.line_discount) || 0,
       commission_rate: parseFloat(r.commission_rate) || 0,
       commission_amount: parseFloat(r.commission_amount) || 0,
     }));

@@ -25,6 +25,13 @@ export const normalizeOrderLineItems = (items) => {
     const price = parseFloat(
       line.price ?? line.unit_price ?? line.unitprice ?? 0,
     );
+    const lineDiscRaw = parseFloat(
+      line.lineDiscount ?? line.line_discount ?? line.discount_percent ?? 0,
+    );
+    const lineDiscount =
+      Number.isFinite(lineDiscRaw) && lineDiscRaw > 0
+        ? Math.min(100, lineDiscRaw)
+        : 0;
     return {
       ...line,
       productId: productId != null ? Number(productId) || productId : null,
@@ -32,6 +39,7 @@ export const normalizeOrderLineItems = (items) => {
       brand: String(brand),
       quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
       price: Number.isFinite(price) ? price : 0,
+      lineDiscount,
       productcode: line.productcode ?? line.product_code ?? "",
       subcode: line.subcode ?? "",
       availableStock:

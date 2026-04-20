@@ -30,11 +30,16 @@ export const normalizeBrand = (brand) => {
           : 0;
 
   const brandId = brand?.id || displayName;
+  const logoUrl =
+    typeof brand?.logo_url === "string" && brand.logo_url.trim() !== ""
+      ? brand.logo_url.trim()
+      : null;
 
   return {
     id: brandId,
     displayName: fixEncoding(displayName),
     commission: commissionValue,
+    logoUrl,
     raw: brand,
   };
 };

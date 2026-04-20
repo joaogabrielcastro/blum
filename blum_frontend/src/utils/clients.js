@@ -38,3 +38,26 @@ export function getClientDisplayName(client) {
   }
   return "";
 }
+
+/** Linhas de endereço para PDF / impressão (cadastro PR). */
+export function formatClientAddressLines(client) {
+  if (!client) return [];
+  const street = client.street ?? client.logradouro ?? "";
+  const number = client.number ?? client.numero ?? "";
+  const line1 = [street, number]
+    .filter((x) => x != null && String(x).trim() !== "")
+    .join(", ");
+  const nbh = client.neighborhood ?? client.bairro ?? "";
+  const city = client.city ?? client.cidade ?? "";
+  const line2 = [nbh, city]
+    .filter((x) => x != null && String(x).trim() !== "")
+    .join(" — ");
+  const zip = client.zipcode ?? client.cep ?? "";
+  const lines = [];
+  if (line1) lines.push(line1);
+  if (line2) lines.push(line2);
+  if (zip && String(zip).trim() !== "") lines.push(`CEP ${String(zip).trim()}`);
+  const comp = client.complement ?? client.complemento ?? "";
+  if (comp && String(comp).trim() !== "") lines.push(String(comp).trim());
+  return lines;
+}

@@ -1,19 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const BrandForm = ({ onSubmit, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
     name: "",
     commission_rate: "",
+    logo_url: "",
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Se houver dados iniciais (para edição), preencher o formulário
-  useState(() => {
+  useEffect(() => {
     if (initialData) {
       setFormData({
         name: initialData.name || "",
         commission_rate: initialData.commission_rate?.toString() || "0",
+        logo_url: initialData.logo_url != null ? String(initialData.logo_url) : "",
       });
     }
   }, [initialData]);
@@ -49,6 +50,7 @@ const BrandForm = ({ onSubmit, onCancel, initialData }) => {
       const brandData = {
         name: formData.name.trim(),
         commission_rate: parseFloat(formData.commission_rate),
+        logo_url: formData.logo_url.trim() || null,
       };
 
       await onSubmit(brandData);
@@ -125,6 +127,23 @@ const BrandForm = ({ onSubmit, onCancel, initialData }) => {
           <p className="text-gray-600 text-xs mt-1">
             Percentual de comissão que será aplicado aos produtos desta
             Representada
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-gray-700 mb-2">
+            URL do logo (opcional)
+          </label>
+          <input
+            type="url"
+            name="logo_url"
+            value={formData.logo_url}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="https://exemplo.com/logo.png"
+          />
+          <p className="text-gray-600 text-xs mt-1">
+            Imagem exibida na lista de representadas (PNG, JPG ou SVG público).
           </p>
         </div>
 

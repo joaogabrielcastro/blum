@@ -39,6 +39,7 @@ const RepresentadaPicker = ({
   const [query, setQuery] = useState("");
   const [editingBrandId, setEditingBrandId] = useState(null);
   const [editCommission, setEditCommission] = useState("");
+  const [editLogoUrl, setEditLogoUrl] = useState("");
 
   const isAdmin = userRole === "admin";
 
@@ -63,6 +64,7 @@ const RepresentadaPicker = ({
     e.stopPropagation();
     setEditingBrandId(brand.id);
     setEditCommission(String(brand.commission ?? ""));
+    setEditLogoUrl(brand.logoUrl || brand.raw?.logo_url || "");
   };
 
   const handleSaveEdit = async (brandId, e) => {
@@ -75,10 +77,12 @@ const RepresentadaPicker = ({
       await onEditBrand(original.name, {
         name: original.name,
         commission_rate: parseFloat(editCommission) || 0,
+        logo_url: editLogoUrl.trim() || null,
       });
     }
     setEditingBrandId(null);
     setEditCommission("");
+    setEditLogoUrl("");
   };
 
   const handleCommissionChange = (e) => {
@@ -218,9 +222,19 @@ const RepresentadaPicker = ({
             >
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="shrink-0 w-14 h-14 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center text-purple-700 font-bold text-lg">
-                    {(brand.displayName || "?").charAt(0).toUpperCase()}
-                  </div>
+                  {brand.logoUrl ? (
+                    <div className="shrink-0 w-14 h-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
+                      <img
+                        src={brand.logoUrl}
+                        alt=""
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="shrink-0 w-14 h-14 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center text-purple-700 font-bold text-lg">
+                      {(brand.displayName || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-purple-700 text-base truncate">
                       {brand.displayName}
@@ -298,8 +312,18 @@ const RepresentadaPicker = ({
               {isAdmin && editingBrandId === brand.id && (
                 <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg shadow-md max-w-sm">
                   <h4 className="font-semibold text-sm text-gray-800 mb-2">
-                    Editar comissão — {brand.displayName}
+                    Editar representada — {brand.displayName}
                   </h4>
+                  <label className="block text-xs text-gray-600 mb-1">
+                    URL do logo (imagem)
+                  </label>
+                  <input
+                    type="url"
+                    value={editLogoUrl}
+                    onChange={(e) => setEditLogoUrl(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-3"
+                    placeholder="https://…"
+                  />
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="text"
@@ -316,6 +340,7 @@ const RepresentadaPicker = ({
                       onClick={() => {
                         setEditingBrandId(null);
                         setEditCommission("");
+                        setEditLogoUrl("");
                       }}
                       className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
                     >

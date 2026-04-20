@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import formatCurrency from "../utils/format";
+import { formatClientAddressLines } from "../utils/clients";
+
+const PAYMENT_PDF_LABELS = {
+  carteira: "Carteira (em aberto)",
+  boleto: "Boleto",
+  pix: "PIX",
+  cheque: "Cheque",
+  dinheiro: "Dinheiro",
+};
 
 // Função utilitária para normalizar items
 const normalizeItems = (items) => {
@@ -15,7 +24,7 @@ const normalizeItems = (items) => {
   return [];
 };
 
-const PdfGenerator = ({ order, clients, brands, onClose }) => {
+const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => {
   const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
   const [headerImage, setHeaderImage] = useState(null);
@@ -112,16 +121,16 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     const margin = 15;
     let yPosition = 15;
 
-    // Definição de colunas
     const columns = {
       produto: margin + 2,
-      qtd: pageWidth - 65,
-      preco: pageWidth - 40,
+      desc: pageWidth - 88,
+      qtd: pageWidth - 70,
+      preco: pageWidth - 48,
       subtotal: pageWidth - 15,
       totais: {
         label: pageWidth - 70,
-        value: pageWidth - 15
-      }
+        value: pageWidth - 15,
+      },
     };
 
     const checkPageOverflow = (heightNeeded = 15) => {
@@ -151,7 +160,6 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
         doc.addImage(headerImage, "JPEG", imgX, yPosition, finalWidth, finalHeight);
         yPosition += finalHeight + 8; // ✅ Menos espaço após a imagem
         
-        console.log(`📐 Imagem redimensionada: ${finalWidth.toFixed(1)}x${finalHeight.toFixed(1)}mm`);
       } catch (error) {
         console.error("Erro ao adicionar imagem:", error);
         createDefaultHeader(doc, pageWidth, order.id, pdfDocType);
@@ -177,29 +185,43 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     doc.setFontSize(10);
     doc.setFont(undefined, "normal");
     
-    const clientName = clients[order.clientId] || "N/A";
+    const cid = order.clientId ?? order.clientid;
+    const clientName = clients[cid] || "N/A";
     doc.text(`Cliente: ${clientName}`, margin, yPosition);
-    yPosition += 6; // ✅ Menos espaço entre linhas
+    yPosition += 5;
 
-    // Cabeçalho da tabela - mais próximo do conteúdo
+    const clientRow = clientsList.find(
+      (c) => String(c.id ?? c.Id) === String(cid),
+    );
+    const addrLines = formatClientAddressLines(clientRow);
+    if (addrLines.length > 0) {
+      doc.setFontSize(9);
+      addrLines.forEach((ln) => {
+        checkPageOverflow(8);
+        doc.text(ln, margin, yPosition);
+        yPosition += 4;
+      });
+    }
+
     yPosition += 4;
-    doc.setFont(undefined, "bold");
     doc.setFontSize(9);
-    
+    doc.setFont(undefined, "bold");
     doc.setFillColor(240, 240, 240);
     doc.rect(margin, yPosition, pageWidth - 2 * margin, 8, "F");
-    
+
     doc.text("PRODUTO", columns.produto, yPosition + 5);
+    doc.setFontSize(8);
+    doc.text("DESC.%", columns.desc, yPosition + 5, { align: "right" });
+    doc.setFontSize(9);
     doc.text("QTD.", columns.qtd, yPosition + 5, { align: "right" });
-    doc.text("PREÇO UNIT.", columns.preco, yPosition + 5, { align: "right" }); // ✅ "UNIT." adicionado
+    doc.text("PREÇO UNIT.", columns.preco, yPosition + 5, { align: "right" });
     doc.text("SUBTOTAL", columns.subtotal, yPosition + 5, { align: "right" });
-    
+
     yPosition += 10;
 
-    // Itens do pedido
     doc.setFont(undefined, "normal");
     doc.setFontSize(9);
-    
+
     const items = normalizeItems(order.items);
 
     items.forEach((item, index) => {
@@ -208,72 +230,127 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
       const productName = item.productName || item.name || "Produto";
       const quantity = Number(item.quantity) || 0;
       const unitPrice = Number(item.unitPrice || item.price || 0);
-      const subtotal = quantity * unitPrice;
+      const ld = Number(item.lineDiscount ?? item.line_discount ?? 0) || 0;
+      const lineFactor = 1 - Math.min(100, Math.max(0, ld)) / 100;
+      const lineSubtotal = quantity * unitPrice * lineFactor;
 
       if (index % 2 === 0) {
         doc.setFillColor(250, 250, 250);
         doc.rect(margin, yPosition, pageWidth - 2 * margin, 12, "F");
       }
 
-      const maxWidth = columns.qtd - columns.produto - 10;
+      const maxWidth = columns.desc - columns.produto - 4;
       const productLines = doc.splitTextToSize(productName, maxWidth);
-      
+
       const lineHeight = Math.max(12, productLines.length * 4);
-      
+
       productLines.forEach((line, lineIndex) => {
-        doc.text(line, columns.produto, yPosition + 4 + (lineIndex * 4));
+        doc.text(line, columns.produto, yPosition + 4 + lineIndex * 4);
       });
 
-      doc.text(quantity.toString(), columns.qtd, yPosition + 5, { align: "right" });
-      doc.text(formatCurrency(unitPrice), columns.preco, yPosition + 5, { align: "right" });
-      doc.text(formatCurrency(subtotal), columns.subtotal, yPosition + 5, { align: "right" });
+      doc.text(
+        ld > 0 ? `${Number(ld).toFixed(1)}%` : "—",
+        columns.desc,
+        yPosition + 5,
+        { align: "right" },
+      );
+      doc.text(String(quantity), columns.qtd, yPosition + 5, {
+        align: "right",
+      });
+      doc.text(
+        formatCurrency(unitPrice),
+        columns.preco,
+        yPosition + 5,
+        { align: "right" },
+      );
+      doc.text(
+        formatCurrency(lineSubtotal),
+        columns.subtotal,
+        yPosition + 5,
+        { align: "right" },
+      );
 
       yPosition += lineHeight;
     });
 
-    // ... (resto do código permanece igual, mas com espaçamentos ajustados)
-    yPosition += 8; // ✅ Menos espaço após os itens
+    yPosition += 8;
 
     checkPageOverflow(20);
 
-    // TOTAIS
-    const subtotalValue = Number(order.totalPrice) || 0;
-    const discountValue = Number(order.discount) || 0;
-    const totalValue = subtotalValue - discountValue;
+    let subtotalAfterLines = 0;
+    items.forEach((item) => {
+      const quantity = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unitPrice || item.price || 0);
+      const ld = Number(item.lineDiscount ?? item.line_discount ?? 0) || 0;
+      const lineFactor = 1 - Math.min(100, Math.max(0, ld)) / 100;
+      subtotalAfterLines += quantity * unitPrice * lineFactor;
+    });
+    const orderDiscPct = Number(order.discount) || 0;
+    const orderDiscAmt = subtotalAfterLines * (orderDiscPct / 100);
+    const totalValue =
+      Number(order.totalPrice) || subtotalAfterLines - orderDiscAmt;
 
     doc.setDrawColor(200, 200, 200);
-    doc.line(columns.totais.label - 10, yPosition, columns.totais.value + 5, yPosition);
-    yPosition += 6; // ✅ Menos espaço
+    doc.line(
+      columns.totais.label - 10,
+      yPosition,
+      columns.totais.value + 5,
+      yPosition,
+    );
+    yPosition += 6;
 
-    if (discountValue > 0) {
-      doc.setFont(undefined, "normal");
-      doc.setFontSize(9);
-      doc.text("Subtotal:", columns.totais.label, yPosition, { align: "right" });
-      doc.text(formatCurrency(subtotalValue), columns.totais.value, yPosition, { align: "right" });
-      yPosition += 4; // ✅ Menos espaço
+    doc.setFont(undefined, "normal");
+    doc.setFontSize(9);
+    doc.text("Subtotal (itens):", columns.totais.label, yPosition, {
+      align: "right",
+    });
+    doc.text(
+      formatCurrency(subtotalAfterLines),
+      columns.totais.value,
+      yPosition,
+      { align: "right" },
+    );
+    yPosition += 4;
 
-      doc.text("Desconto:", columns.totais.label, yPosition, { align: "right" });
-      doc.text(`-${formatCurrency(discountValue)}`, columns.totais.value, yPosition, { align: "right" });
-      yPosition += 4; // ✅ Menos espaço
+    if (orderDiscPct > 0) {
+      doc.text(
+        `Desconto geral (${orderDiscPct}%):`,
+        columns.totais.label,
+        yPosition,
+        { align: "right" },
+      );
+      doc.text(
+        `-${formatCurrency(orderDiscAmt)}`,
+        columns.totais.value,
+        yPosition,
+        { align: "right" },
+      );
+      yPosition += 4;
     }
 
     doc.setFont(undefined, "bold");
     doc.setFontSize(10);
     doc.text("TOTAL:", columns.totais.label, yPosition, { align: "right" });
-    doc.text(formatCurrency(totalValue), columns.totais.value, yPosition, { align: "right" });
-    yPosition += 12; // ✅ Menos espaço
+    doc.text(
+      formatCurrency(totalValue),
+      columns.totais.value,
+      yPosition,
+      { align: "right" },
+    );
+    yPosition += 12;
 
     checkPageOverflow(25);
 
-    // Informações de pagamento e data
     doc.setFontSize(9);
     doc.setFont(undefined, "bold");
     doc.text("Condição de Pagamento:", margin, yPosition);
     yPosition += 4;
-    
+
     doc.setFont(undefined, "normal");
-    const paymentMethod = order.paymentMethod || "Boleto";
-    doc.text(paymentMethod, margin, yPosition);
+    const rawPay = order.paymentMethod ?? order.payment_method;
+    const paymentMethod =
+      (rawPay && PAYMENT_PDF_LABELS[rawPay]) || rawPay || "—";
+    doc.text(String(paymentMethod), margin, yPosition);
     yPosition += 6; // ✅ Menos espaço
 
     doc.setFont(undefined, "bold");
@@ -281,8 +358,10 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     yPosition += 4;
     
     doc.setFont(undefined, "normal");
-    const emissionDate = order.finishedAt 
-      ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
+    const created =
+      order.createdAt ?? order.createdat ?? order.created_at ?? null;
+    const emissionDate = created
+      ? new Date(created).toLocaleDateString("pt-BR")
       : new Date().toLocaleDateString("pt-BR");
     doc.text(emissionDate, margin, yPosition);
     yPosition += 12; // ✅ Menos espaço

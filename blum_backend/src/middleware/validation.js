@@ -143,6 +143,11 @@ exports.validateOrder = [
 
   body("items.*.price").isFloat({ min: 0 }).withMessage("Preço inválido"),
 
+  body("items.*.lineDiscount")
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage("Desconto da linha deve estar entre 0 e 100"),
+
   body("discount")
     .optional()
     .isFloat({ min: 0, max: 100 })
@@ -171,6 +176,12 @@ exports.validateBrand = [
     .optional()
     .isFloat({ min: 0, max: 100 })
     .withMessage("Taxa de comissão deve estar entre 0 e 100"),
+
+  body("logo_url")
+    .optional({ values: "falsy" })
+    .isString()
+    .isLength({ max: 1024 })
+    .withMessage("URL do logo inválida"),
 
   handleValidationErrors,
 ];

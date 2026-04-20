@@ -38,15 +38,22 @@ const OrdersForm = ({
     return num.toFixed(decimals);
   };
 
-  // Calcular subtotal e desconto CORRETAMENTE
-  const subtotal = items.reduce((total, item) => {
+  const lineNetTotal = (item) => {
     const price = parseFloat(item.price) || 0;
-    const quantity = parseInt(item.quantity) || 1;
-    return total + price * quantity;
-  }, 0);
+    const quantity = parseInt(item.quantity, 10) || 1;
+    const ld = parseFloat(item.lineDiscount) || 0;
+    const factor = 1 - Math.min(100, Math.max(0, ld)) / 100;
+    return price * quantity * factor;
+  };
 
-  const discountAmount = subtotal * (parseFloat(discount) / 100);
-  const netTotal = subtotal - discountAmount;
+  const subtotalAfterLineDiscounts = items.reduce(
+    (total, item) => total + lineNetTotal(item),
+    0,
+  );
+
+  const discountAmount =
+    subtotalAfterLineDiscounts * (parseFloat(discount) / 100);
+  const netTotal = subtotalAfterLineDiscounts - discountAmount;
 
   useEffect(() => {
     if (editingOrder) {
@@ -225,7 +232,14 @@ const OrdersForm = ({
       }
     }
 
-    newItems[index][field] = value;
+    if (field === "lineDiscount") {
+      let v = parseFloat(value);
+      if (!Number.isFinite(v)) v = 0;
+      v = Math.min(100, Math.max(0, v));
+      newItems[index][field] = v;
+    } else {
+      newItems[index][field] = value;
+    }
     setItems(newItems);
   };
 
@@ -249,6 +263,7 @@ const OrdersForm = ({
           brand: product.brand,
           quantity: 1,
           price: product.price,
+          lineDiscount: 0,
           productId: product.id,
           productcode: product.productcode,
           subcode: product.subcode,
@@ -378,6 +393,10 @@ const OrdersForm = ({
           ...item,
           price: parseFloat(item.price) || 0,
           quantity: parseInt(item.quantity) || 1,
+          lineDiscount: Math.min(
+            100,
+            Math.max(0, parseFloat(item.lineDiscount) || 0),
+          ),
         })),
         discount: parseFloat(discount) || 0,
         totalprice: parseFloat(netTotal) || 0,
@@ -595,7 +614,7 @@ const OrdersForm = ({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Desconto (%)
+                Desconto geral no pedido (%)
               </label>
               <input
                 type="number"
@@ -606,6 +625,9 @@ const OrdersForm = ({
                 onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                 className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                Aplicado sobre o subtotal já com descontos por item.
+              </p>
             </div>
           </div>
 
@@ -735,7 +757,7 @@ const OrdersForm = ({
                             handleItemChange(
                               index,
                               "quantity",
-                              parseInt(e.target.value),
+                              parseInt(e.target.value, 10),
                             )
                           }
                           className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -756,12 +778,33 @@ const OrdersForm = ({
                       </button>
                     </div>
 
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-500 block">
+                        Desconto no item (%)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={item.lineDiscount ?? 0}
+                        onChange={(e) =>
+                          handleItemChange(
+                            index,
+                            "lineDiscount",
+                            e.target.value,
+                          )
+                        }
+                        className="w-full p-2 border border-gray-300 rounded-md text-center text-base"
+                      />
+                    </div>
+
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">
-                        Unitario: R$ {safeToFixed(item.price)}
+                        Unitário: R$ {safeToFixed(item.price)}
                       </span>
                       <span className="font-semibold text-gray-900">
-                        Subtotal: R$ {safeToFixed(item.price * item.quantity)}
+                        Subtotal: R$ {safeToFixed(lineNetTotal(item))}
                       </span>
                     </div>
                   </div>
@@ -776,6 +819,9 @@ const OrdersForm = ({
                       </th>
                       <th className="px-8 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                         Qtd.
+                      </th>
+                      <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                        Desc. %
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                         Preço Unit.
@@ -826,7 +872,7 @@ const OrdersForm = ({
                                 handleItemChange(
                                   index,
                                   "quantity",
-                                  parseInt(e.target.value),
+                                  parseInt(e.target.value, 10),
                                 )
                               }
                               className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -838,6 +884,23 @@ const OrdersForm = ({
                             )}
                           </div>
                         </td>
+                        <td className="px-2 py-4 whitespace-nowrap text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={item.lineDiscount ?? 0}
+                            onChange={(e) =>
+                              handleItemChange(
+                                index,
+                                "lineDiscount",
+                                e.target.value,
+                              )
+                            }
+                            className="w-full max-w-[4.5rem] p-1.5 border border-gray-300 rounded-md text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm text-gray-700">
                             R$ {safeToFixed(item.price)}
@@ -845,7 +908,7 @@ const OrdersForm = ({
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm font-semibold text-gray-900">
-                            R$ {safeToFixed(item.price * item.quantity)}
+                            R$ {safeToFixed(lineNetTotal(item))}
                           </span>
                         </td>
                         <td className="px-3 py-4 whitespace-nowrap text-center">
@@ -870,12 +933,14 @@ const OrdersForm = ({
           <div className="mt-6 bg-gray-50 p-4 sm:p-6 rounded-lg border">
             <div className="space-y-3">
               <div className="flex justify-between items-center text-gray-600">
-                <span>Subtotal</span>
-                <span className="font-medium">R$ {safeToFixed(subtotal)}</span>
+                <span>Subtotal (após descontos nos itens)</span>
+                <span className="font-medium">
+                  R$ {safeToFixed(subtotalAfterLineDiscounts)}
+                </span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between items-center text-gray-600">
-                  <span>Desconto ({discount}%)</span>
+                  <span>Desconto geral ({discount}%)</span>
                   <span className="font-medium text-red-500">
                     - R$ {safeToFixed(discountAmount)}
                   </span>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import apiService from "../services/apiService";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
@@ -25,6 +25,43 @@ function formatOpenDays(createdAt, status) {
     0,
     Math.floor((Date.now() - d.getTime()) / 86400000),
   );
+}
+
+function formatDaySectionLabel(dateKey) {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const thatDay = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tt = new Date(thatDay);
+  tt.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today - tt) / 86400000);
+  if (diffDays === 0) return "Hoje";
+  if (diffDays === 1) return "Ontem";
+  return thatDay.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function groupOrdersByDay(orders) {
+  const groups = new Map();
+  for (const order of orders) {
+    const raw = order.createdAt ?? order.createdat;
+    if (!raw) continue;
+    const dt = new Date(raw);
+    if (Number.isNaN(dt.getTime())) continue;
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(order);
+  }
+  const keys = [...groups.keys()].sort((a, b) => b.localeCompare(a));
+  return keys.map((dateKey) => ({
+    dateKey,
+    label: formatDaySectionLabel(dateKey),
+    orders: groups.get(dateKey),
+  }));
 }
 
 const OrdersPage = ({ userId, userRole, brands }) => {
@@ -261,6 +298,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         <PdfGenerator
           order={pdfOrder}
           clients={clients}
+          clientsList={clientsList}
           brands={safeBrands}
           onClose={() => setPdfOrder(null)}
         />
@@ -287,82 +325,103 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
       <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
         {orders.length > 0 ? (
-          <ul className="divide-y divide-gray-200">
-            {orders.map((order) => {
-              const openDays = formatOpenDays(order.createdAt, order.status);
-              return (
-              <li
-                key={order.id}
-                className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
-              >
-                <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-800">
-                    {order.documentType === "orcamento"
-                      ? "Orçamento"
-                      : "Pedido"}{" "}
-                    #{order.id}
-                  </h2>
-                  <p className="text-xs font-medium text-indigo-700 mt-0.5">
-                    {order.documentType === "orcamento"
-                      ? "Status: orçamento (aguardando virar pedido)"
-                      : order.paymentMethod
-                        ? `Pedido • Pagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}`
-                        : "Pedido • Pagamento não informado"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Cliente: {clients[order.clientId] || "N/A"}
-                  </p>
-                  {order.representadas ? (
-                    <p className="text-sm text-gray-700 mt-1 font-medium">
-                      Representada: {order.representadas}
-                    </p>
-                  ) : null}
-                  <p className="text-sm text-gray-500 mt-1">
-                    Itens: {order.itemsCount ?? order.items?.length ?? 0}
-                  </p>
-                  {order.createdAt ? (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Criado em:{" "}
-                      {new Date(order.createdAt).toLocaleDateString("pt-BR")}
-                      {openDays != null ? (
-                        <span className="ml-2 text-amber-800 font-medium">
-                          • há {openDays} dia{openDays === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                    </p>
-                  ) : null}
-                  <p className="text-sm text-gray-500 mt-1">
-                    Descrição: {order.description || "N/A"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Finalizado em:{" "}
-                    {order.finishedAt
-                      ? new Date(order.finishedAt).toLocaleDateString("pt-BR")
-                      : "—"}
-                  </p>
-                </div>
-                <div className="flex flex-col items-start sm:items-end gap-3 text-left sm:text-right w-full sm:w-fit">
-                  <div className="flex flex-col items-start sm:items-end gap-2 w-full">
-                    <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-full sm:w-fit">
-                      <p className="text-base font-bold text-gray-800">
-                        Total: {formatCurrency(order.totalPrice)}
-                      </p>
-                      {order.discount > 0 && (
-                        <p className="text-xs text-gray-500 line-through">
-                          {formatCurrency(
-                            parseFloat(order.totalPrice) +
-                              parseFloat(order.discount),
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    {renderOrderActions(order)}
-                  </div>
-                </div>
-              </li>
-            );
-            })}
-          </ul>
+          <div className="space-y-8">
+            {ordersByDay.map(({ dateKey, label, orders: dayOrders }) => (
+              <section key={dateKey} className="space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100 pb-2">
+                  {label}
+                </h2>
+                <ul className="divide-y divide-gray-200">
+                  {dayOrders.map((order) => {
+                    const openDays = formatOpenDays(
+                      order.createdAt,
+                      order.status,
+                    );
+                    return (
+                      <li
+                        key={order.id}
+                        className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
+                      >
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            {order.documentType === "orcamento"
+                              ? "Orçamento"
+                              : "Pedido"}{" "}
+                            #{order.id}
+                          </h3>
+                          <p className="text-xs font-medium text-indigo-700 mt-0.5">
+                            {order.documentType === "orcamento"
+                              ? "Status: orçamento (aguardando virar pedido)"
+                              : order.paymentMethod
+                                ? `Pedido • Pagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}`
+                                : "Pedido • Pagamento não informado"}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Cliente: {clients[order.clientId] || "N/A"}
+                          </p>
+                          {order.representadas ? (
+                            <p className="text-sm text-gray-700 mt-1 font-medium">
+                              Representada: {order.representadas}
+                            </p>
+                          ) : null}
+                          <p className="text-sm text-gray-500 mt-1">
+                            Itens: {order.itemsCount ?? order.items?.length ?? 0}
+                          </p>
+                          {order.createdAt ? (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Criado em:{" "}
+                              {new Date(order.createdAt).toLocaleString(
+                                "pt-BR",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                              {openDays != null ? (
+                                <span className="ml-2 text-amber-800 font-medium">
+                                  • há {openDays} dia
+                                  {openDays === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
+                            </p>
+                          ) : null}
+                          <p className="text-sm text-gray-500 mt-1">
+                            Descrição: {order.description || "N/A"}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Finalizado em:{" "}
+                            {order.finishedAt
+                              ? new Date(order.finishedAt).toLocaleDateString(
+                                  "pt-BR",
+                                )
+                              : "—"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-start sm:items-end gap-3 text-left sm:text-right w-full sm:w-fit">
+                          <div className="flex flex-col items-start sm:items-end gap-2 w-full">
+                            <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-full sm:w-fit">
+                              <p className="text-base font-bold text-gray-800">
+                                Total: {formatCurrency(order.totalPrice)}
+                              </p>
+                              {order.discount > 0 && (
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Desconto geral no pedido: {order.discount}%
+                                </p>
+                              )}
+                            </div>
+                            {renderOrderActions(order)}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         ) : (
           <div className="text-center text-gray-500">
             Nenhum pedido encontrado.

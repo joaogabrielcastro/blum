@@ -11,10 +11,10 @@ exports.getBrands = async (req, res) => {
     let brands;
     if (!restricted) {
       brands =
-        await sql`SELECT id, name, commission_rate FROM brands ORDER BY name ASC`;
+        await sql`SELECT id, name, commission_rate, logo_url FROM brands ORDER BY name ASC`;
     } else {
       brands = await sql`
-        SELECT id, name, commission_rate FROM brands
+        SELECT id, name, commission_rate, logo_url FROM brands
         WHERE name = ANY(${restricted})
         ORDER BY name ASC
       `;
@@ -28,7 +28,7 @@ exports.getBrands = async (req, res) => {
 
 // Função para criar marca
 exports.createBrand = async (req, res) => {
-  const { name, commission_rate = 0 } = req.body;
+  const { name, commission_rate = 0, logo_url = null } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: "O nome da marca é obrigatório." });
@@ -36,8 +36,8 @@ exports.createBrand = async (req, res) => {
 
   try {
     await sql`
-      INSERT INTO brands (name, commission_rate) 
-      VALUES (${name}, ${commission_rate}) 
+      INSERT INTO brands (name, commission_rate, logo_url) 
+      VALUES (${name}, ${commission_rate}, ${logo_url || null}) 
       ON CONFLICT (name) DO NOTHING
     `;
     res.status(201).json({ message: "Marca criada com sucesso!" });
@@ -49,12 +49,22 @@ exports.createBrand = async (req, res) => {
 
 exports.updateBrand = async (req, res) => {
   const { oldName } = req.params;
-  const { name, commission_rate } = req.body;
+  const { name, commission_rate, logo_url } = req.body;
 
   try {
+    const current = await sql`
+      SELECT logo_url FROM brands WHERE name = ${oldName}
+    `;
+    if (current.length === 0) {
+      return res.status(404).json({ error: "Marca não encontrada." });
+    }
+    const nextLogo = Object.prototype.hasOwnProperty.call(req.body, "logo_url")
+      ? logo_url || null
+      : current[0].logo_url ?? null;
+
     await sql`
       UPDATE brands 
-      SET name = ${name}, commission_rate = ${commission_rate}
+      SET name = ${name}, commission_rate = ${commission_rate}, logo_url = ${nextLogo}
       WHERE name = ${oldName}
     `;
     res.status(200).json({ message: "Marca atualizada com sucesso!" });
