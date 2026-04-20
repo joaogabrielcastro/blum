@@ -250,6 +250,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     );
   };
 
+  const ordersByDay = useMemo(() => groupOrdersByDay(orders), [orders]);
+
   if (loading || editingLoading) {
     return (
       <div className="p-8 text-center text-gray-500">
