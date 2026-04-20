@@ -261,7 +261,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         >
           Excluir
         </button>
-        {isDelivered && (
+        {(isDelivered || isQuote) && (
           <button
             onClick={() => handleOpenPdf(order)}
             disabled={pdfLoadingOrderId === order.id}
