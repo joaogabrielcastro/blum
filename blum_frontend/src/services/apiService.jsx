@@ -288,6 +288,25 @@ const apiService = {
     });
   },
 
+  updateOrderPaymentMethod: async (orderId, payment_method) => {
+    return apiRequest(`${API_URL}/orders/${orderId}/payment-method`, {
+      method: "PUT",
+      body: JSON.stringify({ payment_method }),
+    });
+  },
+
+  duplicateOrder: async (orderId) => {
+    return apiRequest(`${API_URL}/orders/${orderId}/duplicate`, {
+      method: "POST",
+    });
+  },
+
+  getClientItemPriceHistory: async (clientId, productId, limit = 8) => {
+    return apiRequest(
+      `${API_URL}/orders/clients/${clientId}/products/${productId}/price-history?limit=${limit}`,
+    );
+  },
+
   convertOrderToPedido: async (orderId) => {
     return apiRequest(`${API_URL}/orders/${orderId}/convert-to-pedido`, {
       method: "PUT",

@@ -6,6 +6,7 @@ import {
 } from "../utils/clients";
 import { normalizeOrderLineItems } from "../utils/format";
 import { productMatchesFlexible } from "../utils/productSearch";
+import ClientItemPriceHistoryModal from "./ClientItemPriceHistoryModal";
 
 const OrdersForm = ({
   userId,
@@ -30,6 +31,7 @@ const OrdersForm = ({
     useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [historyModalItem, setHistoryModalItem] = useState(null);
 
   // Função segura para toFixed
   const safeToFixed = (value, decimals = 2) => {
@@ -54,6 +56,8 @@ const OrdersForm = ({
   const discountAmount =
     subtotalAfterLineDiscounts * (parseFloat(discount) / 100);
   const netTotal = subtotalAfterLineDiscounts - discountAmount;
+  const canApplyGeneralDiscount =
+    paymentMethod === "pix" || paymentMethod === "dinheiro";
 
   useEffect(() => {
     if (editingOrder) {
@@ -358,6 +362,17 @@ const OrdersForm = ({
       alert("Por favor, preencha todos os campos dos produtos.");
       return;
     }
+    const discountValue = parseFloat(discount) || 0;
+    if (!canApplyGeneralDiscount && discountValue > 0) {
+      alert(
+        "Desconto geral só é permitido para PIX ou dinheiro (máximo 2%).",
+      );
+      return;
+    }
+    if (canApplyGeneralDiscount && discountValue > 2) {
+      alert("Para PIX ou dinheiro, o desconto geral máximo permitido é 2%.");
+      return;
+    }
     if (!userId) {
       alert(
         "ID do usuário não disponível. Por favor, tente fazer login novamente.",
@@ -407,9 +422,7 @@ const OrdersForm = ({
           : "orcamento",
       };
 
-      if (editingOrder?.documentType === "pedido") {
-        orderData.payment_method = paymentMethod || null;
-      }
+      orderData.payment_method = paymentMethod || null;
 
       if (editingOrder) {
         await apiService.updateOrder(editingOrder.id, orderData);
@@ -573,33 +586,46 @@ const OrdersForm = ({
             </div>
           </div>
 
-          {/* --- Descrição, pagamento (pedido) e Desconto --- */}
+          {/* --- Descrição, pagamento e desconto --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {editingOrder?.documentType === "pedido" && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Forma de pagamento / faturamento
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione (opcional)</option>
-                  <option value="carteira">
-                    Carteira (não pago / em aberto)
-                  </option>
-                  <option value="boleto">Pagamento em boleto</option>
-                  <option value="pix">Pagamento via PIX</option>
-                  <option value="cheque">Pagamento via cheque</option>
-                  <option value="dinheiro">Pagamento em dinheiro</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Equivale ao controle de “faturado” no Mercos: use para saber
-                  como foi quitado.
-                </p>
-              </div>
-            )}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Condição / forma de pagamento
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => {
+                  const nextMethod = e.target.value;
+                  setPaymentMethod(nextMethod);
+                  const currentDiscount = parseFloat(discount) || 0;
+                  if (nextMethod === "pix" || nextMethod === "dinheiro") {
+                    if (currentDiscount > 2) {
+                      setDiscount(2);
+                      alert(
+                        "Para PIX ou dinheiro, o desconto geral foi ajustado para o máximo de 2%.",
+                      );
+                    }
+                  } else if (currentDiscount > 0) {
+                    setDiscount(0);
+                    alert(
+                      "Para esta forma de pagamento, desconto geral não é permitido.",
+                    );
+                  }
+                }}
+                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Selecione (opcional)</option>
+                <option value="carteira">Carteira (não pago / em aberto)</option>
+                <option value="boleto">Pagamento em boleto</option>
+                <option value="pix">Pagamento via PIX</option>
+                <option value="cheque">Pagamento via cheque</option>
+                <option value="dinheiro">Pagamento em dinheiro</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Desconto geral só é permitido em PIX ou dinheiro.
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Descrição
@@ -612,6 +638,7 @@ const OrdersForm = ({
                 placeholder="Descrição do pedido (opcional)"
               />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Desconto geral no pedido (%)
@@ -619,15 +646,31 @@ const OrdersForm = ({
               <input
                 type="number"
                 min="0"
-                max="100"
+                max={canApplyGeneralDiscount ? "2" : "0"}
                 step="0.01"
                 value={discount}
-                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => {
+                  const raw = parseFloat(e.target.value) || 0;
+                  const capped = canApplyGeneralDiscount
+                    ? Math.min(2, Math.max(0, raw))
+                    : 0;
+                  setDiscount(capped);
+                }}
+                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                disabled={!canApplyGeneralDiscount}
               />
               <p className="mt-1 text-xs text-gray-500">
                 Aplicado sobre o subtotal já com descontos por item.
               </p>
+              {canApplyGeneralDiscount ? (
+                <p className="mt-1 text-xs font-medium text-amber-700">
+                  Para PIX ou dinheiro, desconto geral limitado a 2%.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs font-medium text-gray-500">
+                  Para esta forma de pagamento, desconto geral deve ser 0%.
+                </p>
+              )}
             </div>
           </div>
 
@@ -807,6 +850,14 @@ const OrdersForm = ({
                         Subtotal: R$ {safeToFixed(lineNetTotal(item))}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryModalItem(item)}
+                      disabled={!clientId || !item.productId}
+                      className="w-full rounded-md border border-blue-300 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Ver histórico deste produto no cliente
+                    </button>
                   </div>
                 ))}
               </div>
@@ -912,14 +963,24 @@ const OrdersForm = ({
                           </span>
                         </td>
                         <td className="px-3 py-4 whitespace-nowrap text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="px-3 py-1.5 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors text-sm font-medium"
-                            title="Remover Item"
-                          >
-                            Excluir
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="px-3 py-1.5 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors text-sm font-medium"
+                              title="Remover Item"
+                            >
+                              Excluir
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setHistoryModalItem(item)}
+                              disabled={!clientId || !item.productId}
+                              className="px-2 py-1 border border-blue-200 text-blue-700 rounded-md hover:bg-blue-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Histórico cliente
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1065,6 +1126,13 @@ const OrdersForm = ({
               )}
           </div>
         </div>
+      )}
+      {historyModalItem && (
+        <ClientItemPriceHistoryModal
+          clientId={clientId}
+          item={historyModalItem}
+          onClose={() => setHistoryModalItem(null)}
+        />
       )}
     </>
   );

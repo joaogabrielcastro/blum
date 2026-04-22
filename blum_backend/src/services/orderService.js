@@ -33,6 +33,13 @@ const REPRESENTADAS_FRAGMENT = {
   text: REPRESENTADAS_SQL,
   values: [],
 };
+const ALLOWED_PAYMENT_METHODS = [
+  "carteira",
+  "boleto",
+  "pix",
+  "cheque",
+  "dinheiro",
+];
 
 class OrderService {
   async loadCommissionRatesByBrandNames(brandNames) {
@@ -274,14 +281,29 @@ class OrderService {
     } else {
       docType = "orcamento";
     }
-    const allowed = ["carteira", "boleto", "pix", "cheque", "dinheiro"];
     let payment =
       orderData.payment_method !== undefined
         ? orderData.payment_method || null
         : existing?.payment_method ?? null;
-    if (payment && !allowed.includes(payment)) payment = null;
-    if (docType === "orcamento") payment = null;
+    if (payment && !ALLOWED_PAYMENT_METHODS.includes(payment)) payment = null;
     return { docType, payment };
+  }
+
+  enforceDiscountRules(discountRaw, paymentMethod) {
+    const discount = Number(discountRaw) || 0;
+    const allowDiscount = paymentMethod === "pix" || paymentMethod === "dinheiro";
+    if (!allowDiscount && discount > 0) {
+      const err = new Error(
+        "Desconto geral só é permitido para PIX ou dinheiro.",
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    if (allowDiscount && discount > 2) {
+      const err = new Error("Desconto geral máximo para PIX ou dinheiro é 2%.");
+      err.statusCode = 400;
+      throw err;
+    }
   }
 
   resolveSellerUserId(orderData, authUser) {
@@ -299,6 +321,7 @@ class OrderService {
   async create(orderData, authUser) {
     const { clientid, description, items, discount } = orderData;
     const { docType, payment } = this.normalizeDocumentAndPayment(orderData);
+    this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
 
@@ -366,6 +389,7 @@ class OrderService {
       orderData,
       existing,
     );
+    this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
 
@@ -427,6 +451,107 @@ class OrderService {
     await this.persistOrderItems(id, calculated.items);
 
     return this.findById(id);
+  }
+
+  async updatePaymentMethod(id, paymentMethod) {
+    if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
+      const err = new Error("Forma de pagamento inválida.");
+      err.statusCode = 400;
+      throw err;
+    }
+    const current = await this.findById(id);
+    if (current.document_type !== "pedido") {
+      const err = new Error(
+        "A forma de pagamento só pode ser definida em pedidos.",
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+    this.enforceDiscountRules(current.discount, paymentMethod);
+    await sql`
+      UPDATE orders
+      SET payment_method = ${paymentMethod}
+      WHERE id = ${id}
+    `;
+    return this.findById(id);
+  }
+
+  async duplicate(id) {
+    const source = await this.findById(id);
+    const sourceItems = Array.isArray(source.items) ? source.items : [];
+    if (sourceItems.length === 0) {
+      throw new Error("Não é possível duplicar um pedido sem itens.");
+    }
+    const sourceDiscount = parseFloat(source.discount) || 0;
+    const calculated = await this.calculateItemsCommission(
+      sourceItems,
+      sourceDiscount,
+    );
+    const inserted = await sql`
+      INSERT INTO orders
+        (clientid, user_ref, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
+      VALUES
+        (${source.clientid}, ${source.user_ref}, ${source.description || ""},
+         ${sourceDiscount}, ${calculated.finalTotal}, ${calculated.totalCommission},
+         'Em aberto', NOW(), 'orcamento', null)
+      RETURNING id
+    `;
+    const newId = inserted[0].id;
+    await this.persistOrderItems(newId, calculated.items);
+    return this.findById(newId);
+  }
+
+  async getClientItemPriceHistory(
+    clientId,
+    productId,
+    authUser = null,
+    limit = 8,
+  ) {
+    if (!clientId || !productId) {
+      throw new Error("clientId e productId são obrigatórios");
+    }
+    const safeLimit = Math.min(30, Math.max(1, parseInt(limit, 10) || 8));
+    if (authUser?.role === "salesperson") {
+      return sql`
+        SELECT
+          oi.id,
+          o.id AS order_id,
+          o.createdat AS created_at,
+          oi.unit_price AS unit_price,
+          oi.quantity,
+          oi.line_discount,
+          o.payment_method,
+          u.name AS seller_name
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN users u ON u.id = o.user_ref
+        WHERE o.clientid = ${clientId}
+          AND oi.product_id = ${productId}
+          AND o.document_type = 'pedido'
+          AND o.user_ref = ${authUser.userId}
+        ORDER BY o.createdat DESC
+        LIMIT ${safeLimit}
+      `;
+    }
+    return sql`
+      SELECT
+        oi.id,
+        o.id AS order_id,
+        o.createdat AS created_at,
+        oi.unit_price AS unit_price,
+        oi.quantity,
+        oi.line_discount,
+        o.payment_method,
+        u.name AS seller_name
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      LEFT JOIN users u ON u.id = o.user_ref
+      WHERE o.clientid = ${clientId}
+        AND oi.product_id = ${productId}
+        AND o.document_type = 'pedido'
+      ORDER BY o.createdat DESC
+      LIMIT ${safeLimit}
+    `;
   }
 
   async convertToPedido(id) {

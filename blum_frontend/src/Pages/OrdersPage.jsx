@@ -17,6 +17,14 @@ const PAYMENT_LABELS = {
   dinheiro: "Dinheiro",
 };
 
+const PAYMENT_BADGE_CLASS = {
+  carteira: "bg-amber-100 text-amber-900 border-amber-300",
+  boleto: "bg-blue-100 text-blue-900 border-blue-300",
+  pix: "bg-emerald-100 text-emerald-900 border-emerald-300",
+  cheque: "bg-purple-100 text-purple-900 border-purple-300",
+  dinheiro: "bg-lime-100 text-lime-900 border-lime-300",
+};
+
 function formatOpenDays(createdAt, status) {
   if (!createdAt || status === "Entregue") return null;
   const d = new Date(createdAt);
@@ -74,6 +82,10 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [clientsList, setClientsList] = useState([]);
   const [pdfOrder, setPdfOrder] = useState(null);
   const [pdfLoadingOrderId, setPdfLoadingOrderId] = useState(null);
+  const [duplicatingOrderId, setDuplicatingOrderId] = useState(null);
+  const [paymentDialogOrder, setPaymentDialogOrder] = useState(null);
+  const [paymentDialogMethod, setPaymentDialogMethod] = useState("boleto");
+  const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
 
   // Validar e transformar brands para garantir segurança
@@ -216,6 +228,45 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     }
   };
 
+  const handleDuplicateOrder = async (orderId) => {
+    try {
+      setDuplicatingOrderId(orderId);
+      const duplicated = await apiService.duplicateOrder(orderId);
+      setEditingOrder(formatOrderData(duplicated));
+      setShowForm(true);
+      await fetchData();
+    } catch (error) {
+      alert(error?.message || "Não foi possível duplicar o pedido.");
+    } finally {
+      setDuplicatingOrderId(null);
+    }
+  };
+
+  const handleOpenPaymentDialog = (order) => {
+    setPaymentDialogOrder(order);
+    setPaymentDialogMethod("boleto");
+  };
+
+  const handleConfirmPaymentMethod = async () => {
+    if (!paymentDialogOrder?.id) return;
+    try {
+      setUpdatingPayment(true);
+      await apiService.updateOrderPaymentMethod(
+        paymentDialogOrder.id,
+        paymentDialogMethod,
+      );
+      setPaymentDialogOrder(null);
+      await fetchData();
+    } catch (error) {
+      alert(
+        error?.message ||
+          "Não foi possível atualizar a forma de pagamento do pedido.",
+      );
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
+
   const renderOrderActions = (order) => {
     const isDelivered = order.status === "Entregue";
     const isQuote = order.documentType === "orcamento";
@@ -253,8 +304,25 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                 Finalizar entrega
               </button>
             )}
+            {!isQuote && order.paymentMethod === "carteira" && (
+              <button
+                type="button"
+                onClick={() => handleOpenPaymentDialog(order)}
+                className="min-h-10 px-3 py-1 text-sm font-medium text-amber-700 border border-amber-500 rounded-lg hover:bg-amber-50 transition"
+              >
+                Registrar pagamento
+              </button>
+            )}
           </>
         )}
+        <button
+          type="button"
+          onClick={() => handleDuplicateOrder(order.id)}
+          disabled={duplicatingOrderId === order.id}
+          className="min-h-10 px-3 py-1 text-sm font-medium text-violet-700 border border-violet-400 rounded-lg hover:bg-violet-50 transition disabled:opacity-60"
+        >
+          {duplicatingOrderId === order.id ? "Duplicando..." : "Duplicar"}
+        </button>
         <button
           onClick={() => setModalAction({ type: "delete", orderId: order.id })}
           className="min-h-10 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
@@ -329,6 +397,46 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           onClose={() => setPdfOrder(null)}
         />
       )}
+      {paymentDialogOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-800">
+              Registrar pagamento do pedido #{paymentDialogOrder.id}
+            </h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Escolha como o cliente quitou o pedido que estava em carteira.
+            </p>
+            <select
+              value={paymentDialogMethod}
+              onChange={(e) => setPaymentDialogMethod(e.target.value)}
+              className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="boleto">Boleto</option>
+              <option value="pix">PIX</option>
+              <option value="cheque">Cheque</option>
+              <option value="dinheiro">Dinheiro</option>
+            </select>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentDialogOrder(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                disabled={updatingPayment}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPaymentMethod}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                disabled={updatingPayment}
+              >
+                {updatingPayment ? "Salvando..." : "Salvar pagamento"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
@@ -348,7 +456,6 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       <p className="text-gray-600 mb-8">
         Acompanhe o status e histórico de pedidos.
       </p>
-
       <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
         {orders.length > 0 ? (
           <div className="space-y-8">
@@ -378,13 +485,31 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                           <p className="text-xs font-medium text-indigo-700 mt-0.5">
                             {order.documentType === "orcamento"
                               ? "Status: orçamento (aguardando virar pedido)"
-                              : order.paymentMethod
-                                ? `Pedido • Pagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}`
-                                : "Pedido • Pagamento não informado"}
+                              : "Pedido"}
                           </p>
+                          {order.documentType === "pedido" && (
+                            <p className="mt-2">
+                              <span
+                                className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${
+                                  PAYMENT_BADGE_CLASS[order.paymentMethod] ||
+                                  "bg-gray-100 text-gray-800 border-gray-300"
+                                }`}
+                              >
+                                {order.paymentMethod
+                                  ? PAYMENT_LABELS[order.paymentMethod] ||
+                                    order.paymentMethod
+                                  : "Pagamento não informado"}
+                              </span>
+                            </p>
+                          )}
                           <p className="text-sm text-gray-500 mt-1">
                             Cliente: {clients[order.clientId] || "N/A"}
                           </p>
+                          {userRole === "admin" && order.sellerName ? (
+                            <p className="text-sm text-gray-500 mt-1">
+                              Vendedor: {order.sellerName}
+                            </p>
+                          ) : null}
                           {order.representadas ? (
                             <p className="text-sm text-gray-700 mt-1 font-medium">
                               Representada: {order.representadas}

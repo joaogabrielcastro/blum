@@ -182,6 +182,76 @@ exports.finalize = async (req, res) => {
   }
 };
 
+// UPDATE PAYMENT METHOD - Atualizar forma de pagamento de pedido
+exports.updatePaymentMethod = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { payment_method: paymentMethod } = req.body;
+    const existing = await orderService.findById(id);
+    assertOrderAccess(req, existing);
+    const updated = await orderService.updatePaymentMethod(id, paymentMethod);
+    res.status(200).json(updated);
+  } catch (error) {
+    console.error("Erro ao atualizar forma de pagamento:", error);
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message === "Pedido não encontrado") {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Erro ao atualizar forma de pagamento." });
+  }
+};
+
+// DUPLICATE - Duplicar pedido/orçamento
+exports.duplicate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await orderService.findById(id);
+    assertOrderAccess(req, existing);
+    const duplicated = await orderService.duplicate(id);
+    res.status(201).json(duplicated);
+  } catch (error) {
+    console.error("Erro ao duplicar pedido:", error);
+    if (error.statusCode === 403) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message === "Pedido não encontrado") {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Erro ao duplicar pedido." });
+  }
+};
+
+// GET CLIENT ITEM PRICE HISTORY
+exports.getClientItemPriceHistory = async (req, res) => {
+  try {
+    const { clientId, productId } = req.params;
+    const { limit } = req.query;
+    const rows = await orderService.getClientItemPriceHistory(
+      parseInt(clientId, 10),
+      parseInt(productId, 10),
+      req.user,
+      limit,
+    );
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error("Erro ao buscar histórico de preço cliente/produto:", error);
+    if (error.statusCode === 400) {
+      return res.status(400).json({ error: error.message });
+    }
+    res
+      .status(500)
+      .json({ error: "Erro ao buscar histórico de preço do cliente." });
+  }
+};
+
 // GET CLIENT STATS - Estatísticas do cliente
 exports.getClientStats = async (req, res) => {
   try {

@@ -163,6 +163,24 @@ exports.validateOrder = [
   handleValidationErrors,
 ];
 
+exports.validateOrderPaymentMethodUpdate = [
+  param("id").isInt({ min: 1 }).withMessage("ID inválido"),
+  body("payment_method")
+    .isIn(["carteira", "boleto", "pix", "cheque", "dinheiro"])
+    .withMessage("Forma de pagamento inválida"),
+  handleValidationErrors,
+];
+
+exports.validateClientItemHistoryParams = [
+  param("clientId").isInt({ min: 1 }).withMessage("ID de cliente inválido"),
+  param("productId").isInt({ min: 1 }).withMessage("ID de produto inválido"),
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 30 })
+    .withMessage("limit deve ser entre 1 e 30"),
+  handleValidationErrors,
+];
+
 // Validações para marcas
 exports.validateBrand = [
   body("name")

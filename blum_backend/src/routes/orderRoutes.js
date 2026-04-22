@@ -2,10 +2,21 @@ const express = require("express");
 const router = express.Router();
 const ordersController = require("../controllers/orderController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
-const { validateOrder, validateId } = require("../middleware/validation");
+const {
+  validateOrder,
+  validateId,
+  validateOrderPaymentMethodUpdate,
+  validateClientItemHistoryParams,
+} = require("../middleware/validation");
 
 // Todas as rotas requerem autenticação
 router.get("/", authenticate, ordersController.getAll);
+router.get(
+  "/clients/:clientId/products/:productId/price-history",
+  authenticate,
+  validateClientItemHistoryParams,
+  ordersController.getClientItemPriceHistory,
+);
 router.get("/seller/:userId", authenticate, ordersController.getOrdersBySeller);
 router.get(
   "/stats/:clientId",
@@ -26,6 +37,18 @@ router.put(
   authenticate,
   validateId,
   ordersController.finalize
+);
+router.put(
+  "/:id/payment-method",
+  authenticate,
+  validateOrderPaymentMethodUpdate,
+  ordersController.updatePaymentMethod,
+);
+router.post(
+  "/:id/duplicate",
+  authenticate,
+  validateId,
+  ordersController.duplicate,
 );
 router.put(
   "/:id/status",
