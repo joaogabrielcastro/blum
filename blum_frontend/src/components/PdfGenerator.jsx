@@ -24,6 +24,16 @@ const normalizeItems = (items) => {
   return [];
 };
 
+const formatQuantityForPdf = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "0";
+  if (Math.abs(n - Math.round(n)) < 0.0001) return String(Math.round(n));
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+};
+
 const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => {
   const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -228,6 +238,11 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
       checkPageOverflow(15);
 
       const productName = item.productName || item.name || "Produto";
+      const productCode = item.productcode || item.product_code || "";
+      const subcode = item.subcode || "";
+      const productLabel = productCode
+        ? `${productName} (Cod: ${productCode}${subcode ? ` / Sub: ${subcode}` : ""})`
+        : productName;
       const quantity = Number(item.quantity) || 0;
       const unitPrice = Number(item.unitPrice || item.price || 0);
       const ld = Number(item.lineDiscount ?? item.line_discount ?? 0) || 0;
@@ -240,7 +255,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
       }
 
       const maxWidth = columns.desc - columns.produto - 4;
-      const productLines = doc.splitTextToSize(productName, maxWidth);
+      const productLines = doc.splitTextToSize(productLabel, maxWidth);
 
       const lineHeight = Math.max(12, productLines.length * 4);
 
@@ -254,7 +269,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
         yPosition + 5,
         { align: "right" },
       );
-      doc.text(String(quantity), columns.qtd, yPosition + 5, {
+      doc.text(formatQuantityForPdf(quantity), columns.qtd, yPosition + 5, {
         align: "right",
       });
       doc.text(
@@ -352,6 +367,20 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
       (rawPay && PAYMENT_PDF_LABELS[rawPay]) || rawPay || "—";
     doc.text(String(paymentMethod), margin, yPosition);
     yPosition += 6; // ✅ Menos espaço
+
+    if (order.sellerName || order.sellerUsername) {
+      doc.setFont(undefined, "bold");
+      doc.text("Pedido lançado por:", margin, yPosition);
+      yPosition += 4;
+      doc.setFont(undefined, "normal");
+      const seller = order.sellerName || order.sellerUsername;
+      const withUser =
+        order.sellerName && order.sellerUsername
+          ? `${order.sellerName} (@${order.sellerUsername})`
+          : seller;
+      doc.text(String(withUser), margin, yPosition);
+      yPosition += 6;
+    }
 
     doc.setFont(undefined, "bold");
     doc.text("Data de Emissão:", margin, yPosition);

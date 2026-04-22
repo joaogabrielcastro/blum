@@ -138,7 +138,7 @@ exports.validateOrder = [
     .withMessage("Marca do produto é obrigatória"),
 
   body("items.*.quantity")
-    .isInt({ min: 1 })
+    .isFloat({ gt: 0 })
     .withMessage("Quantidade deve ser maior que zero"),
 
   body("items.*.price").isFloat({ min: 0 }).withMessage("Preço inválido"),
@@ -154,6 +154,11 @@ exports.validateOrder = [
     .withMessage("Desconto deve estar entre 0 e 100"),
 
   body("description").optional().trim(),
+
+  body("createdat")
+    .optional({ values: "falsy" })
+    .isISO8601()
+    .withMessage("Data de criação inválida"),
 
   body("document_type")
     .optional()

@@ -505,9 +505,15 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                           <p className="text-sm text-gray-500 mt-1">
                             Cliente: {clients[order.clientId] || "N/A"}
                           </p>
-                          {userRole === "admin" && order.sellerName ? (
+                          {userRole === "admin" && (order.sellerName || order.sellerUsername) ? (
                             <p className="text-sm text-gray-500 mt-1">
-                              Vendedor: {order.sellerName}
+                              Criado por:{" "}
+                              {order.sellerName ||
+                                order.sellerUsername ||
+                                "Representante"}
+                              {order.sellerName && order.sellerUsername
+                                ? ` (@${order.sellerUsername})`
+                                : ""}
                             </p>
                           ) : null}
                           {order.representadas ? (

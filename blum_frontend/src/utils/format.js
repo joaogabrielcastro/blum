@@ -21,7 +21,11 @@ export const normalizeOrderLineItems = (items) => {
       line.productId ?? line.product_id ?? line.productid ?? null;
     const productName = line.productName ?? line.product_name ?? "";
     const brand = line.brand ?? "";
-    const qty = parseInt(line.quantity, 10);
+    const qty = parseFloat(
+      String(line.quantity ?? "")
+        .trim()
+        .replace(",", "."),
+    );
     const price = parseFloat(
       line.price ?? line.unit_price ?? line.unitprice ?? 0,
     );
@@ -75,6 +79,7 @@ export const formatOrderData = (order) => {
     clientId: order.clientid ?? order.clientId ?? order.client_id,
     userId: sellerId,
     sellerName: order.seller_name ?? order.sellerName,
+    sellerUsername: order.seller_username ?? order.sellerUsername,
     description: order.description,
     items,
     itemsCount: order.items_count ?? order.itemsCount ?? itemsLen,

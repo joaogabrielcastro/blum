@@ -40,6 +40,38 @@ const ALLOWED_PAYMENT_METHODS = [
   "cheque",
   "dinheiro",
 ];
+const DECIMAL_QUANTITY_BRANDS = new Set(["solo fino", "colombocal"]);
+
+function normalizeBrandName(name) {
+  return String(name || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+}
+
+function allowsDecimalQuantityByBrand(brand) {
+  return DECIMAL_QUANTITY_BRANDS.has(normalizeBrandName(brand));
+}
+
+function parseQuantityValue(rawValue, { brand, defaultValue = 0 } = {}) {
+  const raw = String(rawValue ?? "")
+    .trim()
+    .replace(",", ".");
+  const parsed = parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
+  if (allowsDecimalQuantityByBrand(brand)) {
+    return Math.round(parsed * 1000) / 1000;
+  }
+  return Math.max(1, Math.round(parsed));
+}
+
+function parseCreatedAt(rawValue) {
+  if (rawValue == null || rawValue === "") return null;
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Data de criação inválida");
+  }
+  return date;
+}
 
 class OrderService {
   async loadCommissionRatesByBrandNames(brandNames) {
@@ -79,7 +111,10 @@ class OrderService {
 
     const itemsWithCommission = items.map((item) => {
       const price = parseFloat(item.price) || 0;
-      const quantity = parseInt(item.quantity, 10) || 1;
+      const quantity = parseQuantityValue(item.quantity, {
+        brand: item.brand,
+        defaultValue: 1,
+      });
       const lineDiscPct = this.lineDiscountPct(item);
       const lineFactor = 1 - lineDiscPct / 100;
       const grossLine = price * quantity;
@@ -136,7 +171,10 @@ class OrderService {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
       for (const it of calculatedItems) {
-        const qty = parseInt(it.quantity, 10) || 1;
+        const qty = parseQuantityValue(it.quantity, {
+          brand: it.brand,
+          defaultValue: 1,
+        });
         const price = parseFloat(it.price) || 0;
         const lineDisc = parseFloat(it.line_discount) || 0;
         const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
@@ -241,7 +279,13 @@ class OrderService {
 
     const order = result[0];
     const lines =
-      await sql`SELECT * FROM order_items WHERE order_id = ${id} ORDER BY id`;
+      await sql`
+        SELECT oi.*, p.productcode, p.subcode
+        FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = ${id}
+        ORDER BY oi.id
+      `;
 
     order.items = lines.map((r) => ({
       productId: r.product_id,
@@ -252,6 +296,8 @@ class OrderService {
       lineDiscount: parseFloat(r.line_discount) || 0,
       commission_rate: parseFloat(r.commission_rate) || 0,
       commission_amount: parseFloat(r.commission_amount) || 0,
+      productcode: r.productcode || "",
+      subcode: r.subcode || "",
     }));
 
     order.representadas = representadasFromItems(order.items);
@@ -324,6 +370,7 @@ class OrderService {
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
+    const createdAt = parseCreatedAt(orderData.createdat);
 
     if (
       !clientid ||
@@ -348,9 +395,13 @@ class OrderService {
         }
 
         const availableStock = product[0].stock;
-        const requestedQuantity = parseInt(item.quantity) || 0;
+        const requestedQuantity = parseQuantityValue(item.quantity, {
+          brand: item.brand,
+          defaultValue: 0,
+        });
+        const shouldCheckStock = !allowsDecimalQuantityByBrand(item.brand);
 
-        if (requestedQuantity > availableStock) {
+        if (shouldCheckStock && requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
               `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
@@ -373,7 +424,7 @@ class OrderService {
       VALUES
         (${clientid}, ${sellerUserId}, ${description || ""},
          ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', NOW(), ${docType}, ${payment})
+         'Em aberto', COALESCE(${createdAt}, NOW()), ${docType}, ${payment})
       RETURNING *
     `;
 
@@ -392,6 +443,7 @@ class OrderService {
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
+    const createdAt = parseCreatedAt(orderData.createdat);
 
     if (!clientid || !items || !Array.isArray(items)) {
       throw new Error(
@@ -411,9 +463,13 @@ class OrderService {
         }
 
         const availableStock = product[0].stock;
-        const requestedQuantity = parseInt(item.quantity) || 0;
+        const requestedQuantity = parseQuantityValue(item.quantity, {
+          brand: item.brand,
+          defaultValue: 0,
+        });
+        const shouldCheckStock = !allowsDecimalQuantityByBrand(item.brand);
 
-        if (requestedQuantity > availableStock) {
+        if (shouldCheckStock && requestedQuantity > availableStock) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
               `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
@@ -439,7 +495,8 @@ class OrderService {
           totalprice = ${calculated.finalTotal},
           total_commission = ${calculated.totalCommission},
           document_type = ${docType},
-          payment_method = ${payment}
+          payment_method = ${payment},
+          createdat = COALESCE(${createdAt}, createdat)
       WHERE id = ${id}
       RETURNING *
     `;
@@ -629,18 +686,26 @@ class OrderService {
       throw err;
     }
 
-    const lines =
-      await sql`SELECT product_id, quantity FROM order_items WHERE order_id = ${id}`;
+    const lines = await sql`
+      SELECT product_id, quantity, brand
+      FROM order_items
+      WHERE order_id = ${id}
+    `;
     const itemsArray = lines.map((r) => ({
       productId: r.product_id,
       quantity: r.quantity,
+      brand: r.brand,
     }));
 
     for (const item of itemsArray) {
-      if (item.productId && item.quantity) {
+      if (
+        item.productId &&
+        item.quantity &&
+        !allowsDecimalQuantityByBrand(item.brand)
+      ) {
         await sql`
           UPDATE products
-          SET stock = stock - ${item.quantity}
+          SET stock = stock - CAST(${item.quantity} AS INTEGER)
           WHERE id = ${item.productId}
         `;
       }

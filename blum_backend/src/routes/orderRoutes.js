@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const ordersController = require("../controllers/orderController");
-const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { authenticate } = require("../middleware/authMiddleware");
 const {
   validateOrder,
   validateId,
@@ -60,7 +60,6 @@ router.put("/:id", authenticate, validateId, ordersController.update);
 router.delete(
   "/:id",
   authenticate,
-  authorize("admin"),
   validateId,
   ordersController.delete
 );

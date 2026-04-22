@@ -8,6 +8,39 @@ import { normalizeOrderLineItems } from "../utils/format";
 import { productMatchesFlexible } from "../utils/productSearch";
 import ClientItemPriceHistoryModal from "./ClientItemPriceHistoryModal";
 
+const DECIMAL_QUANTITY_BRANDS = new Set(["solo fino", "colombocal"]);
+
+const normalizeBrandName = (brand) =>
+  String(brand || "")
+    .trim()
+    .toLocaleLowerCase("pt-BR");
+
+const allowsDecimalQuantityBrand = (brand) =>
+  DECIMAL_QUANTITY_BRANDS.has(normalizeBrandName(brand));
+
+const parseQuantityByBrand = (value, brand) => {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(",", ".");
+  const parsed = parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  if (allowsDecimalQuantityBrand(brand)) {
+    return Math.round(parsed * 1000) / 1000;
+  }
+  return Math.max(1, Math.round(parsed));
+};
+
+const toDateTimeLocalValue = (dateInput) => {
+  const dt = dateInput ? new Date(dateInput) : new Date();
+  if (Number.isNaN(dt.getTime())) return "";
+  const year = dt.getFullYear();
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  const hours = String(dt.getHours()).padStart(2, "0");
+  const minutes = String(dt.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 const OrdersForm = ({
   userId,
   clients,
@@ -32,6 +65,9 @@ const OrdersForm = ({
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [historyModalItem, setHistoryModalItem] = useState(null);
+  const [orderDateTime, setOrderDateTime] = useState(
+    toDateTimeLocalValue(new Date()),
+  );
 
   // Função segura para toFixed
   const safeToFixed = (value, decimals = 2) => {
@@ -42,7 +78,7 @@ const OrdersForm = ({
 
   const lineNetTotal = (item) => {
     const price = parseFloat(item.price) || 0;
-    const quantity = parseInt(item.quantity, 10) || 1;
+    const quantity = parseQuantityByBrand(item.quantity, item.brand) || 1;
     const ld = parseFloat(item.lineDiscount) || 0;
     const factor = 1 - Math.min(100, Math.max(0, ld)) / 100;
     return price * quantity * factor;
@@ -72,6 +108,7 @@ const OrdersForm = ({
       const firstBrand = lines.find((i) => i.brand)?.brand;
       if (firstBrand) setSelectedBrand(firstBrand);
       setPaymentMethod(editingOrder.paymentMethod || "");
+      setOrderDateTime(toDateTimeLocalValue(editingOrder.createdAt));
     } else {
       setClientId("");
       setClientSearchTerm("");
@@ -83,6 +120,7 @@ const OrdersForm = ({
       setProductSearch("");
       setSearchResults([]);
       setPaymentMethod("");
+      setOrderDateTime(toDateTimeLocalValue(new Date()));
     }
   }, [editingOrder, brands, clients]);
 
@@ -223,17 +261,29 @@ const OrdersForm = ({
     const newItems = [...items];
 
     // Valida quantidade contra estoque disponível
-    if (field === "quantity" && newItems[index].availableStock) {
-      if (value > newItems[index].availableStock) {
+    if (field === "quantity") {
+      const itemBrand = newItems[index].brand;
+      const parsedQty = parseQuantityByBrand(value, itemBrand);
+      if (!parsedQty) {
+        return;
+      }
+      if (
+        newItems[index].availableStock &&
+        !allowsDecimalQuantityBrand(itemBrand) &&
+        parsedQty > newItems[index].availableStock
+      ) {
         alert(
-          `Quantidade solicitada (${value}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
+          `Quantidade solicitada (${parsedQty}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
         );
         return; // Não permite a mudança
       }
-      if (value < 1) {
+      if (parsedQty <= 0) {
         alert("A quantidade deve ser no mínimo 1");
         return;
       }
+      newItems[index][field] = parsedQty;
+      setItems(newItems);
+      return;
     }
 
     if (field === "lineDiscount") {
@@ -241,9 +291,7 @@ const OrdersForm = ({
       if (!Number.isFinite(v)) v = 0;
       v = Math.min(100, Math.max(0, v));
       newItems[index][field] = v;
-    } else {
-      newItems[index][field] = value;
-    }
+    } else newItems[index][field] = value;
     setItems(newItems);
   };
 
@@ -379,13 +427,22 @@ const OrdersForm = ({
       );
       return;
     }
+    if (!orderDateTime || Number.isNaN(new Date(orderDateTime).getTime())) {
+      alert("Informe uma data/hora válida para o pedido.");
+      return;
+    }
 
     // Valida estoque antes de submeter
     const stockErrors = [];
     items.forEach((item) => {
-      if (item.availableStock && item.quantity > item.availableStock) {
+      const parsedQty = parseQuantityByBrand(item.quantity, item.brand);
+      if (
+        item.availableStock &&
+        !allowsDecimalQuantityBrand(item.brand) &&
+        parsedQty > item.availableStock
+      ) {
         stockErrors.push(
-          `"${item.productName}": Solicitado ${item.quantity}, Disponível ${item.availableStock}`,
+          `"${item.productName}": Solicitado ${parsedQty}, Disponível ${item.availableStock}`,
         );
       }
     });
@@ -407,7 +464,7 @@ const OrdersForm = ({
         items: items.map((item) => ({
           ...item,
           price: parseFloat(item.price) || 0,
-          quantity: parseInt(item.quantity) || 1,
+          quantity: parseQuantityByBrand(item.quantity, item.brand) || 1,
           lineDiscount: Math.min(
             100,
             Math.max(0, parseFloat(item.lineDiscount) || 0),
@@ -423,6 +480,9 @@ const OrdersForm = ({
       };
 
       orderData.payment_method = paymentMethod || null;
+      if (orderDateTime) {
+        orderData.createdat = new Date(orderDateTime).toISOString();
+      }
 
       if (editingOrder) {
         await apiService.updateOrder(editingOrder.id, orderData);
@@ -628,6 +688,21 @@ const OrdersForm = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data do pedido
+              </label>
+              <input
+                type="datetime-local"
+                value={orderDateTime}
+                onChange={(e) => setOrderDateTime(e.target.value)}
+                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Use esta data para lançar pedidos antigos no sistema.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Descrição
               </label>
               <textarea
@@ -793,14 +868,19 @@ const OrdersForm = ({
                         </label>
                         <input
                           type="number"
-                          min="1"
-                          max={item.availableStock || undefined}
+                          min={allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"}
+                          step={allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"}
+                          max={
+                            allowsDecimalQuantityBrand(item.brand)
+                              ? undefined
+                              : item.availableStock || undefined
+                          }
                           value={item.quantity}
                           onChange={(e) =>
                             handleItemChange(
                               index,
                               "quantity",
-                              parseInt(e.target.value, 10),
+                              e.target.value,
                             )
                           }
                           className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -916,14 +996,27 @@ const OrdersForm = ({
                           <div className="flex flex-col items-center gap-1">
                             <input
                               type="number"
-                              min="1"
-                              max={item.availableStock || undefined}
+                              min={
+                                allowsDecimalQuantityBrand(item.brand)
+                                  ? "0.001"
+                                  : "1"
+                              }
+                              step={
+                                allowsDecimalQuantityBrand(item.brand)
+                                  ? "0.001"
+                                  : "1"
+                              }
+                              max={
+                                allowsDecimalQuantityBrand(item.brand)
+                                  ? undefined
+                                  : item.availableStock || undefined
+                              }
                               value={item.quantity}
                               onChange={(e) =>
                                 handleItemChange(
                                   index,
                                   "quantity",
-                                  parseInt(e.target.value, 10),
+                                  e.target.value,
                                 )
                               }
                               className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
