@@ -43,6 +43,7 @@ const toDateTimeLocalValue = (dateInput) => {
 
 const OrdersForm = ({
   userId,
+  userRole,
   clients,
   clientsList = [],
   onOrderAdded,
@@ -94,6 +95,7 @@ const OrdersForm = ({
   const netTotal = subtotalAfterLineDiscounts - discountAmount;
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
+  const canEditUnitPrice = userRole === "admin";
 
   useEffect(() => {
     if (editingOrder) {
@@ -291,6 +293,10 @@ const OrdersForm = ({
       if (!Number.isFinite(v)) v = 0;
       v = Math.min(100, Math.max(0, v));
       newItems[index][field] = v;
+    } else if (field === "price") {
+      const price = parseFloat(String(value).replace(",", "."));
+      if (!Number.isFinite(price) || price <= 0) return;
+      newItems[index][field] = price;
     } else newItems[index][field] = value;
     setItems(newItems);
   };
@@ -305,7 +311,7 @@ const OrdersForm = ({
       );
       if (!existingItem) {
         // Verifica se há estoque disponível
-        if (product.stock <= 0) {
+        if (product.stock <= 0 && !allowsDecimalQuantityBrand(product.brand)) {
           alert(`Produto "${product.name}" sem estoque disponível!`);
           return;
         }
@@ -918,8 +924,30 @@ const OrdersForm = ({
                             e.target.value,
                           )
                         }
-                        className="w-full p-2 border border-gray-300 rounded-md text-center text-base"
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-500 block">
+                        Preço unitário (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={item.price}
+                        onChange={(e) =>
+                          handleItemChange(index, "price", e.target.value)
+                        }
+                        disabled={!canEditUnitPrice}
+                        className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base disabled:bg-gray-100 disabled:text-gray-500"
+                      />
+                      {!canEditUnitPrice && (
+                        <p className="text-xs text-gray-400">
+                          Somente administrador pode alterar o preço.
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex justify-between text-sm">
@@ -1042,13 +1070,21 @@ const OrdersForm = ({
                                 e.target.value,
                               )
                             }
-                            className="w-full max-w-[4.5rem] p-1.5 border border-gray-300 rounded-md text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full max-w-[7rem] p-2 border border-gray-300 rounded-md text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">
-                          <span className="text-sm text-gray-700">
-                            R$ {safeToFixed(item.price)}
-                          </span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={item.price}
+                            onChange={(e) =>
+                              handleItemChange(index, "price", e.target.value)
+                            }
+                            disabled={!canEditUnitPrice}
+                            className="w-full max-w-[8.5rem] p-2 border border-gray-300 rounded-md text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                          />
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">
                           <span className="text-sm font-semibold text-gray-900">

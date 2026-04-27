@@ -239,9 +239,8 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
 
       const productName = item.productName || item.name || "Produto";
       const productCode = item.productcode || item.product_code || "";
-      const subcode = item.subcode || "";
       const productLabel = productCode
-        ? `${productName} (Cod: ${productCode}${subcode ? ` / Sub: ${subcode}` : ""})`
+        ? `${productName} (Cod: ${productCode})`
         : productName;
       const quantity = Number(item.quantity) || 0;
       const unitPrice = Number(item.unitPrice || item.price || 0);

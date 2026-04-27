@@ -52,6 +52,10 @@ function allowsDecimalQuantityByBrand(brand) {
   return DECIMAL_QUANTITY_BRANDS.has(normalizeBrandName(brand));
 }
 
+function controlsStockByBrand(brand) {
+  return !allowsDecimalQuantityByBrand(brand);
+}
+
 function parseQuantityValue(rawValue, { brand, defaultValue = 0 } = {}) {
   const raw = String(rawValue ?? "")
     .trim()
@@ -399,7 +403,7 @@ class OrderService {
           brand: item.brand,
           defaultValue: 0,
         });
-        const shouldCheckStock = !allowsDecimalQuantityByBrand(item.brand);
+        const shouldCheckStock = controlsStockByBrand(item.brand);
 
         if (shouldCheckStock && requestedQuantity > availableStock) {
           throw new Error(
@@ -467,7 +471,7 @@ class OrderService {
           brand: item.brand,
           defaultValue: 0,
         });
-        const shouldCheckStock = !allowsDecimalQuantityByBrand(item.brand);
+        const shouldCheckStock = controlsStockByBrand(item.brand);
 
         if (shouldCheckStock && requestedQuantity > availableStock) {
           throw new Error(
@@ -701,13 +705,22 @@ class OrderService {
       if (
         item.productId &&
         item.quantity &&
-        !allowsDecimalQuantityByBrand(item.brand)
+        controlsStockByBrand(item.brand)
       ) {
-        await sql`
+        const updatedStock = await sql`
           UPDATE products
           SET stock = stock - CAST(${item.quantity} AS INTEGER)
           WHERE id = ${item.productId}
+            AND stock >= CAST(${item.quantity} AS INTEGER)
+          RETURNING id
         `;
+        if (updatedStock.length === 0) {
+          const err = new Error(
+            `Estoque insuficiente ao finalizar pedido para o produto #${item.productId}.`,
+          );
+          err.statusCode = 409;
+          throw err;
+        }
       }
     }
 

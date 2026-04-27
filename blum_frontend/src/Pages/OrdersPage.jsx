@@ -87,6 +87,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [paymentDialogMethod, setPaymentDialogMethod] = useState("boleto");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
+  const [orderSearch, setOrderSearch] = useState("");
 
   // Validar e transformar brands para garantir segurança
   const safeBrands = Array.isArray(brands)
@@ -343,6 +344,30 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   };
 
   const ordersByDay = useMemo(() => groupOrdersByDay(orders), [orders]);
+  const filteredOrdersByDay = useMemo(() => {
+    const term = orderSearch.trim().toLocaleLowerCase("pt-BR");
+    if (!term) return ordersByDay;
+    return ordersByDay
+      .map((group) => ({
+        ...group,
+        orders: group.orders.filter((order) => {
+          const clientLabel = clients[order.clientId] || "";
+          const haystack = [
+            order.id,
+            order.description,
+            order.status,
+            order.representadas,
+            order.sellerName,
+            order.sellerUsername,
+            clientLabel,
+          ]
+            .map((v) => String(v || "").toLocaleLowerCase("pt-BR"))
+            .join(" ");
+          return haystack.includes(term);
+        }),
+      }))
+      .filter((group) => group.orders.length > 0);
+  }, [ordersByDay, orderSearch, clients]);
 
   if (loading || editingLoading) {
     return (
@@ -357,6 +382,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       <div className="w-full -mx-2 sm:-mx-4 md:-mx-6 px-0 sm:px-4 md:px-6 lg:px-8 overflow-x-hidden">
         <OrdersForm
           userId={userId}
+          userRole={userRole}
           clients={clients}
           clientsList={clientsList}
           brands={safeBrands} // ← Usando safeBrands validado
@@ -452,14 +478,23 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           + Novo orçamento
         </button>
       </div>
+      <div className="mb-5">
+        <input
+          type="search"
+          value={orderSearch}
+          onChange={(e) => setOrderSearch(e.target.value)}
+          placeholder="Buscar pedido por numero, cliente, representante, representada..."
+          className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
       <p className="text-gray-600 mb-8">
         Acompanhe o status e histórico de pedidos.
       </p>
       <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
-        {orders.length > 0 ? (
+        {filteredOrdersByDay.length > 0 ? (
           <div className="space-y-8">
-            {ordersByDay.map(({ dateKey, label, orders: dayOrders }) => (
+            {filteredOrdersByDay.map(({ dateKey, label, orders: dayOrders }) => (
               <section key={dateKey} className="space-y-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100 pb-2">
                   {label}
@@ -581,7 +616,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           </div>
         ) : (
           <div className="text-center text-gray-500">
-            Nenhum pedido encontrado.
+            Nenhum pedido encontrado para esta busca.
           </div>
         )}
       </div>
