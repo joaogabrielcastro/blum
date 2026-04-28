@@ -570,7 +570,7 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full max-w-none md:max-w-6xl md:mx-auto px-0 sm:px-0 md:px-6 lg:px-10">
+      <div className="w-full max-w-none md:max-w-[1400px] md:mx-auto px-0 sm:px-0 md:px-8 lg:px-12">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-5 sm:mb-10 px-3 md:px-0 pt-1 md:pt-0">
           {editingOrder
             ? editingOrder.documentType === "orcamento"
@@ -582,7 +582,7 @@ const OrdersForm = ({
           <form
             id="order-form-main"
             onSubmit={handleSubmit}
-            className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-5 md:p-10 space-y-8 sm:space-y-10 w-full pb-28 md:pb-10"
+            className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-5 md:p-10 lg:p-12 space-y-8 sm:space-y-10 w-full pb-28 md:pb-10"
           >
           <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5 md:p-6 space-y-6">
           <div>
@@ -988,22 +988,22 @@ const OrdersForm = ({
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
+                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">
                         Produto
                       </th>
-                      <th className="px-8 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                         Qtd.
                       </th>
-                      <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                         Desc. %
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                         Preço Unit.
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                         Subtotal
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                      <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
                         Ações
                       </th>
                     </tr>
@@ -1011,7 +1011,7 @@ const OrdersForm = ({
                   <tbody className="bg-white divide-y divide-gray-200">
                     {items.map((item, index) => (
                       <tr key={item.productId || index}>
-                        <td className="px-4 py-4">
+                        <td className="px-5 py-4">
                           <div className="max-w-[300px]">
                             <div
                               className="text-sm font-medium text-gray-900 truncate"
@@ -1035,7 +1035,7 @@ const OrdersForm = ({
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <div className="flex flex-col items-center gap-1">
                             <input
                               type="number"
@@ -1071,7 +1071,7 @@ const OrdersForm = ({
                             )}
                           </div>
                         </td>
-                        <td className="px-2 py-4 whitespace-nowrap text-center">
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
                           <input
                             type="number"
                             min="0"
@@ -1088,7 +1088,7 @@ const OrdersForm = ({
                             className="w-full max-w-[7rem] p-2 border border-gray-300 rounded-md text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <td className="px-5 py-4 whitespace-nowrap text-right">
                           <input
                             type="number"
                             min="0.01"
@@ -1101,12 +1101,12 @@ const OrdersForm = ({
                             className="w-full max-w-[8.5rem] p-2 border border-gray-300 rounded-md text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                           />
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <td className="px-5 py-4 whitespace-nowrap text-right">
                           <span className="text-sm font-semibold text-gray-900">
                             R$ {safeToFixed(lineNetTotal(item))}
                           </span>
                         </td>
-                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <td className="px-5 py-4 whitespace-nowrap text-center">
                           <div className="flex flex-col gap-2">
                             <button
                               type="button"
