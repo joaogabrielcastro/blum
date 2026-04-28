@@ -570,8 +570,8 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full max-w-none md:max-w-4xl md:mx-auto px-0 sm:px-0 md:px-4 lg:px-8">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-8 px-3 md:px-0 pt-1 md:pt-0">
+      <div className="w-full max-w-none md:max-w-6xl md:mx-auto px-0 sm:px-0 md:px-6 lg:px-10">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-5 sm:mb-10 px-3 md:px-0 pt-1 md:pt-0">
           {editingOrder
             ? editingOrder.documentType === "orcamento"
               ? "Editar orçamento"
@@ -582,10 +582,19 @@ const OrdersForm = ({
           <form
             id="order-form-main"
             onSubmit={handleSubmit}
-            className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-4 md:p-8 space-y-6 sm:space-y-8 w-full pb-28 md:pb-8"
+            className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-5 md:p-10 space-y-8 sm:space-y-10 w-full pb-28 md:pb-10"
           >
+          <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5 md:p-6 space-y-6">
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-800">
+              Dados do pedido
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              Preencha cliente, representada, pagamento e demais informações.
+            </p>
+          </div>
           {/* --- Cliente e Representada --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cliente *
@@ -653,7 +662,7 @@ const OrdersForm = ({
           </div>
 
           {/* --- Descrição, pagamento e desconto --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Condição / forma de pagamento
@@ -754,13 +763,19 @@ const OrdersForm = ({
               )}
             </div>
           </div>
+          </section>
 
           {/* --- Seção de Produtos (mobile: tela cheia; desktop: dropdown) --- */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-gray-800">
-              Adicionar Produtos
-            </h3>
-
+          <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 md:p-6 space-y-5">
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800">
+                Produtos do pedido
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                Busque e adicione itens, depois ajuste quantidade, desconto e preço.
+              </p>
+            </div>
+          <div className="space-y-5 pt-1">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Buscar produto (várias palavras, sem precisar igual ao cadastro)
@@ -840,7 +855,7 @@ const OrdersForm = ({
 
           {/* --- Tabela de Itens Adicionados --- */}
           {items.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-8">
               <h3 className="text-xl font-semibold text-gray-800 mb-4">
                 Itens do Pedido
               </h3>
@@ -1118,9 +1133,13 @@ const OrdersForm = ({
               </div>
             </div>
           )}
+          </section>
 
           {/* --- Total --- */}
-          <div className="mt-6 bg-gray-50 p-4 sm:p-6 rounded-lg border">
+          <section className="mt-8 bg-green-50/50 p-5 sm:p-7 rounded-xl border border-green-100">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">
+              Resumo financeiro
+            </h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center text-gray-600">
                 <span>Subtotal (após descontos nos itens)</span>
@@ -1143,7 +1162,7 @@ const OrdersForm = ({
                 </span>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* --- Ações (desktop) --- */}
           <div className="hidden md:flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-2">
