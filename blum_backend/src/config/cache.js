@@ -48,10 +48,20 @@ async function invalidateProductsCache() {
   const prefix = "products:";
   if (redisClient) {
     try {
-      const keys = await redisClient.keys(`${prefix}*`);
-      if (keys.length) {
-        await redisClient.del(...keys);
-      }
+      let cursor = "0";
+      do {
+        const [nextCursor, keys] = await redisClient.scan(
+          cursor,
+          "MATCH",
+          `${prefix}*`,
+          "COUNT",
+          100,
+        );
+        if (keys.length) {
+          await redisClient.del(...keys);
+        }
+        cursor = nextCursor;
+      } while (cursor !== "0");
     } catch (e) {
       memCache.flushAll();
     }

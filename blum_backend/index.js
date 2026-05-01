@@ -1,6 +1,7 @@
 require("dotenv").config({ override: false });
 const { assertProductionConfig } = require("./src/config/env");
 assertProductionConfig();
+const { randomUUID } = require("crypto");
 
 const express = require("express");
 const cors = require("cors");
@@ -47,6 +48,35 @@ app.use("/api/v1/auth/login", loginLimiter);
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+app.use((req, res, next) => {
+  const requestId = req.headers["x-request-id"] || randomUUID();
+  req.requestId = requestId;
+  res.setHeader("x-request-id", requestId);
+
+  const start = process.hrtime.bigint();
+  res.on("finish", () => {
+    const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000;
+    const payload = {
+      requestId,
+      method: req.method,
+      path: req.originalUrl || req.url,
+      statusCode: res.statusCode,
+      elapsedMs: Number(elapsedMs.toFixed(2)),
+    };
+    if (res.statusCode >= 500) {
+      console.error(JSON.stringify({ level: "error", ...payload }));
+      return;
+    }
+    if (res.statusCode >= 400) {
+      console.warn(JSON.stringify({ level: "warn", ...payload }));
+      return;
+    }
+    console.log(JSON.stringify({ level: "info", ...payload }));
+  });
+
+  next();
+});
 
 const corsExtra = (process.env.CORS_ORIGINS || "")
   .split(",")
@@ -148,14 +178,36 @@ const productRoutes = require("./src/routes/productRoutes");
 const orderRoutes = require("./src/routes/orderRoutes");
 const reportRoutes = require("./src/routes/reportRoutes");
 const brandRoutes = require("./src/routes/brandRoutes");
+const ENABLE_V1_DEPRECATION_HEADERS =
+  process.env.ENABLE_V1_DEPRECATION_HEADERS === "true";
+const V1_SUNSET_DATE = process.env.API_V1_SUNSET_DATE || "Wed, 31 Dec 2026 23:59:59 GMT";
 
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/clients", clientRoutes);
-app.use("/api/v1/products", productRoutes);
-app.use("/api/v1/orders", orderRoutes);
-app.use("/api/v1/reports", reportRoutes);
-app.use("/api/v1/brands", brandRoutes);
-app.use("/api/v1/purchases", purchaseRoutes);
+const setApiVersion = (version) => (req, res, next) => {
+  req.apiVersion = version;
+  res.setHeader("x-api-version", version);
+  if (version === "v1" && ENABLE_V1_DEPRECATION_HEADERS) {
+    res.setHeader("Deprecation", "true");
+    res.setHeader("Sunset", V1_SUNSET_DATE);
+    res.setHeader(
+      "Link",
+      '</api/v2>; rel="successor-version"; title="Use API v2"',
+    );
+  }
+  next();
+};
+
+const mountApiRoutes = (versionPrefix) => {
+  app.use(`${versionPrefix}/auth`, setApiVersion(versionPrefix.slice(-2)), authRoutes);
+  app.use(`${versionPrefix}/clients`, setApiVersion(versionPrefix.slice(-2)), clientRoutes);
+  app.use(`${versionPrefix}/products`, setApiVersion(versionPrefix.slice(-2)), productRoutes);
+  app.use(`${versionPrefix}/orders`, setApiVersion(versionPrefix.slice(-2)), orderRoutes);
+  app.use(`${versionPrefix}/reports`, setApiVersion(versionPrefix.slice(-2)), reportRoutes);
+  app.use(`${versionPrefix}/brands`, setApiVersion(versionPrefix.slice(-2)), brandRoutes);
+  app.use(`${versionPrefix}/purchases`, setApiVersion(versionPrefix.slice(-2)), purchaseRoutes);
+};
+
+mountApiRoutes("/api/v1");
+mountApiRoutes("/api/v2");
 
 app.use((err, req, res, next) => {
   if (res.headersSent) {
@@ -168,7 +220,13 @@ app.use((err, req, res, next) => {
     isProd && status >= 500 && !err.expose
       ? "Erro interno do servidor"
       : err.message || "Erro";
-  res.status(status).json({ status: "error", message: safeMessage });
+  res.status(status).json({
+    status: "error",
+    error: safeMessage,
+    message: safeMessage,
+    details: err.details || undefined,
+    requestId: req.requestId || null,
+  });
 });
 
 const setupDatabase = async () => {

@@ -279,14 +279,14 @@ const OrdersPage = ({ userId, userRole, brands }) => {
             Entregue
           </span>
         )}
+        <button
+          onClick={() => handleEditOrder(order.id)}
+          className="min-h-10 px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          Editar
+        </button>
         {!isDelivered && (
           <>
-            <button
-              onClick={() => handleEditOrder(order.id)}
-              className="min-h-10 px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
-            >
-              Editar
-            </button>
             {isQuote ? (
               <button
                 type="button"

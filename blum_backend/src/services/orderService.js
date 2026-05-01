@@ -1,24 +1,10 @@
 const { sql, pool } = require("../config/database");
-
-function enrichOrder(row) {
-  if (!row) return row;
-  const uid = row.user_ref != null ? String(row.user_ref) : null;
-  return {
-    ...row,
-    userid: uid,
-    userId: row.user_ref,
-  };
-}
-
-/** DISTINCT representadas das linhas (detalhe do pedido). */
-function representadasFromItems(items) {
-  const set = new Set();
-  for (const it of items || []) {
-    const b = String(it.brand ?? "").trim();
-    if (b) set.add(b);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR")).join(", ");
-}
+const orderRepository = require("../repositories/orderRepository");
+const {
+  enrichOrder,
+  representadasFromItems,
+  mapOrderItemsWithProducts,
+} = require("../mappers/orderMapper");
 
 const REPRESENTADAS_SQL = `(
   SELECT COALESCE(string_agg(s.b, ', ' ORDER BY s.b), '')
@@ -75,6 +61,21 @@ function parseCreatedAt(rawValue) {
     throw new Error("Data de criação inválida");
   }
   return date;
+}
+
+function aggregateControlledStockQuantities(items = []) {
+  const totals = new Map();
+  for (const item of items) {
+    if (!item?.productId || !controlsStockByBrand(item.brand)) continue;
+    const qty = parseQuantityValue(item.quantity, {
+      brand: item.brand,
+      defaultValue: 0,
+    });
+    if (!qty) continue;
+    const key = String(item.productId);
+    totals.set(key, (totals.get(key) || 0) + qty);
+  }
+  return totals;
 }
 
 class OrderService {
@@ -157,45 +158,52 @@ class OrderService {
     };
   }
 
-  async persistOrderItems(orderId, calculatedItems) {
+  async persistOrderItemsWithClient(client, orderId, calculatedItems, tenantId = 1) {
+    await client.query("DELETE FROM order_items WHERE order_id = $1", [orderId]);
+    if (!calculatedItems?.length) {
+      return;
+    }
+    const insertSql = `
+      INSERT INTO order_items (
+        order_id, product_id, product_name, brand, quantity, unit_price,
+        line_discount, commission_rate, commission_amount, line_total, tenant_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `;
+    for (const it of calculatedItems) {
+      const qty = parseQuantityValue(it.quantity, {
+        brand: it.brand,
+        defaultValue: 1,
+      });
+      const price = parseFloat(it.price) || 0;
+      const lineDisc = parseFloat(it.line_discount) || 0;
+      const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
+      const lineTotal = qty * price * lineFactor;
+      await client.query(insertSql, [
+        orderId,
+        it.productId != null ? it.productId : null,
+        it.productName || "",
+        it.brand || "",
+        qty,
+        price,
+        lineDisc,
+        it.commission_rate || 0,
+        it.commission_amount || 0,
+        lineTotal,
+        tenantId,
+      ]);
+    }
+  }
+
+  async persistOrderItems(orderId, calculatedItems, tenantId = 1) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("DELETE FROM order_items WHERE order_id = $1", [
+      await this.persistOrderItemsWithClient(
+        client,
         orderId,
-      ]);
-      if (!calculatedItems?.length) {
-        await client.query("COMMIT");
-        return;
-      }
-      const insertSql = `
-        INSERT INTO order_items (
-          order_id, product_id, product_name, brand, quantity, unit_price,
-          line_discount, commission_rate, commission_amount, line_total
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `;
-      for (const it of calculatedItems) {
-        const qty = parseQuantityValue(it.quantity, {
-          brand: it.brand,
-          defaultValue: 1,
-        });
-        const price = parseFloat(it.price) || 0;
-        const lineDisc = parseFloat(it.line_discount) || 0;
-        const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
-        const lineTotal = qty * price * lineFactor;
-        await client.query(insertSql, [
-          orderId,
-          it.productId != null ? it.productId : null,
-          it.productName || "",
-          it.brand || "",
-          qty,
-          price,
-          lineDisc,
-          it.commission_rate || 0,
-          it.commission_amount || 0,
-          lineTotal,
-        ]);
-      }
+        calculatedItems,
+        tenantId,
+      );
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK");
@@ -212,7 +220,7 @@ class OrderService {
       throw new Error("Sessão inválida");
     }
 
-    const { role, userId } = authUser;
+    const { role, userId, tenantId = 1 } = authUser;
 
     if (role === "admin") {
       let rows;
@@ -223,9 +231,9 @@ class OrderService {
             ${REPRESENTADAS_SQL}
            FROM orders o
            LEFT JOIN users u ON u.id = o.user_ref
-           WHERE o.clientid = $1
+           WHERE o.clientid = $1 AND o.tenant_id = $2
            ORDER BY o.createdat DESC`,
-          [clientid],
+          [clientid, tenantId],
         );
       } else {
         rows = await sql(
@@ -234,7 +242,9 @@ class OrderService {
             ${REPRESENTADAS_SQL}
            FROM orders o
            LEFT JOIN users u ON u.id = o.user_ref
+           WHERE o.tenant_id = $1
            ORDER BY o.createdat DESC`,
+          [tenantId],
         );
       }
       return rows.map(enrichOrder);
@@ -249,7 +259,7 @@ class OrderService {
             ${REPRESENTADAS_FRAGMENT}
           FROM orders o
           LEFT JOIN users u ON u.id = o.user_ref
-          WHERE o.user_ref = ${uid} AND o.clientid = ${clientid}
+          WHERE o.user_ref = ${uid} AND o.clientid = ${clientid} AND o.tenant_id = ${tenantId}
           ORDER BY o.createdat DESC
         `;
         return rows.map(enrichOrder);
@@ -260,7 +270,7 @@ class OrderService {
           ${REPRESENTADAS_FRAGMENT}
         FROM orders o
         LEFT JOIN users u ON u.id = o.user_ref
-        WHERE o.user_ref = ${uid}
+        WHERE o.user_ref = ${uid} AND o.tenant_id = ${tenantId}
         ORDER BY o.createdat DESC
       `;
       return rows.map(enrichOrder);
@@ -269,12 +279,12 @@ class OrderService {
     return [];
   }
 
-  async findById(id) {
+  async findById(id, tenantId = 1) {
     const result = await sql`
       SELECT o.*, u.name AS seller_name, u.username AS seller_username
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_ref
-      WHERE o.id = ${id}
+      WHERE o.id = ${id} AND o.tenant_id = ${tenantId}
     `;
 
     if (result.length === 0) {
@@ -287,36 +297,25 @@ class OrderService {
         SELECT oi.*, p.productcode, p.subcode
         FROM order_items oi
         LEFT JOIN products p ON p.id = oi.product_id
-        WHERE oi.order_id = ${id}
+        WHERE oi.order_id = ${id} AND oi.tenant_id = ${tenantId}
         ORDER BY oi.id
       `;
 
-    order.items = lines.map((r) => ({
-      productId: r.product_id,
-      productName: r.product_name,
-      brand: r.brand,
-      quantity: r.quantity,
-      price: parseFloat(r.unit_price),
-      lineDiscount: parseFloat(r.line_discount) || 0,
-      commission_rate: parseFloat(r.commission_rate) || 0,
-      commission_amount: parseFloat(r.commission_amount) || 0,
-      productcode: r.productcode || "",
-      subcode: r.subcode || "",
-    }));
+    order.items = mapOrderItemsWithProducts(lines);
 
     order.representadas = representadasFromItems(order.items);
 
     return enrichOrder(order);
   }
 
-  async findBySeller(userId) {
+  async findBySeller(userId, tenantId = 1) {
     const rows = await sql`
       SELECT o.*, u.name AS seller_name, u.username AS seller_username,
         (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
         ${REPRESENTADAS_FRAGMENT}
       FROM orders o
       LEFT JOIN users u ON u.id = o.user_ref
-      WHERE o.user_ref = ${userId}
+      WHERE o.user_ref = ${userId} AND o.tenant_id = ${tenantId}
       ORDER BY o.createdat DESC
     `;
     return rows.map(enrichOrder);
@@ -374,6 +373,7 @@ class OrderService {
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
+    const tenantId = authUser.tenantId || 1;
     const createdAt = parseCreatedAt(orderData.createdat);
 
     if (
@@ -390,7 +390,7 @@ class OrderService {
     for (const item of items) {
       if (item.productId) {
         const product =
-          await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
+          await sql`SELECT stock, name FROM products WHERE id = ${item.productId} AND tenant_id = ${tenantId}`;
 
         if (product.length === 0) {
           throw new Error(
@@ -417,28 +417,29 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(items, discount);
 
     const sellerRow =
-      await sql`SELECT id FROM users WHERE id = ${sellerUserId}`;
+      await sql`SELECT id FROM users WHERE id = ${sellerUserId} AND tenant_id = ${tenantId}`;
     if (sellerRow.length === 0) {
       throw new Error("Vendedor não encontrado");
     }
 
     const result = await sql`
       INSERT INTO orders
-        (clientid, user_ref, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
+        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
       VALUES
-        (${clientid}, ${sellerUserId}, ${description || ""},
+        (${clientid}, ${sellerUserId}, ${tenantId}, ${description || ""},
          ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission},
          'Em aberto', COALESCE(${createdAt}, NOW()), ${docType}, ${payment})
       RETURNING *
     `;
 
-    await this.persistOrderItems(result[0].id, calculated.items);
+    await this.persistOrderItems(result[0].id, calculated.items, tenantId);
 
     return this.findById(result[0].id);
   }
 
   async update(id, orderData, authUser) {
-    const existing = await this.findById(id);
+    const tenantId = authUser.tenantId || 1;
+    const existing = await this.findById(id, tenantId);
     const { clientid, description, items, discount } = orderData;
     const { docType, payment } = this.normalizeDocumentAndPayment(
       orderData,
@@ -448,6 +449,11 @@ class OrderService {
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
     const createdAt = parseCreatedAt(orderData.createdat);
+    const isDeliveredPedido =
+      existing.status === "Entregue" && existing.document_type === "pedido";
+    const previousControlledStock = aggregateControlledStockQuantities(
+      existing.items || [],
+    );
 
     if (!clientid || !items || !Array.isArray(items)) {
       throw new Error(
@@ -458,7 +464,7 @@ class OrderService {
     for (const item of items) {
       if (item.productId) {
         const product =
-          await sql`SELECT stock, name FROM products WHERE id = ${item.productId}`;
+          await sql`SELECT stock, name FROM products WHERE id = ${item.productId} AND tenant_id = ${tenantId}`;
 
         if (product.length === 0) {
           throw new Error(
@@ -472,11 +478,15 @@ class OrderService {
           defaultValue: 0,
         });
         const shouldCheckStock = controlsStockByBrand(item.brand);
+        const previousQuantity = isDeliveredPedido
+          ? previousControlledStock.get(String(item.productId)) || 0
+          : 0;
+        const effectiveAvailable = availableStock + previousQuantity;
 
-        if (shouldCheckStock && requestedQuantity > availableStock) {
+        if (shouldCheckStock && requestedQuantity > effectiveAvailable) {
           throw new Error(
             `Estoque insuficiente para "${product[0].name}". ` +
-              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
+              `Disponível: ${effectiveAvailable}, Solicitado: ${requestedQuantity}`,
           );
         }
       }
@@ -485,42 +495,99 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(items, discount);
 
     const sellerRow =
-      await sql`SELECT id FROM users WHERE id = ${sellerUserId}`;
+      await sql`SELECT id FROM users WHERE id = ${sellerUserId} AND tenant_id = ${tenantId}`;
     if (sellerRow.length === 0) {
       throw new Error("Vendedor não encontrado");
     }
 
-    const result = await sql`
-      UPDATE orders
-      SET clientid = ${clientid},
-          user_ref = ${sellerUserId},
-          description = ${description || ""},
-          discount = ${discount || 0},
-          totalprice = ${calculated.finalTotal},
-          total_commission = ${calculated.totalCommission},
-          document_type = ${docType},
-          payment_method = ${payment},
-          createdat = COALESCE(${createdAt}, createdat)
-      WHERE id = ${id}
-      RETURNING *
-    `;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await orderRepository.updateOrderCore(client, {
+        id,
+        clientid,
+        sellerUserId,
+        description,
+        discount,
+        finalTotal: calculated.finalTotal,
+        totalCommission: calculated.totalCommission,
+        docType,
+        payment,
+        createdAt,
+        tenantId,
+      });
 
-    if (result.length === 0) {
-      throw new Error("Pedido não encontrado");
+      if (result.length === 0) {
+        throw new Error("Pedido não encontrado");
+      }
+
+      await this.persistOrderItemsWithClient(
+        client,
+        id,
+        calculated.items,
+        tenantId,
+      );
+
+      if (isDeliveredPedido) {
+        const nextControlledStock = aggregateControlledStockQuantities(
+          calculated.items || [],
+        );
+        const productIds = new Set([
+          ...previousControlledStock.keys(),
+          ...nextControlledStock.keys(),
+        ]);
+
+        for (const productId of productIds) {
+          const oldQty = previousControlledStock.get(productId) || 0;
+          const newQty = nextControlledStock.get(productId) || 0;
+          const delta = newQty - oldQty;
+          if (!delta) continue;
+
+          if (delta > 0) {
+            const updatedStock = await orderRepository.decreaseProductStock(
+              client,
+              {
+                productId,
+                quantity: delta,
+                tenantId,
+              },
+            );
+            if (updatedStock.length === 0) {
+              const err = new Error(
+                `Estoque insuficiente ao ajustar o pedido entregue para o produto #${productId}.`,
+              );
+              err.statusCode = 409;
+              throw err;
+            }
+          } else {
+            const restoreQty = Math.abs(delta);
+            await orderRepository.increaseProductStock(client, {
+              productId,
+              quantity: restoreQty,
+              tenantId,
+            });
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    await this.persistOrderItems(id, calculated.items);
 
     return this.findById(id);
   }
 
-  async updatePaymentMethod(id, paymentMethod) {
+  async updatePaymentMethod(id, paymentMethod, tenantId = 1) {
     if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
       const err = new Error("Forma de pagamento inválida.");
       err.statusCode = 400;
       throw err;
     }
-    const current = await this.findById(id);
+    const current = await this.findById(id, tenantId);
     if (current.document_type !== "pedido") {
       const err = new Error(
         "A forma de pagamento só pode ser definida em pedidos.",
@@ -532,13 +599,13 @@ class OrderService {
     await sql`
       UPDATE orders
       SET payment_method = ${paymentMethod}
-      WHERE id = ${id}
+      WHERE id = ${id} AND tenant_id = ${tenantId}
     `;
-    return this.findById(id);
+    return this.findById(id, tenantId);
   }
 
-  async duplicate(id) {
-    const source = await this.findById(id);
+  async duplicate(id, tenantId = 1) {
+    const source = await this.findById(id, tenantId);
     const sourceItems = Array.isArray(source.items) ? source.items : [];
     if (sourceItems.length === 0) {
       throw new Error("Não é possível duplicar um pedido sem itens.");
@@ -550,16 +617,16 @@ class OrderService {
     );
     const inserted = await sql`
       INSERT INTO orders
-        (clientid, user_ref, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
+        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
       VALUES
-        (${source.clientid}, ${source.user_ref}, ${source.description || ""},
+        (${source.clientid}, ${source.user_ref}, ${tenantId}, ${source.description || ""},
          ${sourceDiscount}, ${calculated.finalTotal}, ${calculated.totalCommission},
          'Em aberto', NOW(), 'orcamento', null)
       RETURNING id
     `;
     const newId = inserted[0].id;
-    await this.persistOrderItems(newId, calculated.items);
-    return this.findById(newId);
+    await this.persistOrderItems(newId, calculated.items, tenantId);
+    return this.findById(newId, tenantId);
   }
 
   async getClientItemPriceHistory(
@@ -572,6 +639,7 @@ class OrderService {
       throw new Error("clientId e productId são obrigatórios");
     }
     const safeLimit = Math.min(30, Math.max(1, parseInt(limit, 10) || 8));
+    const tenantId = authUser?.tenantId || 1;
     if (authUser?.role === "salesperson") {
       return sql`
         SELECT
@@ -587,6 +655,7 @@ class OrderService {
         JOIN orders o ON o.id = oi.order_id
         LEFT JOIN users u ON u.id = o.user_ref
         WHERE o.clientid = ${clientId}
+          AND o.tenant_id = ${tenantId}
           AND oi.product_id = ${productId}
           AND o.document_type = 'pedido'
           AND o.user_ref = ${authUser.userId}
@@ -608,6 +677,7 @@ class OrderService {
       JOIN orders o ON o.id = oi.order_id
       LEFT JOIN users u ON u.id = o.user_ref
       WHERE o.clientid = ${clientId}
+        AND o.tenant_id = ${tenantId}
         AND oi.product_id = ${productId}
         AND o.document_type = 'pedido'
       ORDER BY o.createdat DESC
@@ -615,8 +685,8 @@ class OrderService {
     `;
   }
 
-  async convertToPedido(id) {
-    const order = await this.findById(id);
+  async convertToPedido(id, tenantId = 1) {
+    const order = await this.findById(id, tenantId);
     if (order.document_type !== "orcamento") {
       const err = new Error(
         "Apenas orçamentos podem ser convertidos em pedido.",
@@ -630,12 +700,12 @@ class OrderService {
       throw err;
     }
     await sql`
-      UPDATE orders SET document_type = 'pedido' WHERE id = ${id}
+      UPDATE orders SET document_type = 'pedido' WHERE id = ${id} AND tenant_id = ${tenantId}
     `;
-    return this.findById(id);
+    return this.findById(id, tenantId);
   }
 
-  async updateStatus(id, status) {
+  async updateStatus(id, status, tenantId = 1) {
     if (!status) {
       throw new Error("Status é obrigatório");
     }
@@ -643,7 +713,7 @@ class OrderService {
     const result = await sql`
       UPDATE orders
       SET status = ${status}
-      WHERE id = ${id}
+      WHERE id = ${id} AND tenant_id = ${tenantId}
       RETURNING *
     `;
 
@@ -654,16 +724,16 @@ class OrderService {
     return result[0];
   }
 
-  async delete(id) {
-    const result = await sql`DELETE FROM orders WHERE id = ${id} RETURNING *`;
+  async delete(id, tenantId = 1) {
+    const result = await sql`DELETE FROM orders WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING *`;
 
     if (result.length === 0) {
       throw new Error("Pedido não encontrado");
     }
   }
 
-  async finalize(id) {
-    const current = await this.findById(id);
+  async finalize(id, tenantId = 1) {
+    const current = await this.findById(id, tenantId);
     if (current.document_type !== "pedido") {
       const err = new Error(
         "Converta o orçamento em pedido antes de finalizar a entrega.",
@@ -672,56 +742,58 @@ class OrderService {
       throw err;
     }
 
-    const updated = await sql`
-      UPDATE orders
-      SET status = 'Entregue', finishedat = COALESCE(finishedat, NOW())
-      WHERE id = ${id}
-        AND (status IS DISTINCT FROM 'Entregue')
-      RETURNING id
-    `;
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const updated = await orderRepository.markOrderDelivered(client, id, tenantId);
 
-    if (updated.length === 0) {
-      const row = await sql`SELECT id, status FROM orders WHERE id = ${id}`;
-      if (row.length === 0) {
-        throw new Error("Pedido não encontrado");
+      if (updated.length === 0) {
+        const row = await orderRepository.getOrderStatusById(client, id, tenantId);
+        if (!row) {
+          throw new Error("Pedido não encontrado");
+        }
+        const err = new Error("Pedido já foi finalizado");
+        err.statusCode = 409;
+        throw err;
       }
-      const err = new Error("Pedido já foi finalizado");
-      err.statusCode = 409;
-      throw err;
-    }
 
-    const lines = await sql`
-      SELECT product_id, quantity, brand
-      FROM order_items
-      WHERE order_id = ${id}
-    `;
-    const itemsArray = lines.map((r) => ({
-      productId: r.product_id,
-      quantity: r.quantity,
-      brand: r.brand,
-    }));
+      const lines = await orderRepository.getOrderLinesForStock(client, id, tenantId);
+      const itemsArray = lines.map((r) => ({
+        productId: r.product_id,
+        quantity: r.quantity,
+        brand: r.brand,
+      }));
 
-    for (const item of itemsArray) {
-      if (
-        item.productId &&
-        item.quantity &&
-        controlsStockByBrand(item.brand)
-      ) {
-        const updatedStock = await sql`
-          UPDATE products
-          SET stock = stock - CAST(${item.quantity} AS INTEGER)
-          WHERE id = ${item.productId}
-            AND stock >= CAST(${item.quantity} AS INTEGER)
-          RETURNING id
-        `;
-        if (updatedStock.length === 0) {
-          const err = new Error(
-            `Estoque insuficiente ao finalizar pedido para o produto #${item.productId}.`,
+      for (const item of itemsArray) {
+        if (
+          item.productId &&
+          item.quantity &&
+          controlsStockByBrand(item.brand)
+        ) {
+          const updatedStock = await orderRepository.decreaseProductStock(
+            client,
+            {
+              productId: item.productId,
+              quantity: item.quantity,
+              tenantId,
+            },
           );
-          err.statusCode = 409;
-          throw err;
+          if (updatedStock.length === 0) {
+            const err = new Error(
+              `Estoque insuficiente ao finalizar pedido para o produto #${item.productId}.`,
+            );
+            err.statusCode = 409;
+            throw err;
+          }
         }
       }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
 
     return { message: "Pedido finalizado com sucesso" };
@@ -732,6 +804,7 @@ class OrderService {
       throw new Error("O ID do cliente é obrigatório");
     }
 
+    const tenantId = authUser?.tenantId || 1;
     if (authUser && authUser.role === "salesperson") {
       const result = await sql`
         SELECT
@@ -739,6 +812,7 @@ class OrderService {
         COALESCE(SUM(totalprice), 0) AS "totalSpent"
       FROM orders
       WHERE clientid = ${clientId} AND status = 'Entregue'
+        AND tenant_id = ${tenantId}
         AND user_ref = ${authUser.userId}
     `;
       return result[0] || { totalOrders: 0, totalSpent: 0 };
@@ -750,6 +824,7 @@ class OrderService {
         COALESCE(SUM(totalprice), 0) AS "totalSpent"
       FROM orders
       WHERE clientid = ${clientId} AND status = 'Entregue'
+        AND tenant_id = ${tenantId}
     `;
 
     return result[0] || { totalOrders: 0, totalSpent: 0 };

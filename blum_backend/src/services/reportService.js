@@ -1,7 +1,8 @@
 const { sql } = require("../config/database");
+const reportRepository = require("../repositories/reportRepository");
 
 class ReportService {
-  async getSalesByRep() {
+  async getSalesByRep(tenantId = 1) {
     return await sql`
       SELECT
         u.id AS "userId",
@@ -10,7 +11,7 @@ class ReportService {
         SUM(o.totalprice) AS "totalSales"
       FROM orders o
       JOIN users u ON u.id = o.user_ref
-      WHERE o.status = 'Entregue'
+      WHERE o.status = 'Entregue' AND o.tenant_id = ${tenantId}
       GROUP BY u.id, u.username, u.name
       ORDER BY "totalSales" DESC
     `;
@@ -20,13 +21,14 @@ class ReportService {
     const { period, authUser } = filters;
     const userRole = authUser?.role;
     const userId = authUser?.userId;
+    const tenantId = authUser?.tenantId || 1;
 
     let baseQuery = `
       SELECT
         COALESCE(COUNT(id), 0) AS "totalOrders",
         COALESCE(SUM(totalprice), 0) AS "totalSales"
       FROM orders
-      WHERE status = 'Entregue'
+      WHERE status = 'Entregue' AND tenant_id = ${tenantId}
     `;
     const params = [];
 
@@ -41,7 +43,7 @@ class ReportService {
       baseQuery += ` AND user_ref = $${params.length}`;
     }
 
-    const result = await sql(baseQuery, params);
+    const result = await reportRepository.query(baseQuery, params);
 
     return {
       totalOrders: parseInt(result[0].totalOrders) || 0,
@@ -50,7 +52,7 @@ class ReportService {
   }
 
   async getCommissionReport(filters = {}) {
-    const { startDate, endDate, userId } = filters;
+    const { startDate, endDate, userId, tenantId = 1 } = filters;
 
     let query = sql`
       SELECT
@@ -62,7 +64,7 @@ class ReportService {
         SUM(o.total_commission) as total_commission
       FROM orders o
       JOIN users u ON u.id = o.user_ref
-      WHERE o.status = 'Entregue'
+      WHERE o.status = 'Entregue' AND o.tenant_id = ${tenantId}
     `;
 
     if (startDate) {
@@ -85,9 +87,9 @@ class ReportService {
   }
 
   async getCommissionByBrand(filters = {}) {
-    const { startDate, endDate, sellerId } = filters;
+    const { startDate, endDate, sellerId, tenantId = 1 } = filters;
 
-    let conditions = ["o.status = 'Entregue'"];
+    let conditions = ["o.status = 'Entregue'", `o.tenant_id = ${Number(tenantId) || 1}`];
     const params = [];
 
     if (startDate) {
@@ -136,7 +138,7 @@ class ReportService {
       ORDER BY o.createdat DESC
     `;
 
-    return await sql(query, params);
+    return await reportRepository.query(query, params);
   }
 }
 

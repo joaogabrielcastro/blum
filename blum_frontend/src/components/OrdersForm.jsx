@@ -578,6 +578,15 @@ const OrdersForm = ({
               : "Editar pedido"
             : "Novo orçamento"}
         </h2>
+        {editingOrder?.status === "Entregue" ? (
+          <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+            <p className="text-sm font-semibold">Pedido entregue em edição</p>
+            <p className="mt-1 text-sm">
+              Ao salvar este pedido, o sistema ajusta o estoque automaticamente
+              conforme os itens adicionados, removidos ou alterados.
+            </p>
+          </div>
+        ) : null}
         <div className="w-full">
           <form
             id="order-form-main"
@@ -985,25 +994,25 @@ const OrdersForm = ({
                 ))}
               </div>
               <div className="overflow-x-auto border border-gray-200 rounded-lg hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="w-full min-w-[980px] divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">
                         Produto
                       </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[110px]">
                         Qtd.
                       </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
                         Desc. %
                       </th>
-                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
                         Preço Unit.
                       </th>
-                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px]">
                         Subtotal
                       </th>
-                      <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                      <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
                         Ações
                       </th>
                     </tr>
@@ -1062,7 +1071,7 @@ const OrdersForm = ({
                                   e.target.value,
                                 )
                               }
-                              className="w-full p-2 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full min-w-[82px] p-2 border border-gray-300 rounded-md text-center text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
                             {item.availableStock && (
                               <span className="text-xs text-gray-500">
@@ -1085,7 +1094,7 @@ const OrdersForm = ({
                                 e.target.value,
                               )
                             }
-                            className="w-full max-w-[7rem] p-2 border border-gray-300 rounded-md text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full min-w-[78px] p-2 border border-gray-300 rounded-md text-center text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-right">
@@ -1098,7 +1107,7 @@ const OrdersForm = ({
                               handleItemChange(index, "price", e.target.value)
                             }
                             disabled={!canEditUnitPrice}
-                            className="w-full max-w-[8.5rem] p-2 border border-gray-300 rounded-md text-right text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                            className="w-full min-w-[105px] p-2 border border-gray-300 rounded-md text-right text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
                           />
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-right">

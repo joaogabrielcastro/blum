@@ -73,7 +73,7 @@ async function processCsvData(csvText, selectedBrand) {
   return products;
 }
 
-async function importProductsToDatabase(products) {
+async function importProductsToDatabase(products, tenantId = 1) {
   const results = {
     created: 0,
     updated: 0,
@@ -94,6 +94,7 @@ async function importProductsToDatabase(products) {
         SELECT id, name, productcode, stock, price 
         FROM products 
         WHERE productcode = ${product.productCode}
+          AND tenant_id = ${tenantId}
       `;
 
       if (existing.length > 0) {
@@ -105,6 +106,7 @@ async function importProductsToDatabase(products) {
             brand = ${product.brand},
             subcode = ${subcode}
           WHERE productcode = ${product.productCode}
+            AND tenant_id = ${tenantId}
           RETURNING id, name, stock, price, subcode
         `;
 
@@ -116,10 +118,10 @@ async function importProductsToDatabase(products) {
         const newProduct = await sql`
           INSERT INTO products (
             name, productcode, subcode, price, stock, brand,
-            minstock, createdat
+            minstock, tenant_id, createdat
           ) VALUES (
             ${product.name}, ${product.productCode}, ${subcode}, ${product.price}, 
-            ${product.stock}, ${product.brand}, 0, NOW()
+            ${product.stock}, ${product.brand}, 0, ${tenantId}, NOW()
           )
           RETURNING id, name, productcode, brand, subcode
         `;

@@ -131,7 +131,13 @@ REDIS_URL=redis://127.0.0.1:6379
 
 # IA (Opcional - para importação inteligente)
 GEMINI_API_KEY=sua_chave_api_gemini
+
+# Versionamento API (opcional)
+# ENABLE_V1_DEPRECATION_HEADERS=true
+# API_V1_SUNSET_DATE=Wed, 31 Dec 2026 23:59:59 GMT
 ```
+
+> Dica: existe um template em `blum_backend/.env.example`.
 
 ### Migrações SQL
 
@@ -351,7 +357,14 @@ GET    /api/v1/reports/sales-by-rep     # Vendas por representante
 ### Status
 ```
 GET    /api/v1/status                   # Status do servidor
+GET    /api/v2/status                   # Status do servidor (v2)
 ```
+
+### Versionamento de API
+
+- A API `v1` continua compatível para clientes existentes.
+- A API `v2` está disponível em paralelo com foco em payload camelCase.
+- Guia de rollout/migração: `API_V2_ROLLOUT.md`.
 
 ## 👥 Usuários e Permissões
 

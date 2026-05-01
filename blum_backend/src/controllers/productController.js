@@ -1,6 +1,10 @@
 const productService = require("../services/productService");
 const brandAccessService = require("../services/brandAccessService");
 const {
+  mapProductResponse,
+  mapProductsPayload,
+} = require("../mappers/apiResponseMapper");
+const {
   cacheGet,
   cacheSet,
   invalidateProductsCache,
@@ -9,6 +13,7 @@ const {
 
 exports.getAll = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const {
       brand,
       productcode,
@@ -23,6 +28,7 @@ exports.getAll = async (req, res) => {
       await brandAccessService.getRestrictedBrandNamesOrNull(
         req.user.userId,
         req.user.role,
+        req.user.tenantId,
       );
 
     if (
@@ -37,6 +43,7 @@ exports.getAll = async (req, res) => {
     }
 
     const filters = {
+      tenantId: req.user.tenantId,
       brand,
       productcode,
       subcode,
@@ -53,10 +60,13 @@ exports.getAll = async (req, res) => {
 
     const cachedData = await cacheGet(cacheKey);
     if (cachedData) {
-      return res.status(200).json(cachedData);
+      return res.status(200).json(mapProductsPayload(cachedData, mapOptions));
     }
 
-    const result = await productService.findAll(filters);
+    const result = mapProductsPayload(
+      await productService.findAll(filters),
+      mapOptions,
+    );
     await cacheSet(cacheKey, result);
 
     res.status(200).json(result);
@@ -70,13 +80,17 @@ exports.getAll = async (req, res) => {
 
 exports.search = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { q } = req.query;
     const allowedBrandNames =
       await brandAccessService.getRestrictedBrandNamesOrNull(
         req.user.userId,
         req.user.role,
+        req.user.tenantId,
       );
-    const products = await productService.search(q, 20, allowedBrandNames);
+    const products = (
+      await productService.search(q, 20, allowedBrandNames, req.user.tenantId)
+    ).map((item) => mapProductResponse(item, mapOptions));
     res.status(200).json(products);
   } catch (error) {
     console.error("Erro na busca de produtos:", error);
@@ -86,12 +100,14 @@ exports.search = async (req, res) => {
 
 exports.getById = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const product = await productService.findById(id);
+    const product = await productService.findById(id, req.user.tenantId);
     const allowedBrandNames =
       await brandAccessService.getRestrictedBrandNamesOrNull(
         req.user.userId,
         req.user.role,
+        req.user.tenantId,
       );
     if (
       allowedBrandNames &&
@@ -100,7 +116,7 @@ exports.getById = async (req, res) => {
     ) {
       return res.status(404).json({ error: "Produto não encontrado" });
     }
-    res.status(200).json(product);
+    res.status(200).json(mapProductResponse(product, mapOptions));
   } catch (error) {
     console.error("Erro ao buscar produto:", error);
     const status = error.message === "Produto não encontrado" ? 404 : 500;
@@ -110,11 +126,15 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const product = await productService.create(req.body);
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const product = await productService.create({
+      ...req.body,
+      tenant_id: req.user.tenantId,
+    });
 
     await invalidateProductsCache();
 
-    res.status(201).json(product);
+    res.status(201).json(mapProductResponse(product, mapOptions));
   } catch (error) {
     console.error("Erro ao criar produto:", error);
     res.status(400).json({ error: error.message });
@@ -124,7 +144,7 @@ exports.create = async (req, res) => {
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
-    await productService.delete(id);
+    await productService.delete(id, req.user.tenantId);
 
     await invalidateProductsCache();
     res.status(204).end();
@@ -137,12 +157,16 @@ exports.delete = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const product = await productService.update(id, req.body);
+    const product = await productService.update(id, {
+      ...req.body,
+      tenant_id: req.user.tenantId,
+    });
 
     await invalidateProductsCache();
 
-    res.status(200).json(product);
+    res.status(200).json(mapProductResponse(product, mapOptions));
   } catch (error) {
     console.error("Erro ao atualizar produto:", error);
     const status = error.message === "Produto não encontrado" ? 404 : 400;

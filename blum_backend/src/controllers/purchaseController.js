@@ -4,6 +4,11 @@ const { sql } = require("../config/database");
 const { processPdf } = require("../services/purchase/pdfProcessService");
 const { finalizePurchaseFromImport } = require("../services/purchase/purchaseFinalizeImportService");
 const csvImportService = require("../services/purchase/csvImportService");
+const purchaseRepository = require("../repositories/purchaseRepository");
+const {
+  mapPurchaseHistoryPayload,
+  mapLastPurchasePriceRow,
+} = require("../mappers/apiResponseMapper");
 
 exports.processPdf = processPdf;
 exports.finalizePurchaseFromCsv = finalizePurchaseFromImport;
@@ -68,8 +73,10 @@ exports.importCsv = async (req, res) => {
         .json({ error: "ID da marca é obrigatório para importação CSV." });
     }
 
-    const brandResult =
-      await sql`SELECT id, name FROM brands WHERE id = ${parseInt(brandId, 10)}`;
+    const brandResult = await purchaseRepository.findBrandByIdAndTenant(
+      parseInt(brandId, 10),
+      req.user.tenantId,
+    );
     if (brandResult.length === 0) {
       return res.status(400).json({ error: "Marca não encontrada." });
     }
@@ -85,7 +92,10 @@ exports.importCsv = async (req, res) => {
       });
     }
 
-    const results = await csvImportService.importProductsToDatabase(products);
+    const results = await csvImportService.importProductsToDatabase(
+      products,
+      req.user.tenantId,
+    );
 
     res.status(200).json({
       message: `Importação concluída! ${results.created} novos produtos, ${results.updated} atualizados na marca ${brandName}`,
@@ -104,6 +114,7 @@ exports.importCsv = async (req, res) => {
 
 exports.processCsv = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     if (!req.file) {
       return res.status(400).json({ error: "Nenhum arquivo CSV enviado." });
     }
@@ -111,13 +122,19 @@ exports.processCsv = async (req, res) => {
     const csvText = req.file.buffer.toString("utf8");
     const products = await csvImportService.processCsvData(csvText, "");
 
-    const parsed = products.map((p, index) => ({
-      productCode: p.productCode || "",
-      description: p.name || `Produto ${index + 1}`,
-      quantity: Number(p.stock || 1),
-      unitPrice: Number(p.price || 0),
-      subcode: p.subcode || p.productCode || `CSV-${index + 1}`,
-    }));
+    const parsed = products.map((p, index) => {
+      const item = {
+        productCode: p.productCode || "",
+        description: p.name || `Produto ${index + 1}`,
+        quantity: Number(p.stock || 1),
+        unitPrice: Number(p.price || 0),
+        subCode: p.subCode || p.subcode || p.productCode || `CSV-${index + 1}`,
+      };
+      if (!mapOptions.camelOnly) {
+        item.subcode = item.subCode;
+      }
+      return item;
+    });
 
     return res.status(200).json(parsed);
   } catch (error) {
@@ -128,25 +145,15 @@ exports.processCsv = async (req, res) => {
 
 exports.getPriceHistory = async (req, res) => {
   const { productId } = req.params;
+  const mapOptions = { camelOnly: req.apiVersion === "v2" };
 
   try {
-    const history = await sql`
-      SELECT 
-        ph.id,
-        ph.purchase_price,
-        ph.quantity,
-        ph.purchase_date,
-        ph.created_at,
-        p.name as product_name,
-        p.productcode,
-        p.subcode
-      FROM price_history ph
-      JOIN products p ON COALESCE(ph.product_id, ph.productid) = p.id
-      WHERE COALESCE(ph.product_id, ph.productid) = ${parseInt(productId, 10)}
-      ORDER BY ph.purchase_date DESC
-    `;
+    const history = await purchaseRepository.findPriceHistoryByProductAndTenant(
+      parseInt(productId, 10),
+      req.user.tenantId,
+    );
 
-    res.status(200).json(history);
+    res.status(200).json(mapPurchaseHistoryPayload(history, mapOptions));
   } catch (error) {
     console.error("ERRO ao buscar histórico de preços:", error.message);
     res.status(500).json({
@@ -158,6 +165,7 @@ exports.getPriceHistory = async (req, res) => {
 
 exports.getLastPurchasePrice = async (req, res) => {
   const { productId } = req.params;
+  const mapOptions = { camelOnly: req.apiVersion === "v2" };
 
   try {
     const lastPurchase = await sql`
@@ -167,6 +175,7 @@ exports.getLastPurchasePrice = async (req, res) => {
         quantity
       FROM price_history 
       WHERE COALESCE(product_id, productid) = ${parseInt(productId, 10)}
+        AND tenant_id = ${req.user.tenantId}
       ORDER BY purchase_date DESC 
       LIMIT 1
     `;
@@ -177,7 +186,7 @@ exports.getLastPurchasePrice = async (req, res) => {
       });
     }
 
-    res.status(200).json(lastPurchase[0]);
+    res.status(200).json(mapLastPurchasePriceRow(lastPurchase[0], mapOptions));
   } catch (error) {
     console.error("ERRO ao buscar último preço:", error.message);
     res.status(500).json({

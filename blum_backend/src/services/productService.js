@@ -1,4 +1,5 @@
-const { sql, pool } = require("../config/database");
+const { sql } = require("../config/database");
+const productRepository = require("../repositories/productRepository");
 
 /** Restrição opcional por representada (vendedor). Fragmento vazio = sem filtro extra. */
 function brandSql(names) {
@@ -28,6 +29,7 @@ class ProductService {
       page = 1,
       limit = 50,
       allowedBrandNames,
+      tenantId = 1,
     } = filters;
     const offset = (page - 1) * limit;
     const bc = brandSql(allowedBrandNames);
@@ -45,31 +47,31 @@ class ProductService {
     if (subcode) {
       query = await sql`
         SELECT * FROM products
-        WHERE subcode = ${subcode} ${bc}
+        WHERE subcode = ${subcode} AND tenant_id = ${tenantId} ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
       countQuery =
-        await sql`SELECT COUNT(*) as count FROM products WHERE subcode = ${subcode} ${bc}`;
+        await sql`SELECT COUNT(*) as count FROM products WHERE subcode = ${subcode} AND tenant_id = ${tenantId} ${bc}`;
     }
     // Busca por PRODUCTCODE
     else if (productcode) {
       query = await sql`
         SELECT * FROM products
-        WHERE productcode = ${productcode} ${bc}
+        WHERE productcode = ${productcode} AND tenant_id = ${tenantId} ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
       countQuery = await sql`
-        SELECT COUNT(*) as count FROM products WHERE productcode = ${productcode} ${bc}`;
+        SELECT COUNT(*) as count FROM products WHERE productcode = ${productcode} AND tenant_id = ${tenantId} ${bc}`;
     }
     // Busca por NOME (aproximada)
     else if (name) {
       query = await sql`
         SELECT * FROM products
-        WHERE name ILIKE ${"%" + name + "%"} ${bc}
+        WHERE name ILIKE ${"%" + name + "%"} AND tenant_id = ${tenantId} ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
       countQuery = await sql`
-        SELECT COUNT(*) as count FROM products WHERE name ILIKE ${"%" + name + "%"} ${bc}`;
+        SELECT COUNT(*) as count FROM products WHERE name ILIKE ${"%" + name + "%"} AND tenant_id = ${tenantId} ${bc}`;
     }
     // Representada + termo livre (várias palavras, sem acento — ver findAllByBrandFlexibleQ)
     else if (brand && brand !== "all" && qTrim) {
@@ -79,6 +81,7 @@ class ProductService {
         limit,
         offset,
         allowedBrandNames,
+        tenantId,
       });
       query = flex.data;
       countQuery = flex.countRows;
@@ -87,20 +90,20 @@ class ProductService {
     else if (brand && brand !== "all") {
       query = await sql`
         SELECT * FROM products
-        WHERE brand = ${brand} ${bc}
+        WHERE brand = ${brand} AND tenant_id = ${tenantId} ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
       countQuery =
-        await sql`SELECT COUNT(*) as count FROM products WHERE brand = ${brand} ${bc}`;
+        await sql`SELECT COUNT(*) as count FROM products WHERE brand = ${brand} AND tenant_id = ${tenantId} ${bc}`;
     }
     // Busca TODOS
     else {
       query = await sql`
         SELECT * FROM products
-        WHERE 1=1 ${bc}
+        WHERE tenant_id = ${tenantId} ${bc}
         ORDER BY createdat DESC
         LIMIT ${limit} OFFSET ${offset}`;
-      countQuery = await sql`SELECT COUNT(*) as count FROM products WHERE 1=1 ${bc}`;
+      countQuery = await sql`SELECT COUNT(*) as count FROM products WHERE tenant_id = ${tenantId} ${bc}`;
     }
 
     const total = parseInt(countQuery[0].count, 10);
@@ -155,11 +158,12 @@ class ProductService {
     limit,
     offset,
     allowedBrandNames,
+    tenantId = 1,
   }) {
     const run = async (tokenSqlFn) => {
       const tw = tokenSqlFn(tokens, 2);
       const vals = [brand, ...tokens];
-      let w = `brand = $1 AND (${tw.sql})`;
+      let w = `brand = $1 AND tenant_id = ${tenantId} AND (${tw.sql})`;
       let nextP = tw.nextParam;
       if (allowedBrandNames && allowedBrandNames.length) {
         vals.push(allowedBrandNames);
@@ -167,11 +171,13 @@ class ProductService {
         nextP++;
       }
       const countSql = `SELECT COUNT(*)::bigint as count FROM products WHERE ${w}`;
-      const countRes = await pool.query(countSql, vals);
+      const countRes = { rows: await productRepository.queryRaw(countSql, vals) };
       const limP = nextP;
       const offP = nextP + 1;
       const dataSql = `SELECT * FROM products WHERE ${w} ORDER BY createdat DESC LIMIT $${limP} OFFSET $${offP}`;
-      const dataRes = await pool.query(dataSql, [...vals, limit, offset]);
+      const dataRes = {
+        rows: await productRepository.queryRaw(dataSql, [...vals, limit, offset]),
+      };
       return {
         data: dataRes.rows,
         countRows: [{ count: String(countRes.rows[0].count) }],
@@ -199,7 +205,7 @@ class ProductService {
    * @param {number} limit - Limite de resultados
    * @returns {Promise<Array>} Lista de produtos
    */
-  async search(searchTerm, limit = 20, allowedBrandNames = null) {
+  async search(searchTerm, limit = 20, allowedBrandNames = null, tenantId = 1) {
     if (!searchTerm || searchTerm.trim() === "") {
       throw new Error("Termo de busca é obrigatório");
     }
@@ -215,7 +221,7 @@ class ProductService {
 
     const trySearch = async (tokenFn) => {
       const t = tokenFn(tokens, 1);
-      let w = `(${t.sql})`;
+      let w = `(tenant_id = ${tenantId}) AND (${t.sql})`;
       const v = [...tokens];
       let np = t.nextParam;
       if (allowedBrandNames && allowedBrandNames.length) {
@@ -229,7 +235,7 @@ class ProductService {
         ORDER BY name
         LIMIT $${np}
       `;
-      const r = await pool.query(sqlText, [...v, limit]);
+      const r = { rows: await productRepository.queryRaw(sqlText, [...v, limit]) };
       return r.rows;
     };
 
@@ -253,8 +259,10 @@ class ProductService {
    * @param {number} id - ID do produto
    * @returns {Promise<Object>} Produto encontrado
    */
-  async findById(id) {
-    const products = await sql`SELECT * FROM products WHERE id = ${id}`;
+  async findById(id, tenantId = 1) {
+    const products = await sql`
+      SELECT * FROM products WHERE id = ${id} AND tenant_id = ${tenantId}
+    `;
 
     if (products.length === 0) {
       throw new Error("Produto não encontrado");
@@ -269,8 +277,9 @@ class ProductService {
    * @returns {Promise<Object>} Produto criado
    */
   async create(productData) {
-    const { name, productcode, subcode, price, stock, brand, minstock } =
+    const { name, productcode, subcode, price, stock, brand, minstock, tenant_id } =
       productData;
+    const tenantId = tenant_id || 1;
 
     if (!name || price === undefined || stock === undefined) {
       throw new Error("Nome, preço e estoque são obrigatórios");
@@ -279,8 +288,8 @@ class ProductService {
     // Verifica se já existe produto com o mesmo código
     if (productcode) {
       const existing = await sql`
-        SELECT id, name FROM products 
-        WHERE productcode = ${productcode}
+        SELECT id, name FROM products
+        WHERE productcode = ${productcode} AND tenant_id = ${tenantId}
       `;
 
       if (existing.length > 0) {
@@ -293,8 +302,8 @@ class ProductService {
     // Verifica se já existe produto com o mesmo subcódigo (se fornecido)
     if (subcode && subcode.trim() !== "") {
       const existingSubcode = await sql`
-        SELECT id, name FROM products 
-        WHERE subcode = ${subcode}
+        SELECT id, name FROM products
+        WHERE subcode = ${subcode} AND tenant_id = ${tenantId}
       `;
 
       if (existingSubcode.length > 0) {
@@ -304,14 +313,16 @@ class ProductService {
       }
     }
 
-    const result = await sql(
-      `INSERT INTO products (name, productcode, subcode, price, stock, brand, minstock, createdat)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-       RETURNING *`,
-      [name, productcode, subcode || "", price, stock, brand, minstock || 0],
-    );
-
-    return result[0];
+    return productRepository.insertProduct({
+      name,
+      productcode,
+      subcode,
+      price,
+      stock,
+      brand,
+      minstock,
+      tenant_id: tenantId,
+    });
   }
 
   /**
@@ -321,8 +332,9 @@ class ProductService {
    * @returns {Promise<Object>} Produto atualizado
    */
   async update(id, productData) {
-    const { name, productcode, subcode, price, stock, brand, minstock } =
+    const { name, productcode, subcode, price, stock, brand, minstock, tenant_id } =
       productData;
+    const tenantId = tenant_id || 1;
 
     if (!name || price === undefined || stock === undefined) {
       throw new Error("Nome, preço e estoque são obrigatórios");
@@ -331,8 +343,8 @@ class ProductService {
     // Verifica se outro produto já usa o mesmo código
     if (productcode) {
       const existing = await sql`
-        SELECT id, name FROM products 
-        WHERE productcode = ${productcode} AND id != ${id}
+        SELECT id, name FROM products
+        WHERE productcode = ${productcode} AND id != ${id} AND tenant_id = ${tenantId}
       `;
 
       if (existing.length > 0) {
@@ -345,8 +357,8 @@ class ProductService {
     // Verifica se outro produto já usa o mesmo subcódigo
     if (subcode && subcode.trim() !== "") {
       const existingSubcode = await sql`
-        SELECT id, name FROM products 
-        WHERE subcode = ${subcode} AND id != ${id}
+        SELECT id, name FROM products
+        WHERE subcode = ${subcode} AND id != ${id} AND tenant_id = ${tenantId}
       `;
 
       if (existingSubcode.length > 0) {
@@ -357,20 +369,11 @@ class ProductService {
     }
 
     const result = await sql(
-      `UPDATE products 
+      `UPDATE products
        SET name = $1, productcode = $2, subcode = $3, price = $4, stock = $5, brand = $6, minstock = $7
-       WHERE id = $8
+       WHERE id = $8 AND tenant_id = $9
        RETURNING *`,
-      [
-        name,
-        productcode,
-        subcode || "",
-        price,
-        stock,
-        brand,
-        minstock || 0,
-        id,
-      ],
+      [name, productcode, subcode || "", price, stock, brand, minstock || 0, id, tenantId],
     );
 
     if (result.length === 0) {
@@ -385,8 +388,9 @@ class ProductService {
    * @param {number} id - ID do produto
    * @returns {Promise<void>}
    */
-  async delete(id) {
-    const result = await sql`DELETE FROM products WHERE id = ${id} RETURNING *`;
+  async delete(id, tenantId = 1) {
+    const result =
+      await sql`DELETE FROM products WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING *`;
 
     if (result.length === 0) {
       throw new Error("Produto não encontrado");
@@ -399,8 +403,8 @@ class ProductService {
    * @param {number} quantity - Quantidade a subtrair
    * @returns {Promise<number>} Novo estoque
    */
-  async updateStock(productId, quantity) {
-    const product = await this.findById(productId);
+  async updateStock(productId, quantity, tenantId = 1) {
+    const product = await this.findById(productId, tenantId);
 
     const newStock = product.stock - quantity;
 
@@ -408,7 +412,7 @@ class ProductService {
       throw new Error("Estoque insuficiente");
     }
 
-    await sql`UPDATE products SET stock = ${newStock} WHERE id = ${productId}`;
+    await sql`UPDATE products SET stock = ${newStock} WHERE id = ${productId} AND tenant_id = ${tenantId}`;
 
     return newStock;
   }
@@ -419,8 +423,8 @@ class ProductService {
    * @param {number} quantity - Quantidade desejada
    * @returns {Promise<boolean>}
    */
-  async hasStock(productId, quantity) {
-    const product = await this.findById(productId);
+  async hasStock(productId, quantity, tenantId = 1) {
+    const product = await this.findById(productId, tenantId);
     return product.stock >= quantity;
   }
 
@@ -428,10 +432,10 @@ class ProductService {
    * Lista produtos com estoque baixo
    * @returns {Promise<Array>} Produtos com estoque baixo
    */
-  async findLowStock() {
-    return await sql`
-      SELECT * FROM products 
-      WHERE stock <= minstock 
+  async findLowStock(tenantId = 1) {
+    return sql`
+      SELECT * FROM products
+      WHERE stock <= minstock AND tenant_id = ${tenantId}
       ORDER BY stock ASC
     `;
   }

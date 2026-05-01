@@ -5,6 +5,7 @@ const { sql } = require("../../config/database");
  */
 async function finalizePurchaseFromImport(req, res) {
   const { brandId, purchaseDate, items } = req.body;
+  const tenantId = req.user?.tenantId || 1;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Nenhum item válido foi recebido." });
@@ -52,7 +53,7 @@ async function finalizePurchaseFromImport(req, res) {
     }
 
     const brandResult = await sql`
-      SELECT id, name FROM brands WHERE id = ${brandIdInt}
+      SELECT id, name FROM brands WHERE id = ${brandIdInt} AND tenant_id = ${tenantId}
     `;
 
     if (brandResult.length === 0) {
@@ -71,6 +72,7 @@ async function finalizePurchaseFromImport(req, res) {
         SELECT id, name FROM products 
         WHERE subcode = ${subcode} 
         AND id != COALESCE(${item.mappedProductId || 0}, 0)
+        AND tenant_id = ${tenantId}
       `;
 
       if (existingSubcode.length > 0) {
@@ -107,7 +109,7 @@ async function finalizePurchaseFromImport(req, res) {
           }
 
           const existingProduct = await sql`
-            SELECT id, name, price as current_price FROM products WHERE id = ${productId}
+            SELECT id, name, price as current_price FROM products WHERE id = ${productId} AND tenant_id = ${tenantId}
           `;
 
           if (existingProduct.length === 0) {
@@ -121,13 +123,13 @@ async function finalizePurchaseFromImport(req, res) {
             SET stock = stock + ${quantity}, 
                 price = ${price},
                 subcode = ${subcode}
-            WHERE id = ${productId}
+            WHERE id = ${productId} AND tenant_id = ${tenantId}
           `;
 
           if (currentPrice !== price) {
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${productId}, ${price}, ${quantity}, ${
+              INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
+              VALUES (${productId}, ${tenantId}, ${price}, ${quantity}, ${
                 purchaseDate || new Date().toISOString()
               })
             `;
@@ -136,7 +138,7 @@ async function finalizePurchaseFromImport(req, res) {
           results.updated++;
         } else if (item.productCode && item.description) {
           const existingWithCode = await sql`
-            SELECT id FROM products WHERE productcode = ${item.productCode}
+            SELECT id FROM products WHERE productcode = ${item.productCode} AND tenant_id = ${tenantId}
           `;
 
           if (existingWithCode.length > 0) {
@@ -145,12 +147,12 @@ async function finalizePurchaseFromImport(req, res) {
               SET stock = stock + ${quantity}, 
                   price = ${price},
                   subcode = ${subcode}
-              WHERE productcode = ${item.productCode}
+              WHERE productcode = ${item.productCode} AND tenant_id = ${tenantId}
             `;
 
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${existingWithCode[0].id}, ${price}, ${quantity}, ${
+              INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
+              VALUES (${existingWithCode[0].id}, ${tenantId}, ${price}, ${quantity}, ${
                 purchaseDate || new Date().toISOString()
               })
             `;
@@ -166,6 +168,7 @@ async function finalizePurchaseFromImport(req, res) {
                 stock, 
                 brand,
                 minstock,
+                tenant_id,
                 createdat
               ) VALUES (
                 ${item.description},
@@ -175,14 +178,15 @@ async function finalizePurchaseFromImport(req, res) {
                 ${quantity},
                 ${brandName},
                 0,
+                ${tenantId},
                 NOW()
               )
               RETURNING id, name, productcode, brand, subcode
             `;
 
             await sql`
-              INSERT INTO price_history (product_id, purchase_price, quantity, purchase_date)
-              VALUES (${newProduct[0].id}, ${price}, ${quantity}, ${
+              INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
+              VALUES (${newProduct[0].id}, ${tenantId}, ${price}, ${quantity}, ${
                 purchaseDate || new Date().toISOString()
               })
             `;

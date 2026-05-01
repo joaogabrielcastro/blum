@@ -30,6 +30,7 @@ exports.authenticate = (req, res, next) => {
       username: decoded.username,
       role: decoded.role,
       name: decoded.name,
+      tenantId: decoded.tenantId || 1,
     };
 
     next();
@@ -98,6 +99,7 @@ exports.optionalAuth = (req, res, next) => {
       username: decoded.username,
       role: decoded.role,
       name: decoded.name,
+      tenantId: decoded.tenantId || 1,
     };
   } catch (error) {
     req.user = null;

@@ -57,6 +57,12 @@ async function seedDefaultUsers(options = {}) {
 
   const countRows = await sql`SELECT COUNT(*)::int AS c FROM users`;
   const count = Number(countRows[0]?.c ?? 0);
+  const tenantRows =
+    await sql`SELECT id FROM tenants WHERE slug = 'default' ORDER BY id LIMIT 1`;
+  const defaultTenantId = tenantRows[0]?.id;
+  if (!defaultTenantId) {
+    throw new Error("Tenant default não encontrado para seed de usuários.");
+  }
 
   if (onlyIfDatabaseEmpty && count > 0) {
     console.log(
@@ -80,8 +86,8 @@ async function seedDefaultUsers(options = {}) {
 
     const password_hash = await bcrypt.hash(user.password, 10);
     await sql`
-      INSERT INTO users (username, password_hash, role, name)
-      VALUES (${user.username}, ${password_hash}, ${user.role}, ${user.name})
+      INSERT INTO users (username, password_hash, role, name, tenant_id)
+      VALUES (${user.username}, ${password_hash}, ${user.role}, ${user.name}, ${defaultTenantId})
     `;
     created += 1;
     if (verbose) {

@@ -296,3 +296,11 @@ exports.validateAdminResetUserPassword = [
     .withMessage("Nova senha deve ter no mínimo 6 caracteres"),
   handleValidationErrors,
 ];
+
+exports.validateRefreshToken = [
+  body("refreshToken")
+    .isString()
+    .notEmpty()
+    .withMessage("refreshToken é obrigatório"),
+  handleValidationErrors,
+];

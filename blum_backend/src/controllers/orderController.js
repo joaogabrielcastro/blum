@@ -1,4 +1,9 @@
 const orderService = require("../services/orderService");
+const {
+  mapOrderResponse,
+  mapOrdersPayload,
+  mapClientItemPriceHistoryPayload,
+} = require("../mappers/apiResponseMapper");
 
 const assertOrderAccess = (req, order) => {
   if (req.user.role === "admin") return;
@@ -12,12 +17,17 @@ const assertOrderAccess = (req, order) => {
 // GET ALL - Buscar todos os pedidos (escopo definido pelo JWT)
 exports.getAll = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { clientid } = req.query;
     const orders = await orderService.findAll({
-      authUser: { role: req.user.role, userId: req.user.userId },
+      authUser: {
+        role: req.user.role,
+        userId: req.user.userId,
+        tenantId: req.user.tenantId,
+      },
       clientid: clientid || undefined,
     });
-    res.status(200).json(orders);
+    res.status(200).json(mapOrdersPayload(orders, mapOptions));
   } catch (error) {
     console.error("Erro ao buscar pedidos:", error);
     res.status(400).json({ error: error.message });
@@ -27,10 +37,11 @@ exports.getAll = async (req, res) => {
 // GET BY ID - Buscar pedido por ID
 exports.getById = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const order = await orderService.findById(id);
+    const order = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, order);
-    res.status(200).json(order);
+    res.status(200).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao buscar pedido:", error);
     if (error.statusCode === 403) {
@@ -46,6 +57,7 @@ exports.getById = async (req, res) => {
 // GET ORDERS BY SELLER - Pedidos por vendedor
 exports.getOrdersBySeller = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { userId } = req.params;
     if (
       req.user.role === "salesperson" &&
@@ -53,8 +65,8 @@ exports.getOrdersBySeller = async (req, res) => {
     ) {
       return res.status(403).json({ error: "Acesso negado" });
     }
-    const orders = await orderService.findBySeller(userId);
-    res.status(200).json(orders);
+    const orders = await orderService.findBySeller(userId, req.user.tenantId);
+    res.status(200).json(mapOrdersPayload(orders, mapOptions));
   } catch (error) {
     console.error("Erro ao buscar pedidos do vendedor:", error);
     res.status(500).json({ error: "Erro ao buscar pedidos do vendedor." });
@@ -64,8 +76,9 @@ exports.getOrdersBySeller = async (req, res) => {
 // CREATE - Criar um novo pedido
 exports.create = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const order = await orderService.create(req.body, req.user);
-    res.status(201).json(order);
+    res.status(201).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao criar pedido:", error);
     res.status(400).json({ error: error.message });
@@ -75,11 +88,12 @@ exports.create = async (req, res) => {
 // Converter orçamento em pedido
 exports.convertToPedido = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const order = await orderService.convertToPedido(id);
-    res.status(200).json(order);
+    const order = await orderService.convertToPedido(id, req.user.tenantId);
+    res.status(200).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao converter orçamento:", error);
     if (error.statusCode === 403) {
@@ -98,11 +112,12 @@ exports.convertToPedido = async (req, res) => {
 // UPDATE - Atualizar um pedido
 exports.update = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
     const order = await orderService.update(id, req.body, req.user);
-    res.status(200).json(order);
+    res.status(200).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao atualizar pedido:", error);
     if (error.statusCode === 403) {
@@ -118,12 +133,13 @@ exports.update = async (req, res) => {
 // UPDATE STATUS - Atualizar status do pedido
 exports.updateStatus = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
     const { status } = req.body;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const order = await orderService.updateStatus(id, status);
-    res.status(200).json(order);
+    const order = await orderService.updateStatus(id, status, req.user.tenantId);
+    res.status(200).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao atualizar status do pedido:", error);
     if (error.statusCode === 403) {
@@ -140,9 +156,9 @@ exports.updateStatus = async (req, res) => {
 exports.delete = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    await orderService.delete(id);
+    await orderService.delete(id, req.user.tenantId);
     res.status(204).end();
   } catch (error) {
     console.error("Erro ao excluir pedido:", error);
@@ -160,9 +176,9 @@ exports.delete = async (req, res) => {
 exports.finalize = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const result = await orderService.finalize(id);
+    const result = await orderService.finalize(id, req.user.tenantId);
     res.status(200).json(result);
   } catch (error) {
     console.error("Erro ao finalizar pedido:", error);
@@ -185,12 +201,17 @@ exports.finalize = async (req, res) => {
 // UPDATE PAYMENT METHOD - Atualizar forma de pagamento de pedido
 exports.updatePaymentMethod = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const { payment_method: paymentMethod } = req.body;
-    const existing = await orderService.findById(id);
+    const paymentMethod = req.body.paymentMethod ?? req.body.payment_method;
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const updated = await orderService.updatePaymentMethod(id, paymentMethod);
-    res.status(200).json(updated);
+    const updated = await orderService.updatePaymentMethod(
+      id,
+      paymentMethod,
+      req.user.tenantId,
+    );
+    res.status(200).json(mapOrderResponse(updated, mapOptions));
   } catch (error) {
     console.error("Erro ao atualizar forma de pagamento:", error);
     if (error.statusCode === 403) {
@@ -209,11 +230,12 @@ exports.updatePaymentMethod = async (req, res) => {
 // DUPLICATE - Duplicar pedido/orçamento
 exports.duplicate = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { id } = req.params;
-    const existing = await orderService.findById(id);
+    const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const duplicated = await orderService.duplicate(id);
-    res.status(201).json(duplicated);
+    const duplicated = await orderService.duplicate(id, req.user.tenantId);
+    res.status(201).json(mapOrderResponse(duplicated, mapOptions));
   } catch (error) {
     console.error("Erro ao duplicar pedido:", error);
     if (error.statusCode === 403) {
@@ -232,6 +254,7 @@ exports.duplicate = async (req, res) => {
 // GET CLIENT ITEM PRICE HISTORY
 exports.getClientItemPriceHistory = async (req, res) => {
   try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const { clientId, productId } = req.params;
     const { limit } = req.query;
     const rows = await orderService.getClientItemPriceHistory(
@@ -240,7 +263,7 @@ exports.getClientItemPriceHistory = async (req, res) => {
       req.user,
       limit,
     );
-    res.status(200).json(rows);
+    res.status(200).json(mapClientItemPriceHistoryPayload(rows, mapOptions));
   } catch (error) {
     console.error("Erro ao buscar histórico de preço cliente/produto:", error);
     if (error.statusCode === 400) {
