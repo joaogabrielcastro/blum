@@ -3,19 +3,21 @@ import { useNavigate } from "react-router-dom";
 import apiService from "../services/apiService";
 import ClientsForm from "../components/ClientsForm";
 import SearchBar from "../components/SearchBar";
-import LoadingSpinner from "../components/LoadingSpinner";
+import ListPageSkeleton from "../components/ListPageSkeleton";
 import EmptyState from "../components/EmptyState";
 import { getClientDisplayName } from "../utils/clients";
+import { useToast } from "../context/ToastContext";
 
 const ClientsPage = () => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [clients, setClients] = useState([]);
   const [filteredClients, setFilteredClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -45,13 +47,15 @@ const ClientsPage = () => {
   const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       const clientsData = await apiService.getClients();
       setClients(clientsData);
       setFilteredClients(clientsData);
     } catch (error) {
       console.error("Erro ao buscar clientes:", error);
-      setError("Falha ao carregar clientes. Tente novamente.");
+      const msg =
+        error?.message || "Falha ao carregar clientes. Tente novamente.";
+      setLoadError(msg);
     } finally {
       setLoading(false);
     }
@@ -92,10 +96,7 @@ const ClientsPage = () => {
       );
 
       setDeleteConfirm(null);
-      setError(null);
-
-      setError({ type: "success", message: "Cliente excluído com sucesso!" });
-      setTimeout(() => setError(null), 3000);
+      toast.success("Cliente removido com sucesso.");
     } catch (error) {
       console.error("Erro ao deletar cliente:", error);
       const errorMessage =
@@ -103,10 +104,7 @@ const ClientsPage = () => {
         error.message?.includes("não encontrado")
           ? "Cliente não encontrado. A lista será atualizada."
           : "Falha ao excluir cliente. Tente novamente.";
-      setError({
-        type: "error",
-        message: errorMessage,
-      });
+      toast.error(errorMessage);
       // Atualiza a lista mesmo com erro
       await fetchClients();
     } finally {
@@ -122,10 +120,6 @@ const ClientsPage = () => {
   const closeDeleteConfirm = () => {
     setDeleteConfirm(null);
   };
-
-  if (loading) {
-    return <LoadingSpinner message="Carregando clientes..." />;
-  }
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
@@ -185,48 +179,15 @@ const ClientsPage = () => {
         </div>
       </div>
 
-      {/* Mensagens de Feedback */}
-      {error && (
+      {loadError && (
         <div className="flex-shrink-0 px-6 py-2">
-          <div
-            className={`p-3 border rounded-lg ${
-              error.type === "success"
-                ? "bg-green-100 border-green-200 text-green-700"
-                : "bg-red-100 border-red-200 text-red-700"
-            }`}
-          >
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                {error.type === "success" ? (
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-4 h-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                )}
-                <span className="text-sm">{error.message}</span>
-              </div>
+          <div className="p-3 border rounded-lg bg-red-50 border-red-200 text-red-800">
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-sm">{loadError}</span>
               <button
-                onClick={() => setError(null)}
-                className="hover:opacity-70 text-sm"
+                type="button"
+                onClick={() => setLoadError(null)}
+                className="hover:opacity-70 text-sm shrink-0"
               >
                 ×
               </button>
@@ -245,6 +206,10 @@ const ClientsPage = () => {
                 onClientAdded={handleClientAdded}
                 onCancel={handleCancelEdit}
               />
+            </div>
+          ) : loading ? (
+            <div className="flex-1 overflow-auto">
+              <ListPageSkeleton cards={6} variant="grid" />
             </div>
           ) : (
             <div className="flex-1 h-full flex flex-col">

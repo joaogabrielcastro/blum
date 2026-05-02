@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ToastProvider } from './context/ToastContext';
 
 // Verifica se o Service Worker é suportado pelo navegador
 // e o registra antes da aplicação React ser renderizada.
@@ -19,6 +20,8 @@ if ('serviceWorker' in navigator) {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>
 );

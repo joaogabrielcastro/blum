@@ -1,7 +1,32 @@
 import { useState } from "react";
 import apiService from "../services/apiService";
+import { useToast } from "../context/ToastContext";
+
+const KNOWN_FIELDS = new Set([
+  "companyName",
+  "contactPerson",
+  "phone",
+  "region",
+  "cnpj",
+  "email",
+  "street",
+  "number",
+  "complement",
+  "neighborhood",
+  "city",
+  "zipcode",
+]);
+
+function normalizeDetailPath(path) {
+  return String(path || "")
+    .replace(/^body\.?/i, "")
+    .replace(/^\[\d+\]\.?/, "")
+    .replace(/^clients\.?/i, "")
+    .trim();
+}
 
 const ClientsForm = ({ client, onClientAdded, onCancel }) => {
+  const toast = useToast();
   const isEditing = !!client;
 
   const [formData, setFormData] = useState({
@@ -161,33 +186,39 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
       const payload = buildClientPayload();
       if (isEditing) {
         await apiService.updateClient(client.id, payload);
-        alert("Cliente atualizado com sucesso!");
+        toast.success("Cliente atualizado com sucesso.");
       } else {
         await apiService.createClient(payload);
-        alert("Cliente salvo com sucesso!");
+        toast.success("Cliente guardado com sucesso.");
       }
       onClientAdded();
     } catch (error) {
       console.error("Erro ao salvar cliente:", error);
 
-      // Mostra detalhes de validação se disponíveis
-      let errorMessage = `Falha ao ${
-        isEditing ? "atualizar" : "adicionar"
-      } cliente.`;
-
       if (error.details && Array.isArray(error.details)) {
-        const fieldErrors = error.details
-          .map(
-            (err) =>
-              `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
-          )
-          .join("\n");
-        errorMessage += `\n\nErros:\n${fieldErrors}`;
-      } else if (error.message) {
-        errorMessage += `\n${error.message}`;
+        const nextFieldErrors = {};
+        for (const err of error.details) {
+          const raw = normalizeDetailPath(err.path || err.param || "");
+          const last = raw.includes(".") ? raw.split(".").pop() : raw;
+          const msg =
+            err.msg ||
+            err.message ||
+            (typeof err === "string" ? err : "Valor inválido");
+          if (last && KNOWN_FIELDS.has(last)) {
+            nextFieldErrors[last] = msg;
+          }
+        }
+        if (Object.keys(nextFieldErrors).length > 0) {
+          setErrors((prev) => ({ ...prev, ...nextFieldErrors }));
+          toast.warning("Corrija os campos assinalados abaixo.");
+          return;
+        }
       }
 
-      alert(errorMessage);
+      toast.error(
+        error.message ||
+          `Não foi possível ${isEditing ? "atualizar" : "guardar"} o cliente.`,
+      );
     } finally {
       setLoading(false);
     }
@@ -420,10 +451,10 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                 disabled={loading || isSearching}
               >
                 {loading
-                  ? "Salvando..."
+                  ? "A guardar..."
                   : isEditing
                     ? "Atualizar Cliente"
-                    : "Salvar Cliente"}
+                    : "Guardar Cliente"}
               </button>
             </div>
           </form>

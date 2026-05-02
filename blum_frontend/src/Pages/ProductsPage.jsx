@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
+import { useToast } from "../context/ToastContext";
 import ProductRow from "../components/ProductRow";
 import ProductsForm from "../components/ProductsForm";
 import BrandForm from "../components/BrandForm";
@@ -10,6 +11,7 @@ import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
 
 const ProductsPage = ({ userRole }) => {
+  const toast = useToast();
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
@@ -53,7 +55,9 @@ const ProductsPage = ({ userRole }) => {
       } catch (err) {
         console.error("Erro ao buscar Representadas:", err);
         if (!cancelled) {
-          setError("Erro ao carregar representadas. Tente novamente.");
+          const msg = err?.message || "Erro ao carregar representadas.";
+          setError(msg);
+          toast.error(msg);
         }
       } finally {
         if (!cancelled) setBrandsLoading(false);
@@ -100,7 +104,9 @@ const ProductsPage = ({ userRole }) => {
         });
       }
     } catch (err) {
-      setError("Erro ao carregar dados. Tente novamente.");
+      const msg = err?.message || "Erro ao carregar dados. Tente novamente.";
+      setError(msg);
+      toast.error(msg);
       console.error("Erro ao buscar produtos:", err);
     } finally {
       setProductsLoading(false);
@@ -120,14 +126,18 @@ const ProductsPage = ({ userRole }) => {
 
         const brandsData = await apiService.getBrands();
         setBrands(brandsData);
+        toast.success("Representada criada com sucesso.");
       } catch (err) {
-        setError("Erro ao adicionar Representada. Tente novamente.");
+        const msg = err?.message || "Erro ao adicionar Representada.";
+        setError(msg);
+        toast.error(msg);
         console.error("Erro ao adicionar Representada:", err);
       }
     }
   };
 
   const handleSaveProduct = async (productData) => {
+    const wasEditing = !!editingProduct;
     try {
       setError(null);
 
@@ -140,8 +150,13 @@ const ProductsPage = ({ userRole }) => {
       setEditingProduct(null);
       setShowProductForm(false);
       await fetchProducts();
+      toast.success(
+        wasEditing ? "Produto atualizado." : "Produto criado com sucesso.",
+      );
     } catch (err) {
-      setError("Erro ao salvar produto. Tente novamente.");
+      const msg = err?.message || "Erro ao salvar produto.";
+      setError(msg);
+      toast.error(msg);
       console.error("Erro ao salvar produto:", err);
     }
   };
@@ -158,12 +173,14 @@ const ProductsPage = ({ userRole }) => {
       await fetchProducts();
       setDeleteType(null);
       setDeleteId(null);
+      toast.success("Produto excluído.");
     } catch (err) {
       const errorMessage =
         err.message.includes("404") || err.message.includes("não encontrado")
           ? "Produto não encontrado. A lista será atualizada."
           : "Erro ao excluir produto. Tente novamente.";
       setError(errorMessage);
+      toast.error(errorMessage);
       console.error("Erro ao excluir produto:", err);
       await fetchProducts();
     }
@@ -176,8 +193,11 @@ const ProductsPage = ({ userRole }) => {
 
       const brandsData = await apiService.getBrands();
       setBrands(brandsData);
+      toast.success("Representada atualizada.");
     } catch (err) {
-      setError("Erro ao editar Representada. Tente novamente.");
+      const msg = err?.message || "Erro ao editar Representada.";
+      setError(msg);
+      toast.error(msg);
       console.error("Erro ao editar Representada:", err);
     }
   };
@@ -200,8 +220,11 @@ const ProductsPage = ({ userRole }) => {
       } else {
         await fetchProducts();
       }
+      toast.success("Representada excluída.");
     } catch (err) {
-      setError(err.message || "Erro ao excluir Representada. Tente novamente.");
+      const msg = err.message || "Erro ao excluir Representada.";
+      setError(msg);
+      toast.error(msg);
       console.error("Erro ao excluir Representada:", err);
     }
   };

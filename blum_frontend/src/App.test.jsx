@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import App from "./App";
+import { ToastProvider } from "./context/ToastContext";
 
 jest.mock("./services/apiService", () => ({
   __esModule: true,
@@ -12,7 +13,11 @@ jest.mock("./services/apiService", () => ({
 
 describe("App", () => {
   it("renderiza tela de login quando não há sessão", async () => {
-    render(<App />);
+    render(
+      <ToastProvider>
+        <App />
+      </ToastProvider>,
+    );
     expect(await screen.findByText("Entrar")).toBeTruthy();
   });
 });

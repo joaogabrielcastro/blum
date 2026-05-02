@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
 import { login } from "../services/apiService";
+import {
+  AUTH_NOTICE_KEY,
+  AUTH_NOTICE_FORBIDDEN,
+  AUTH_NOTICE_SESSION_EXPIRED,
+} from "../constants/authNotice";
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState("");
@@ -10,8 +15,25 @@ const Login = ({ onLogin }) => {
   const [isFormValid, setIsFormValid] = useState(false);
 
   useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem(AUTH_NOTICE_KEY);
+      if (reason) {
+        sessionStorage.removeItem(AUTH_NOTICE_KEY);
+        if (reason === AUTH_NOTICE_SESSION_EXPIRED) {
+          setError("Sessão expirada. Inicie sessão novamente.");
+        } else if (reason === AUTH_NOTICE_FORBIDDEN) {
+          setError(
+            "Não tem permissão para essa ação. Inicie sessão com uma conta adequada.",
+          );
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
     setIsFormValid(username.trim() !== "" && password.trim() !== "");
-    setError("");
   }, [username, password]);
 
   const handleSubmit = async (e) => {
@@ -108,7 +130,10 @@ const Login = ({ onLogin }) => {
                   id="username"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    setError("");
+                  }}
                   placeholder="Digite seu usuário"
                   required
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
@@ -145,7 +170,10 @@ const Login = ({ onLogin }) => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError("");
+                  }}
                   placeholder="Digite sua senha"
                   required
                   className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"

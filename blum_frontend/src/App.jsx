@@ -22,6 +22,7 @@ import {
   normalizeClientsResponse,
 } from "./utils/clients";
 import { verifyToken } from "./services/apiService";
+import { useToast } from "./context/ToastContext";
 
 const PAGE_PATH = {
   dashboard: "/dashboard",
@@ -35,6 +36,7 @@ const PAGE_PATH = {
 
 function AppShell() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [user, setUser] = useState(null);
   const [brands, setBrands] = useState([]);
   const [clients, setClients] = useState({});
@@ -71,6 +73,10 @@ function AppShell() {
       setClients(clientsMap);
     } catch (error) {
       console.error("Erro ao carregar clientes:", error);
+      toast.error(
+        error?.message ||
+          "Não foi possível carregar os dados dos clientes. Algumas páginas podem ficar incompletas.",
+      );
     }
   };
 
@@ -80,6 +86,10 @@ function AppShell() {
       setBrands(brandsData);
     } catch (error) {
       console.error("Erro ao carregar marcas:", error);
+      toast.error(
+        error?.message ||
+          "Não foi possível carregar as representadas. Verifique a ligação e atualize a página.",
+      );
     }
   };
 
@@ -200,9 +210,10 @@ function AppShell() {
           </button>
 
           {!isOnline && (
-            <div className="bg-yellow-500 text-white text-center font-bold py-2 shadow-md">
-              ⚠️ Você está no modo offline. Algumas funcionalidades podem estar
-              limitadas.
+            <div className="bg-yellow-500 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base leading-snug">
+              ⚠️ Sem ligação à internet. Só pode usar o que já foi carregado
+              neste dispositivo; guardar alterações ou pedidos pode falhar até
+              voltar a ficar online.
             </div>
           )}
 

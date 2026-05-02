@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import ErrorMessage from "../components/ErrorMessage";
+import { useToast } from "../context/ToastContext";
 
 const emptyForm = { username: "", password: "", name: "" };
 
 const TeamPage = () => {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
   const [newUser, setNewUser] = useState(emptyForm);
   const [creating, setCreating] = useState(false);
   const [brandModalUser, setBrandModalUser] = useState(null);
@@ -30,11 +31,13 @@ const TeamPage = () => {
       setUsers(Array.isArray(u) ? u : []);
       setBrands(Array.isArray(b) ? b : []);
     } catch (e) {
-      setError(e.message || "Erro ao carregar equipe");
+      const msg = e.message || "Erro ao carregar equipe";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     load();
@@ -49,7 +52,9 @@ const TeamPage = () => {
       const { brandIds } = await apiService.getUserAllowedBrands(user.id);
       setSelectedBrandIds(new Set(brandIds || []));
     } catch (e) {
-      setError(e.message || "Erro ao carregar representadas do vendedor");
+      const msg = e.message || "Erro ao carregar representadas do vendedor";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -71,11 +76,12 @@ const TeamPage = () => {
         brandModalUser.id,
         Array.from(selectedBrandIds),
       );
-      setSuccess("Representadas atualizadas.");
+      toast.success("Representadas atualizadas.");
       setBrandModalUser(null);
-      setTimeout(() => setSuccess(null), 4000);
     } catch (e) {
-      setError(e.message || "Erro ao salvar");
+      const msg = e.message || "Erro ao salvar";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingBrands(false);
     }
@@ -90,12 +96,13 @@ const TeamPage = () => {
     setError(null);
     try {
       await apiService.adminResetUserPassword(pwdModalUser.id, newPwd);
-      setSuccess(`Senha de ${pwdModalUser.username} atualizada.`);
+      toast.success(`Senha de ${pwdModalUser.username} atualizada.`);
       setPwdModalUser(null);
       setNewPwd("");
-      setTimeout(() => setSuccess(null), 4000);
     } catch (e) {
-      setError(e.message || "Erro ao redefinir senha");
+      const msg = e.message || "Erro ao redefinir senha";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingPwd(false);
     }
@@ -119,12 +126,13 @@ const TeamPage = () => {
         role: "salesperson",
         name: n,
       });
-      setSuccess("Vendedor criado.");
+      toast.success("Vendedor criado.");
       setNewUser(emptyForm);
       await load();
-      setTimeout(() => setSuccess(null), 4000);
     } catch (e) {
-      setError(e.message || "Erro ao criar vendedor");
+      const msg = e.message || "Erro ao criar vendedor";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCreating(false);
     }
@@ -141,11 +149,6 @@ const TeamPage = () => {
 
       {error && (
         <ErrorMessage message={error} onClose={() => setError(null)} />
-      )}
-      {success && (
-        <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-800 text-sm border border-green-200">
-          {success}
-        </div>
       )}
 
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-8">
@@ -199,7 +202,7 @@ const TeamPage = () => {
             disabled={creating}
             className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
           >
-            {creating ? "Salvando…" : "Cadastrar vendedor"}
+            {creating ? "A guardar…" : "Cadastrar vendedor"}
           </button>
         </form>
       </section>
@@ -300,7 +303,7 @@ const TeamPage = () => {
                 disabled={savingBrands}
                 className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
-                {savingBrands ? "Salvando…" : "Salvar"}
+                {savingBrands ? "A guardar…" : "Guardar"}
               </button>
             </div>
           </div>
@@ -334,7 +337,7 @@ const TeamPage = () => {
                 disabled={savingPwd}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
               >
-                Salvar
+                {savingPwd ? "A guardar…" : "Guardar"}
               </button>
             </div>
           </div>

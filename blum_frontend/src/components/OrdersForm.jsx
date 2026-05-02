@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import apiService from "../services/apiService";
+import { useToast } from "../context/ToastContext";
 import {
   getClientDisplayName,
   normalizeClientsResponse,
@@ -51,6 +52,7 @@ const OrdersForm = ({
   brands,
   editingOrder,
 }) => {
+  const toast = useToast();
   const [clientId, setClientId] = useState("");
   const [description, setDescription] = useState("");
   const [items, setItems] = useState([]);
@@ -79,10 +81,10 @@ const OrdersForm = ({
 
   const lineNetTotal = (item) => {
     const price = parseFloat(item.price) || 0;
-    const quantity = parseQuantityByBrand(item.quantity, item.brand) || 1;
+    const quantity = parseQuantityByBrand(item.quantity, item.brand);
     const ld = parseFloat(item.lineDiscount) || 0;
     const factor = 1 - Math.min(100, Math.max(0, ld)) / 100;
-    return price * quantity * factor;
+    return price * (quantity > 0 ? quantity : 0) * factor;
   };
 
   const subtotalAfterLineDiscounts = items.reduce(
@@ -265,8 +267,19 @@ const OrdersForm = ({
     // Valida quantidade contra estoque disponível
     if (field === "quantity") {
       const itemBrand = newItems[index].brand;
+      const raw = String(value ?? "").trim();
+      if (raw === "") {
+        newItems[index][field] = "";
+        setItems(newItems);
+        return;
+      }
       const parsedQty = parseQuantityByBrand(value, itemBrand);
       if (!parsedQty) {
+        toast.warning(
+          allowsDecimalQuantityBrand(itemBrand)
+            ? "Informe uma quantidade válida maior que zero."
+            : "Informe uma quantidade inteira maior que zero.",
+        );
         return;
       }
       if (
@@ -274,13 +287,9 @@ const OrdersForm = ({
         !allowsDecimalQuantityBrand(itemBrand) &&
         parsedQty > newItems[index].availableStock
       ) {
-        alert(
+        toast.warning(
           `Quantidade solicitada (${parsedQty}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
         );
-        return; // Não permite a mudança
-      }
-      if (parsedQty <= 0) {
-        alert("A quantidade deve ser no mínimo 1");
         return;
       }
       newItems[index][field] = parsedQty;
@@ -312,14 +321,14 @@ const OrdersForm = ({
       if (!existingItem) {
         // Verifica se há estoque disponível
         if (product.stock <= 0 && !allowsDecimalQuantityBrand(product.brand)) {
-          alert(`Produto "${product.name}" sem estoque disponível!`);
+          toast.warning(`Produto "${product.name}" sem estoque disponível!`);
           return;
         }
 
         const newItem = {
           productName: product.name,
           brand: product.brand,
-          quantity: 1,
+          quantity: "",
           price: product.price,
           lineDiscount: 0,
           productId: product.id,
@@ -329,7 +338,7 @@ const OrdersForm = ({
         };
         setItems((prevItems) => [...prevItems, newItem]);
       } else {
-        alert("Este produto já foi adicionado ao pedido.");
+        toast.warning("Este produto já foi adicionado ao pedido.");
       }
     }
     setProductSearch("");
@@ -398,43 +407,54 @@ const OrdersForm = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!clientId) {
-      alert("Por favor, selecione um cliente.");
+      toast.warning("Por favor, selecione um cliente.");
       return;
     }
 
     if (!selectedBrand) {
-      alert("Por favor, selecione uma representada.");
+      toast.warning("Por favor, selecione uma representada.");
       return;
     }
 
     if (items.length === 0) {
-      alert("Adicione pelo menos um item ao pedido.");
+      toast.warning("Adicione pelo menos um item ao pedido.");
       return;
     }
 
     if (items.some((item) => !item.productName || !item.price)) {
-      alert("Por favor, preencha todos os campos dos produtos.");
+      toast.warning("Por favor, preencha todos os campos dos produtos.");
+      return;
+    }
+
+    const missingQty = items.some((item) => {
+      const q = parseQuantityByBrand(item.quantity, item.brand);
+      return !q || q <= 0;
+    });
+    if (missingQty) {
+      toast.warning(
+        "Informe a quantidade de cada produto (maior que zero) antes de guardar.",
+      );
       return;
     }
     const discountValue = parseFloat(discount) || 0;
     if (!canApplyGeneralDiscount && discountValue > 0) {
-      alert(
+      toast.warning(
         "Desconto geral só é permitido para PIX ou dinheiro (máximo 2%).",
       );
       return;
     }
     if (canApplyGeneralDiscount && discountValue > 2) {
-      alert("Para PIX ou dinheiro, o desconto geral máximo permitido é 2%.");
+      toast.warning("Para PIX ou dinheiro, o desconto geral máximo permitido é 2%.");
       return;
     }
     if (!userId) {
-      alert(
+      toast.warning(
         "ID do usuário não disponível. Por favor, tente fazer login novamente.",
       );
       return;
     }
     if (!orderDateTime || Number.isNaN(new Date(orderDateTime).getTime())) {
-      alert("Informe uma data/hora válida para o pedido.");
+      toast.warning("Informe uma data/hora válida para o pedido.");
       return;
     }
 
@@ -454,7 +474,7 @@ const OrdersForm = ({
     });
 
     if (stockErrors.length > 0) {
-      alert(
+      toast.warning(
         `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join(
           "\n",
         )}\n\nPor favor, ajuste as quantidades antes de continuar.`,
@@ -470,7 +490,7 @@ const OrdersForm = ({
         items: items.map((item) => ({
           ...item,
           price: parseFloat(item.price) || 0,
-          quantity: parseQuantityByBrand(item.quantity, item.brand) || 1,
+          quantity: parseQuantityByBrand(item.quantity, item.brand),
           lineDiscount: Math.min(
             100,
             Math.max(0, parseFloat(item.lineDiscount) || 0),
@@ -492,8 +512,10 @@ const OrdersForm = ({
 
       if (editingOrder) {
         await apiService.updateOrder(editingOrder.id, orderData);
+        toast.success("Pedido atualizado com sucesso.");
       } else {
         await apiService.createOrder(orderData);
+        toast.success("Orçamento criado com sucesso.");
       }
 
       onOrderAdded();
@@ -517,7 +539,7 @@ const OrdersForm = ({
         errorMessage += `\n${error.message}`;
       }
 
-      alert(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -685,13 +707,13 @@ const OrdersForm = ({
                   if (nextMethod === "pix" || nextMethod === "dinheiro") {
                     if (currentDiscount > 2) {
                       setDiscount(2);
-                      alert(
+                      toast.info(
                         "Para PIX ou dinheiro, o desconto geral foi ajustado para o máximo de 2%.",
                       );
                     }
                   } else if (currentDiscount > 0) {
                     setDiscount(0);
-                    alert(
+                    toast.info(
                       "Para esta forma de pagamento, desconto geral não é permitido.",
                     );
                   }
@@ -898,14 +920,22 @@ const OrdersForm = ({
                         </label>
                         <input
                           type="number"
-                          min={allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"}
-                          step={allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"}
+                          step={
+                            allowsDecimalQuantityBrand(item.brand)
+                              ? "0.001"
+                              : "1"
+                          }
                           max={
                             allowsDecimalQuantityBrand(item.brand)
                               ? undefined
                               : item.availableStock || undefined
                           }
-                          value={item.quantity}
+                          value={
+                            item.quantity === "" || item.quantity == null
+                              ? ""
+                              : item.quantity
+                          }
+                          placeholder="—"
                           onChange={(e) =>
                             handleItemChange(
                               index,
@@ -1048,11 +1078,6 @@ const OrdersForm = ({
                           <div className="flex flex-col items-center gap-1">
                             <input
                               type="number"
-                              min={
-                                allowsDecimalQuantityBrand(item.brand)
-                                  ? "0.001"
-                                  : "1"
-                              }
                               step={
                                 allowsDecimalQuantityBrand(item.brand)
                                   ? "0.001"
@@ -1063,7 +1088,12 @@ const OrdersForm = ({
                                   ? undefined
                                   : item.availableStock || undefined
                               }
-                              value={item.quantity}
+                              value={
+                                item.quantity === "" || item.quantity == null
+                                  ? ""
+                                  : item.quantity
+                              }
+                              placeholder="—"
                               onChange={(e) =>
                                 handleItemChange(
                                   index,

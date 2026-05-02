@@ -1,5 +1,11 @@
 // services/apiService.jsx
 
+import {
+  AUTH_NOTICE_FORBIDDEN,
+  AUTH_NOTICE_KEY,
+  AUTH_NOTICE_SESSION_EXPIRED,
+} from "../constants/authNotice";
+
 export const API_URL =
   process.env.REACT_APP_API_URL || "https://api-blum.jwsoftware.com.br/api/v2";
 
@@ -14,6 +20,14 @@ const getAuthHeaders = () => {
 
 const handleAuthError = (status) => {
   if (status === 401 || status === 403) {
+    try {
+      sessionStorage.setItem(
+        AUTH_NOTICE_KEY,
+        status === 403 ? AUTH_NOTICE_FORBIDDEN : AUTH_NOTICE_SESSION_EXPIRED,
+      );
+    } catch (_) {
+      /* ignore */
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "/";
@@ -52,13 +66,20 @@ const formatValidationDetails = (details) => {
 };
 
 const apiRequest = async (url, options = {}) => {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...options.headers,
-    },
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        ...getAuthHeaders(),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new Error(
+      "Sem ligação à internet ou servidor indisponível. Verifique a rede e tente novamente.",
+    );
+  }
 
   if (!response.ok) {
     handleAuthError(response.status);
@@ -111,13 +132,20 @@ const apiRequest = async (url, options = {}) => {
 
 // ==================== AUTHENTICATION ====================
 export const login = async (username, password) => {
-  const response = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ username, password }),
-  });
+  let response;
+  try {
+    response = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    throw new Error(
+      "Sem ligação à internet ou servidor indisponível. Verifique a rede e tente novamente.",
+    );
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

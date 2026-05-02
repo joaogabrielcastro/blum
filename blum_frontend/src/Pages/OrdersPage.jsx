@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import apiService from "../services/apiService";
+import ListPageSkeleton from "../components/ListPageSkeleton";
+import { useToast } from "../context/ToastContext";
 import OrdersForm from "../components/OrdersForm";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
@@ -73,6 +75,7 @@ function groupOrdersByDay(orders) {
 }
 
 const OrdersPage = ({ userId, userRole, brands }) => {
+  const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingLoading, setEditingLoading] = useState(false);
@@ -88,6 +91,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
   const [orderSearch, setOrderSearch] = useState("");
+  const [listFetchError, setListFetchError] = useState(null);
+  const [visibleDayGroups, setVisibleDayGroups] = useState(10);
 
   // Validar e transformar brands para garantir segurança
   const safeBrands = Array.isArray(brands)
@@ -102,9 +107,14 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     if (userId && userRole) fetchData();
   }, [userId, userRole]);
 
+  useEffect(() => {
+    setVisibleDayGroups(10);
+  }, [orderSearch, orders.length]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
+      setListFetchError(null);
       const [ordersData, clientsData] = await Promise.all([
         apiService.getOrders({}),
         apiService.getClients(),
@@ -129,6 +139,10 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       setClients(clientsMap);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
+      const msg =
+        error?.message || "Não foi possível carregar pedidos e clientes.";
+      setListFetchError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -142,6 +156,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       if (type === "delete") {
         await apiService.deleteOrder(orderId);
         setOrders(orders.filter((order) => order.id !== orderId));
+        toast.success("Pedido excluído.");
       } else if (type === "finalize") {
         await apiService.finalizeOrder(orderId);
         setOrders(
@@ -155,6 +170,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
               : order,
           ),
         );
+        toast.success("Entrega finalizada.");
       }
     } catch (error) {
       const errorMessage =
@@ -166,7 +182,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           : `Falha ao ${
               type === "delete" ? "excluir" : "finalizar"
             } pedido. Tente novamente.`;
-      alert(errorMessage);
+      toast.error(errorMessage);
       // Recarrega a lista em caso de erro
       await fetchData();
     } finally {
@@ -185,8 +201,11 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     try {
       await apiService.convertOrderToPedido(orderId);
       await fetchData();
+      toast.success("Orçamento convertido em pedido.");
     } catch (error) {
-      alert(error?.message || "Não foi possível converter o orçamento.");
+      toast.error(
+        error?.message || "Não foi possível converter o orçamento.",
+      );
     }
   };
 
@@ -198,7 +217,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       setShowForm(true);
     } catch (error) {
       console.error("Erro ao carregar pedido para edição:", error);
-      alert(
+      toast.error(
         error?.message ||
           "Não foi possível carregar os itens do pedido para edição.",
       );
@@ -220,7 +239,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       console.error("Erro ao carregar pedido completo para PDF:", error);
       setPdfOrder(order);
       if (!order.items || order.items.length === 0) {
-        alert(
+        toast.error(
           "Não foi possível carregar os itens completos do pedido. Tente novamente.",
         );
       }
@@ -236,8 +255,9 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       setEditingOrder(formatOrderData(duplicated));
       setShowForm(true);
       await fetchData();
+      toast.success("Pedido duplicado. Revise e guarde.");
     } catch (error) {
-      alert(error?.message || "Não foi possível duplicar o pedido.");
+      toast.error(error?.message || "Não foi possível duplicar o pedido.");
     } finally {
       setDuplicatingOrderId(null);
     }
@@ -258,8 +278,9 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       );
       setPaymentDialogOrder(null);
       await fetchData();
+      toast.success("Forma de pagamento atualizada.");
     } catch (error) {
-      alert(
+      toast.error(
         error?.message ||
           "Não foi possível atualizar a forma de pagamento do pedido.",
       );
@@ -369,10 +390,22 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       .filter((group) => group.orders.length > 0);
   }, [ordersByDay, orderSearch, clients]);
 
+  const filteredOrdersByDayPaged = useMemo(
+    () => filteredOrdersByDay.slice(0, visibleDayGroups),
+    [filteredOrdersByDay, visibleDayGroups],
+  );
+
   if (loading || editingLoading) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        {editingLoading ? "Carregando pedido para edição..." : "Carregando pedidos..."}
+      <div className="p-3 sm:p-6 md:p-8 w-full max-w-full">
+        <div className="mb-6 h-8 bg-gray-200/80 rounded animate-pulse max-w-md" />
+        {editingLoading ? (
+          <p className="text-center text-gray-500 py-8">
+            Carregando pedido para edição...
+          </p>
+        ) : (
+          <ListPageSkeleton variant="list" />
+        )}
       </div>
     );
   }
@@ -484,9 +517,15 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           value={orderSearch}
           onChange={(e) => setOrderSearch(e.target.value)}
           placeholder="Buscar pedido por numero, cliente, representante, representada..."
-          className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full min-h-11 rounded-lg border border-gray-300 p-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
+
+      {listFetchError && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {listFetchError}
+        </div>
+      )}
 
       <p className="text-gray-600 mb-8">
         Acompanhe o status e histórico de pedidos.
@@ -494,7 +533,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
         {filteredOrdersByDay.length > 0 ? (
           <div className="space-y-8">
-            {filteredOrdersByDay.map(({ dateKey, label, orders: dayOrders }) => (
+            {filteredOrdersByDayPaged.map(({ dateKey, label, orders: dayOrders }) => (
               <section key={dateKey} className="space-y-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100 pb-2">
                   {label}
@@ -613,6 +652,17 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                 </ul>
               </section>
             ))}
+            {filteredOrdersByDay.length > visibleDayGroups && (
+              <div className="text-center py-6">
+                <button
+                  type="button"
+                  onClick={() => setVisibleDayGroups((n) => n + 10)}
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-800 hover:bg-blue-100 min-h-11 w-full max-w-sm mx-auto"
+                >
+                  Mostrar mais dias
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center text-gray-500">
