@@ -1012,7 +1012,7 @@ const OrdersForm = ({
                       <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px]">
                         Subtotal
                       </th>
-                      <th className="px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">
+                      <th className="sticky right-0 z-10 bg-gray-50 px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-l border-gray-200">
                         Ações
                       </th>
                     </tr>
@@ -1115,7 +1115,7 @@ const OrdersForm = ({
                             R$ {safeToFixed(lineNetTotal(item))}
                           </span>
                         </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-center">
+                        <td className="sticky right-0 z-10 bg-white px-5 py-4 whitespace-nowrap text-center border-l border-gray-100">
                           <div className="flex flex-col gap-2">
                             <button
                               type="button"

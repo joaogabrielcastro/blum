@@ -8,6 +8,8 @@
     "dev": "nodemon index.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "contract:v2": "node scripts/check_v2_contract.js",
+    "perf:explain": "node scripts/perf_explain.js",
     "import:clients": "node scripts/import_clients_excel.js",
     "update:client-addresses": "node scripts/update_clients_address_from_excel.js"
   },

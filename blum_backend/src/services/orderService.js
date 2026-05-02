@@ -163,12 +163,10 @@ class OrderService {
     if (!calculatedItems?.length) {
       return;
     }
-    const insertSql = `
-      INSERT INTO order_items (
-        order_id, product_id, product_name, brand, quantity, unit_price,
-        line_discount, commission_rate, commission_amount, line_total, tenant_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-    `;
+    const values = [];
+    const placeholders = [];
+    let paramIndex = 1;
+
     for (const it of calculatedItems) {
       const qty = parseQuantityValue(it.quantity, {
         brand: it.brand,
@@ -178,7 +176,8 @@ class OrderService {
       const lineDisc = parseFloat(it.line_discount) || 0;
       const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
       const lineTotal = qty * price * lineFactor;
-      await client.query(insertSql, [
+
+      values.push(
         orderId,
         it.productId != null ? it.productId : null,
         it.productName || "",
@@ -190,8 +189,22 @@ class OrderService {
         it.commission_amount || 0,
         lineTotal,
         tenantId,
-      ]);
+      );
+
+      placeholders.push(
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10})`,
+      );
+      paramIndex += 11;
     }
+
+    const insertSql = `
+      INSERT INTO order_items (
+        order_id, product_id, product_name, brand, quantity, unit_price,
+        line_discount, commission_rate, commission_amount, line_total, tenant_id
+      ) VALUES ${placeholders.join(", ")}
+    `;
+
+    await client.query(insertSql, values);
   }
 
   async persistOrderItems(orderId, calculatedItems, tenantId = 1) {

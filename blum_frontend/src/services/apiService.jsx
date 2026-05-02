@@ -1,6 +1,7 @@
 // services/apiService.jsx
 
-export const API_URL = process.env.REACT_APP_API_URL || "https://api-blum.jwsoftware.com.br/api/v1";
+export const API_URL =
+  process.env.REACT_APP_API_URL || "https://api-blum.jwsoftware.com.br/api/v2";
 
 // ==================== HELPER FUNCTIONS ====================
 const getAuthHeaders = () => {
@@ -188,12 +189,12 @@ const apiService = {
     return orders.map((order) => ({
       id: order.id,
       orderNumber: order.id.toString(),
-      orderDate: order.createdat,
-      seller: order.user_ref ?? order.userid,
+      orderDate: order.createdAt ?? order.createdat ?? null,
+      seller: order.userRef ?? order.userId ?? order.user_ref ?? order.userid,
       status: order.status || "pending",
-      totalAmount: order.totalprice || 0,
+      totalAmount: order.totalPrice ?? order.totalprice ?? 0,
       discount: order.discount || 0,
-      paymentMethod: "Não informado",
+      paymentMethod: order.paymentMethod ?? order.payment_method ?? "Não informado",
       notes: order.description || "",
       items: Array.isArray(order.items) ? order.items : [],
     }));

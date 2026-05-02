@@ -15,6 +15,16 @@ const { authenticate, authorize } = require("./src/middleware/authMiddleware");
 
 const app = express();
 const port = process.env.PORT || 3011;
+const ENABLE_V1_USAGE_LOGS = process.env.ENABLE_V1_USAGE_LOGS !== "false";
+const DISABLE_V1_API = process.env.DISABLE_V1_API === "true";
+const API_V1_CUTOFF_DATE = process.env.API_V1_CUTOFF_DATE || "";
+const LEGACY_KEY_REGEX = /_|^(clientid|userid|representadas|subcode)$/i;
+const legacyUsageStats = {
+  v1Requests: 0,
+  legacyBodyRequests: 0,
+  legacyQueryRequests: 0,
+  lastSeenAt: null,
+};
 
 if (process.env.TRUST_PROXY !== "0") {
   if (process.env.TRUST_PROXY === "1" || process.env.NODE_ENV === "production") {
@@ -50,9 +60,79 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use((req, res, next) => {
+  if (req.path.startsWith("/api/v1")) {
+    if (DISABLE_V1_API) {
+      return res.status(410).json({
+        error: "API v1 desativada. Utilize /api/v2.",
+      });
+    }
+    if (API_V1_CUTOFF_DATE) {
+      const cutoffMs = Date.parse(API_V1_CUTOFF_DATE);
+      if (Number.isFinite(cutoffMs) && Date.now() >= cutoffMs) {
+        return res.status(410).json({
+          error: "API v1 encerrada. Utilize /api/v2.",
+        });
+      }
+    }
+  }
+
   const requestId = req.headers["x-request-id"] || randomUUID();
   req.requestId = requestId;
   res.setHeader("x-request-id", requestId);
+
+  if (req.path.startsWith("/api/v1")) {
+    legacyUsageStats.v1Requests += 1;
+    legacyUsageStats.lastSeenAt = new Date().toISOString();
+    if (ENABLE_V1_USAGE_LOGS) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          event: "legacy.v1.request",
+          requestId,
+          path: req.originalUrl || req.url,
+          method: req.method,
+        }),
+      );
+    }
+  }
+
+  const bodyKeys =
+    req.body && typeof req.body === "object" && !Array.isArray(req.body)
+      ? Object.keys(req.body)
+      : [];
+  const queryKeys = req.query ? Object.keys(req.query) : [];
+  const legacyBodyKeys = bodyKeys.filter((key) => LEGACY_KEY_REGEX.test(key));
+  const legacyQueryKeys = queryKeys.filter((key) => LEGACY_KEY_REGEX.test(key));
+  if (legacyBodyKeys.length > 0) {
+    legacyUsageStats.legacyBodyRequests += 1;
+    legacyUsageStats.lastSeenAt = new Date().toISOString();
+    if (ENABLE_V1_USAGE_LOGS) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          event: "legacy.payload.body",
+          requestId,
+          path: req.originalUrl || req.url,
+          keys: legacyBodyKeys,
+        }),
+      );
+    }
+  }
+  if (legacyQueryKeys.length > 0) {
+    legacyUsageStats.legacyQueryRequests += 1;
+    legacyUsageStats.lastSeenAt = new Date().toISOString();
+    if (ENABLE_V1_USAGE_LOGS) {
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          event: "legacy.payload.query",
+          requestId,
+          path: req.originalUrl || req.url,
+          keys: legacyQueryKeys,
+        }),
+      );
+    }
+  }
 
   const start = process.hrtime.bigint();
   res.on("finish", () => {
@@ -121,56 +201,62 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-app.get("/api/v1/status", (req, res) => {
-  res.status(200).json({
-    status: "online",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || "development",
+const registerStatusRoutes = (prefix) => {
+  app.get(`${prefix}/status`, (req, res) => {
+    res.status(200).json({
+      status: "online",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+    });
   });
-});
 
-app.get(
-  "/api/v1/status/details",
-  authenticate,
-  authorize("admin"),
-  async (req, res) => {
-    try {
-      const result = await sql`SELECT version()`;
-      const version = result[0]?.version || "desconhecida";
+  app.get(
+    `${prefix}/status/details`,
+    authenticate,
+    authorize("admin"),
+    async (req, res) => {
+      try {
+        const result = await sql`SELECT version()`;
+        const version = result[0]?.version || "desconhecida";
 
-      const [clientsCount, productsCount, ordersCount] = await Promise.all([
-        sql`SELECT COUNT(*) FROM clients`.then((r) => parseInt(r[0].count)),
-        sql`SELECT COUNT(*) FROM products`.then((r) => parseInt(r[0].count)),
-        sql`SELECT COUNT(*) FROM orders`.then((r) => parseInt(r[0].count)),
-      ]);
+        const [clientsCount, productsCount, ordersCount] = await Promise.all([
+          sql`SELECT COUNT(*) FROM clients`.then((r) => parseInt(r[0].count)),
+          sql`SELECT COUNT(*) FROM products`.then((r) => parseInt(r[0].count)),
+          sql`SELECT COUNT(*) FROM orders`.then((r) => parseInt(r[0].count)),
+        ]);
 
-      res.status(200).json({
-        status: "online",
-        timestamp: new Date().toISOString(),
-        database: {
-          connected: true,
-          version,
-          stats: {
-            clients: clientsCount,
-            products: productsCount,
-            orders: ordersCount,
+        res.status(200).json({
+          status: "online",
+          timestamp: new Date().toISOString(),
+          database: {
+            connected: true,
+            version,
+            stats: {
+              clients: clientsCount,
+              products: productsCount,
+              orders: ordersCount,
+            },
           },
-        },
-        server: {
-          uptime: process.uptime(),
-          environment: process.env.NODE_ENV || "development",
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
-        status: "error",
-        timestamp: new Date().toISOString(),
-        database: { connected: false, error: error.message },
-      });
-    }
-  },
-);
+          server: {
+            uptime: process.uptime(),
+            environment: process.env.NODE_ENV || "development",
+          },
+          legacyUsage: legacyUsageStats,
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: "error",
+          timestamp: new Date().toISOString(),
+          database: { connected: false, error: error.message },
+        });
+      }
+    },
+  );
+};
+
+registerStatusRoutes("/api/v1");
+registerStatusRoutes("/api/v2");
 
 const authRoutes = require("./src/routes/authRoutes");
 const clientRoutes = require("./src/routes/clientRoutes");

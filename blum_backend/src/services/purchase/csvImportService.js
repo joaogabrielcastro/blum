@@ -1,4 +1,4 @@
-const { sql } = require("../../config/database");
+const { sql, pool } = require("../../config/database");
 const { getValueByHeader, parseCsvLine } = require("./csvParseHelpers");
 
 async function processCsvData(csvText, selectedBrand) {
@@ -81,65 +81,134 @@ async function importProductsToDatabase(products, tenantId = 1) {
     details: [],
   };
 
-  for (let i = 0; i < products.length; i++) {
-    const product = products[i];
-
-    try {
-      let subcode = product.subcode;
-      if (!subcode) {
-        subcode = `CSV-${product.productCode}-${Date.now().toString(36)}`;
-      }
-
-      const existing = await sql`
-        SELECT id, name, productcode, stock, price 
-        FROM products 
-        WHERE productcode = ${product.productCode}
-          AND tenant_id = ${tenantId}
-      `;
-
-      if (existing.length > 0) {
-        await sql`
-          UPDATE products SET 
-            name = ${product.name},
-            price = ${product.price},
-            stock = stock + ${product.stock},
-            brand = ${product.brand},
-            subcode = ${subcode}
-          WHERE productcode = ${product.productCode}
-            AND tenant_id = ${tenantId}
-          RETURNING id, name, stock, price, subcode
-        `;
-
-        results.updated++;
-        results.details.push(
-          `✅ Atualizado: ${product.productCode} - ${product.name.substring(0, 30)}...`,
-        );
-      } else {
-        const newProduct = await sql`
-          INSERT INTO products (
-            name, productcode, subcode, price, stock, brand,
-            minstock, tenant_id, createdat
-          ) VALUES (
-            ${product.name}, ${product.productCode}, ${subcode}, ${product.price}, 
-            ${product.stock}, ${product.brand}, 0, ${tenantId}, NOW()
-          )
-          RETURNING id, name, productcode, brand, subcode
-        `;
-
-        results.created++;
-        results.details.push(
-          `🆕 Criado: ${product.productCode} - ${product.name.substring(0, 30)}...`,
-        );
-      }
-    } catch (error) {
-      results.errors++;
-      results.details.push(
-        `❌ Erro: ${product.productCode} - ${error.message}`,
-      );
-    }
+  if (!Array.isArray(products) || products.length === 0) {
+    return results;
   }
 
-  return results;
+  const normalized = products
+    .map((product, index) => {
+      const productCode = String(product.productCode || "").trim();
+      const name = String(product.name || "").trim();
+      if (!productCode || !name) return null;
+      return {
+        product_code: productCode,
+        name,
+        price: Number(product.price || 0),
+        stock: Number(product.stock || 0),
+        brand: String(product.brand || "").trim(),
+        subcode:
+          String(product.subcode || "").trim() ||
+          `CSV-${productCode}-${(index + 1).toString(36)}`,
+      };
+    })
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return results;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const payloadJson = JSON.stringify(normalized);
+    const existingRows = await client.query(
+      `
+      WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+          product_code TEXT,
+          name TEXT,
+          price NUMERIC,
+          stock NUMERIC,
+          subcode TEXT,
+          brand TEXT
+        )
+      )
+      SELECT p.productcode
+      FROM products p
+      JOIN input i ON i.product_code = p.productcode
+      WHERE p.tenant_id = $2
+      `,
+      [payloadJson, tenantId],
+    );
+
+    const existingCodes = new Set(existingRows.rows.map((row) => row.productcode));
+
+    const updated = await client.query(
+      `
+      WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+          product_code TEXT,
+          name TEXT,
+          price NUMERIC,
+          stock NUMERIC,
+          subcode TEXT,
+          brand TEXT
+        )
+      )
+      UPDATE products p
+      SET
+        name = i.name,
+        price = i.price,
+        stock = p.stock + i.stock::INT,
+        brand = i.brand,
+        subcode = i.subcode
+      FROM input i
+      WHERE p.productcode = i.product_code
+        AND p.tenant_id = $2
+      `,
+      [payloadJson, tenantId],
+    );
+
+    const inserted = await client.query(
+      `
+      WITH input AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS x(
+          product_code TEXT,
+          name TEXT,
+          price NUMERIC,
+          stock NUMERIC,
+          subcode TEXT,
+          brand TEXT
+        )
+      )
+      INSERT INTO products (
+        name, productcode, subcode, price, stock, brand, minstock, tenant_id, createdat
+      )
+      SELECT
+        i.name, i.product_code, i.subcode, i.price, i.stock::INT, i.brand, 0, $2, NOW()
+      FROM input i
+      LEFT JOIN products p
+        ON p.productcode = i.product_code AND p.tenant_id = $2
+      WHERE p.id IS NULL
+      `,
+      [payloadJson, tenantId],
+    );
+
+    results.updated = updated.rowCount || 0;
+    results.created = inserted.rowCount || 0;
+    results.errors = Math.max(0, products.length - (results.updated + results.created));
+
+    for (const product of normalized) {
+      const marker = existingCodes.has(product.product_code)
+        ? "✅ Atualizado"
+        : "🆕 Criado";
+      results.details.push(
+        `${marker}: ${product.product_code} - ${product.name.substring(0, 30)}...`,
+      );
+    }
+
+    await client.query("COMMIT");
+    return results;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 module.exports = {

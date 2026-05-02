@@ -26,21 +26,25 @@ If deprecation headers are disabled, `v1` keeps working with no warning headers.
 
 ### Phase 1: Internal validation
 
-1. Keep frontend on `/api/v1`.
+1. Keep frontend on `/api/v2` in homologação, with fallback env override if needed.
 2. Validate `v2` with smoke tests (below).
 3. Monitor backend logs for unexpected 4xx/5xx in `v2`.
 
-### Phase 2: Controlled client migration
+### Phase 2: Controlled client migration + telemetry
 
 1. Move one screen or one API consumer at a time to `/api/v2`.
 2. Prefer low-risk reads first (`GET /products`, `GET /orders`).
 3. After stable reads, migrate writes (`POST/PUT`).
+4. Monitor legacy telemetry in `/api/v2/status/details` (`legacyUsage`) and server logs (`legacy.v1.request`, `legacy.payload.*`).
 
 ### Phase 3: Sunset preparation
 
 1. Enable deprecation headers in production.
 2. Communicate sunset date to all consumers.
 3. Freeze new feature work on `v1`.
+4. Configure cutoff gate:
+   - `API_V1_CUTOFF_DATE=<ISO date>`
+   - `DISABLE_V1_API=true` (when migration is complete)
 
 ## Smoke test checklist
 
@@ -64,6 +68,14 @@ curl -i "$BASE_URL/api/v1/status" | grep -Ei "deprecation|sunset|link|x-api-vers
 ```
 
 Expected: `x-api-version: v1` and deprecation headers when enabled.
+
+### 2.1) Automated v2 contract scan
+
+```bash
+npm run contract:v2 --prefix blum_backend
+```
+
+Expected: `Contrato v2 validado: sem chaves legadas detectadas.`
 
 ### 3) Products contract (v2 camelCase)
 

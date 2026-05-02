@@ -36,6 +36,19 @@ async function finalizePurchaseFromImport(req, res) {
     });
   }
 
+  const productCodes = items
+    .map((item) => String(item.productCode || "").trim())
+    .filter(Boolean);
+  const duplicateProductCodes = productCodes.filter(
+    (code, index) => productCodes.indexOf(code) !== index,
+  );
+  if (duplicateProductCodes.length > 0) {
+    return res.status(400).json({
+      error: "Códigos de produto duplicados no arquivo.",
+      details: `Códigos repetidos: ${[...new Set(duplicateProductCodes)].join(", ")}`,
+    });
+  }
+
   try {
     const results = {
       updated: 0,
@@ -65,23 +78,59 @@ async function finalizePurchaseFromImport(req, res) {
 
     const brandName = brandResult[0].name;
 
-    for (const item of items) {
-      const subcode = item.subcode.trim();
-
-      const existingSubcode = await sql`
-        SELECT id, name FROM products 
-        WHERE subcode = ${subcode} 
-        AND id != COALESCE(${item.mappedProductId || 0}, 0)
+    const mappedIds = items
+      .map((item) => Number.parseInt(item.mappedProductId, 10))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    const uniqueMappedIds = [...new Set(mappedIds)];
+    const existingBySubcode = await sql`
+      SELECT id, name, subcode FROM products
+      WHERE subcode = ANY(${subcodes})
         AND tenant_id = ${tenantId}
-      `;
-
-      if (existingSubcode.length > 0) {
-        return res.status(400).json({
-          error: `Subcódigo "${subcode}" já está em uso.`,
-          details: `Usado pelo produto: ${existingSubcode[0].name}`,
-        });
-      }
+    `;
+    for (const row of existingBySubcode) {
+      const ownerItem = items.find(
+        (item) =>
+          item.subcode?.trim() === row.subcode &&
+          Number.parseInt(item.mappedProductId, 10) === row.id,
+      );
+      if (ownerItem) continue;
+      return res.status(400).json({
+        error: `Subcódigo "${row.subcode}" já está em uso.`,
+        details: `Usado pelo produto: ${row.name}`,
+      });
     }
+
+    const existingMappedProducts =
+      uniqueMappedIds.length > 0
+        ? await sql`
+            SELECT id, name, price as current_price
+            FROM products
+            WHERE id = ANY(${uniqueMappedIds})
+              AND tenant_id = ${tenantId}
+          `
+        : [];
+    const mappedProductsById = new Map(
+      existingMappedProducts.map((row) => [Number(row.id), row]),
+    );
+
+    const uniqueProductCodes = [
+      ...new Set(
+        items
+          .map((item) => String(item.productCode || "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    const existingByProductCode =
+      uniqueProductCodes.length > 0
+        ? await sql`
+            SELECT id, productcode FROM products
+            WHERE productcode = ANY(${uniqueProductCodes})
+              AND tenant_id = ${tenantId}
+          `
+        : [];
+    const productsByCode = new Map(
+      existingByProductCode.map((row) => [String(row.productcode), row]),
+    );
 
     for (const item of items) {
       try {
@@ -108,15 +157,12 @@ async function finalizePurchaseFromImport(req, res) {
             throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
           }
 
-          const existingProduct = await sql`
-            SELECT id, name, price as current_price FROM products WHERE id = ${productId} AND tenant_id = ${tenantId}
-          `;
-
-          if (existingProduct.length === 0) {
+          const existingProduct = mappedProductsById.get(productId);
+          if (!existingProduct) {
             throw new Error(`Produto não encontrado com ID: ${productId}`);
           }
 
-          const currentPrice = existingProduct[0].current_price;
+          const currentPrice = existingProduct.current_price;
 
           await sql`
             UPDATE products 
@@ -137,11 +183,8 @@ async function finalizePurchaseFromImport(req, res) {
 
           results.updated++;
         } else if (item.productCode && item.description) {
-          const existingWithCode = await sql`
-            SELECT id FROM products WHERE productcode = ${item.productCode} AND tenant_id = ${tenantId}
-          `;
-
-          if (existingWithCode.length > 0) {
+          const existingWithCode = productsByCode.get(String(item.productCode));
+          if (existingWithCode) {
             await sql`
               UPDATE products 
               SET stock = stock + ${quantity}, 
@@ -152,7 +195,7 @@ async function finalizePurchaseFromImport(req, res) {
 
             await sql`
               INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
-              VALUES (${existingWithCode[0].id}, ${tenantId}, ${price}, ${quantity}, ${
+              VALUES (${existingWithCode.id}, ${tenantId}, ${price}, ${quantity}, ${
                 purchaseDate || new Date().toISOString()
               })
             `;

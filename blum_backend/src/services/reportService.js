@@ -89,7 +89,10 @@ class ReportService {
   async getCommissionByBrand(filters = {}) {
     const { startDate, endDate, sellerId, tenantId = 1 } = filters;
 
-    let conditions = ["o.status = 'Entregue'", `o.tenant_id = ${Number(tenantId) || 1}`];
+    let conditions = [
+      "o.status = 'Entregue'",
+      `o.tenant_id = ${Number(tenantId) || 1}`,
+    ];
     const params = [];
 
     if (startDate) {
@@ -108,34 +111,43 @@ class ReportService {
     const whereClause = conditions.join(" AND ");
 
     const query = `
+      WITH filtered_orders AS (
+        SELECT o.id, o.user_ref, o.createdat, o.totalprice, o.total_commission
+        FROM orders o
+        WHERE ${whereClause}
+      )
       SELECT
-        o.user_ref,
+        fo.user_ref,
         u.username AS seller_username,
         u.name AS seller_name,
-        o.id AS order_id,
-        o.createdat,
-        o.totalprice,
-        o.total_commission,
+        fo.id AS order_id,
+        fo.createdat,
+        fo.totalprice,
+        fo.total_commission,
         COALESCE(
-          (
-            SELECT json_agg(
-              json_build_object(
-                'brand', oi.brand,
-                'quantity', oi.quantity,
-                'commission_amount', oi.commission_amount,
-                'unit_price', oi.unit_price,
-                'line_total', oi.line_total
-              ) ORDER BY oi.id
-            )
-            FROM order_items oi
-            WHERE oi.order_id = o.id
-          ),
+          json_agg(
+            json_build_object(
+              'brand', oi.brand,
+              'quantity', oi.quantity,
+              'commission_amount', oi.commission_amount,
+              'unit_price', oi.unit_price,
+              'line_total', oi.line_total
+            ) ORDER BY oi.id
+          ) FILTER (WHERE oi.id IS NOT NULL),
           '[]'::json
         ) AS items
-      FROM orders o
-      JOIN users u ON u.id = o.user_ref
-      WHERE ${whereClause}
-      ORDER BY o.createdat DESC
+      FROM filtered_orders fo
+      JOIN users u ON u.id = fo.user_ref
+      LEFT JOIN order_items oi ON oi.order_id = fo.id
+      GROUP BY
+        fo.user_ref,
+        u.username,
+        u.name,
+        fo.id,
+        fo.createdat,
+        fo.totalprice,
+        fo.total_commission
+      ORDER BY fo.createdat DESC
     `;
 
     return await reportRepository.query(query, params);
