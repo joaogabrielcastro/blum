@@ -2,35 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import apiService from "../services/apiService";
 import SalesChart from "../components/SalesChart";
 import LoadingSpinner from "../components/LoadingSpinner";
-
-/** Compatível com respostas v2 (camelCase) e legado snake_case */
-function orderCreatedAt(order) {
-  return order.createdAt ?? order.createdat ?? order.created_at;
-}
-
-function orderFinishedAt(order) {
-  return order.finishedAt ?? order.finishedat ?? order.finished_at;
-}
-
-function orderTotalPrice(order) {
-  const v = order.totalPrice ?? order.totalprice ?? order.total_price;
-  return parseFloat(v) || 0;
-}
-
-function localDateKeyFromIso(raw) {
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatOrderDateLabel(raw) {
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("pt-BR");
-}
+import {
+  orderCreatedAt,
+  formatOrderDateLabel,
+  prepareCumulativeSalesChartData,
+} from "../utils/orderApiFields";
 
 const Dashboard = ({ onNavigate, userId, userRole }) => {
   const [loading, setLoading] = useState(true);
@@ -81,31 +57,7 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
           (order) => order.status === "Entregue",
         );
 
-        const salesByDayKey = {};
-        finishedOrders.forEach((order) => {
-          const finishedRaw = orderFinishedAt(order);
-          if (!finishedRaw) return;
-          const dayKey = localDateKeyFromIso(finishedRaw);
-          if (!dayKey) return;
-          const total = orderTotalPrice(order);
-          salesByDayKey[dayKey] = (salesByDayKey[dayKey] || 0) + total;
-        });
-
-        const sortedDayKeys = Object.keys(salesByDayKey).sort();
-        let cumulativeSales = 0;
-        const chartData = sortedDayKeys.map((dayKey) => {
-          cumulativeSales += salesByDayKey[dayKey];
-          const labelDate = new Date(`${dayKey}T12:00:00`);
-          return {
-            date: Number.isNaN(labelDate.getTime())
-              ? dayKey
-              : labelDate.toLocaleDateString("pt-BR"),
-            "Vendas Acumuladas": cumulativeSales,
-            "Vendas do Dia": salesByDayKey[dayKey],
-          };
-        });
-
-        setSalesData(chartData);
+        setSalesData(prepareCumulativeSalesChartData(finishedOrders));
       } catch (error) {
         console.error("Erro ao buscar dados do dashboard:", error);
       } finally {

@@ -1,104 +1,76 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import apiService from "../services/apiService";
 import formatCurrency from "../utils/format";
 import SalesChart from "../components/SalesChart";
+import BrandSalesComparison from "../components/BrandSalesComparison";
+import {
+  orderFinishedAt,
+  orderTotalPrice,
+  orderTotalCommission,
+  orderClientId,
+  orderSellerUserKey,
+  orderSellerName,
+  formatOrderDateLabel,
+  accumulateSalesByRepresentada,
+  brandBarsFromSalesMap,
+  prepareCumulativeSalesChartData,
+} from "../utils/orderApiFields";
 
 const ReportsPage = ({ userRole, userId }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState("all");
-  const [salesByRep, setSalesByRep] = useState([]);
-  const [commissionsByRep, setCommissionsByRep] = useState([]);
   const [clients, setClients] = useState({});
-  const [chartData, setChartData] = useState([]);
   const monthlyTarget = 80000;
+  const mountedRef = useRef(false);
+
+  const fetchReports = useCallback(async (opts = { showSpinner: true }) => {
+    try {
+      if (opts.showSpinner) setLoading(true);
+      const ordersData = await apiService.getOrders({});
+      const clientsData = await apiService.getClients();
+      const clientsMap = {};
+      clientsData.forEach((client) => {
+        const cid = client.id;
+        clientsMap[cid] = client.companyName || client.companyname;
+      });
+      setClients(clientsMap);
+      const finishedOrders = ordersData.filter(
+        (order) => order.status === "Entregue",
+      );
+      setAllOrders(finishedOrders);
+    } catch (error) {
+      console.error("Erro ao buscar relatórios:", error);
+    } finally {
+      if (opts.showSpinner) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const ordersData = await apiService.getOrders({});
-        const clientsData = await apiService.getClients();
-        const clientsMap = {};
-        clientsData.forEach((client) => {
-          clientsMap[client.id] = client.companyName || client.companyname;
-        });
-        setClients(clientsMap);
-        const finishedOrders = ordersData.filter(
-          (order) => order.status === "Entregue",
-        );
-        setAllOrders(finishedOrders);
-        // Calcular vendas por representante
-        const salesMap = finishedOrders.reduce((acc, order) => {
-          const repId =
-            order.user_ref != null ? String(order.user_ref) : order.userid || "N/A";
-          const total = parseFloat(order.totalprice) || 0;
-          acc[repId] = (acc[repId] || 0) + total;
-          return acc;
-        }, {});
+    if (userId && userRole) {
+      fetchReports({ showSpinner: true });
+      mountedRef.current = true;
+    }
+  }, [userRole, userId, fetchReports]);
 
-        const salesByRepList = Object.keys(salesMap).map((repId) => {
-          const sample = finishedOrders.find(
-            (o) =>
-              (o.user_ref != null ? String(o.user_ref) : o.userid) === repId,
-          );
-          return {
-            userId: repId,
-            displayName: sample?.seller_name || repId,
-            totalSales: salesMap[repId],
-          };
-        });
-        setSalesByRep(salesByRepList);
-
-        const commissionsMap = finishedOrders.reduce((acc, order) => {
-          const repId =
-            order.user_ref != null ? String(order.user_ref) : order.userid || "N/A";
-          const commission = parseFloat(order.total_commission) || 0;
-          acc[repId] = (acc[repId] || 0) + commission;
-          return acc;
-        }, {});
-
-        const commissionsByRepList = Object.keys(commissionsMap).map(
-          (repId) => {
-            const sample = finishedOrders.find(
-              (o) =>
-                (o.user_ref != null ? String(o.user_ref) : o.userid) === repId,
-            );
-            return {
-              userId: repId,
-              displayName: sample?.seller_name || repId,
-              totalCommission: commissionsMap[repId],
-              totalSales: salesMap[repId] || 0,
-              commissionRate:
-                salesMap[repId] > 0
-                  ? (
-                      (commissionsMap[repId] / salesMap[repId]) *
-                      100
-                    ).toFixed(2)
-                  : "0.00",
-            };
-          },
-        );
-        setCommissionsByRep(commissionsByRepList);
-      } catch (error) {
-        console.error("Erro ao buscar relatórios:", error);
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && mountedRef.current) {
+        fetchReports({ showSpinner: false });
       }
     };
-
-    if (userId && userRole) {
-      fetchOrders();
-    }
-  }, [userRole, userId]);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [fetchReports]);
 
   const getFilteredOrders = (days) => {
     const today = new Date();
     const filterDate = new Date();
     filterDate.setDate(today.getDate() - days);
-    return allOrders.filter(
-      (order) => order.finishedat && new Date(order.finishedat) >= filterDate,
-    );
+    return allOrders.filter((order) => {
+      const fin = orderFinishedAt(order);
+      return fin && new Date(fin) >= filterDate;
+    });
   };
 
   const weeklyOrders = getFilteredOrders(7);
@@ -111,64 +83,60 @@ const ReportsPage = ({ userRole, userId }) => {
         ? monthlyOrders
         : allOrders;
 
-  // CORREÇÃO: Gráfico por data para evitar poluição visual
-  useEffect(() => {
-    const prepareChartData = () => {
-      if (ordersToDisplay.length === 0) {
-        setChartData([]);
-        return;
-      }
-
-      // Agrupar vendas por data para gráfico mais limpo
-      const salesByDate = {};
-
-      ordersToDisplay.forEach((order) => {
-        if (!order.finishedat) return;
-
-        const date = new Date(order.finishedat).toLocaleDateString("pt-BR");
-        const total = parseFloat(order.totalprice) || 0;
-
-        if (salesByDate[date]) {
-          salesByDate[date] += total;
-        } else {
-          salesByDate[date] = total;
-        }
-      });
-
-      // Ordenar datas cronologicamente
-      const sortedDates = Object.keys(salesByDate).sort((a, b) => {
-        return (
-          new Date(a.split("/").reverse().join("-")) -
-          new Date(b.split("/").reverse().join("-"))
-        );
-      });
-
-      // Calcular vendas acumuladas
-      let cumulativeSales = 0;
-      const data = sortedDates.map((date) => {
-        cumulativeSales += salesByDate[date];
-        return {
-          date: date,
-          "Vendas Acumuladas": cumulativeSales,
-          "Vendas do Dia": salesByDate[date],
-        };
-      });
-
-      setChartData(data);
-    };
-
-    prepareChartData();
-  }, [ordersToDisplay, filterPeriod]);
+  const chartData = useMemo(
+    () => prepareCumulativeSalesChartData(ordersToDisplay),
+    [ordersToDisplay],
+  );
 
   const totalSales = ordersToDisplay.reduce(
-    (acc, order) => acc + (parseFloat(order.totalprice) || 0),
+    (acc, order) => acc + orderTotalPrice(order),
     0,
   );
 
   const totalCommissions = ordersToDisplay.reduce(
-    (acc, order) => acc + (parseFloat(order.total_commission) || 0),
+    (acc, order) => acc + orderTotalCommission(order),
     0,
   );
+
+  const salesByRepresentadaMap = useMemo(
+    () => accumulateSalesByRepresentada(ordersToDisplay),
+    [ordersToDisplay],
+  );
+
+  const brandBars = useMemo(
+    () => brandBarsFromSalesMap(salesByRepresentadaMap),
+    [salesByRepresentadaMap],
+  );
+
+  const marcasComVenda = Object.keys(salesByRepresentadaMap).length;
+  const mediaPorRepresentada =
+    marcasComVenda > 0 ? totalSales / marcasComVenda : 0;
+
+  const commissionsByRep = useMemo(() => {
+    const salesMap = {};
+    const commissionsMap = {};
+    for (const order of ordersToDisplay) {
+      const repId = orderSellerUserKey(order);
+      salesMap[repId] = (salesMap[repId] || 0) + orderTotalPrice(order);
+      commissionsMap[repId] =
+        (commissionsMap[repId] || 0) + orderTotalCommission(order);
+    }
+    return Object.keys(commissionsMap).map((repId) => {
+      const sample = ordersToDisplay.find(
+        (o) => orderSellerUserKey(o) === repId,
+      );
+      const ts = salesMap[repId] || 0;
+      const tc = commissionsMap[repId] || 0;
+      return {
+        userId: repId,
+        displayName: orderSellerName(sample) || repId,
+        totalCommission: tc,
+        totalSales: ts,
+        commissionRate:
+          ts > 0 ? ((tc / ts) * 100).toFixed(2) : "0.00",
+      };
+    });
+  }, [ordersToDisplay]);
 
   const getRepName = (sale) => {
     if (sale?.displayName) return sale.displayName;
@@ -272,6 +240,23 @@ const ReportsPage = ({ userRole, userId }) => {
         />
       </div>
 
+      <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
+        <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          Vendas por representada vs. total do período
+        </h2>
+        <p className="text-sm text-gray-600 mb-6">
+          O total geral soma o valor cheio de cada pedido. As barras repartem
+          pedidos com várias marcas entre as representadas (mesma regra do
+          somatório do período). A linha tracejada é a média do valor geral
+          por marca com venda.
+        </p>
+        <BrandSalesComparison
+          brandBars={brandBars}
+          totalPeriodo={totalSales}
+          mediaPorRepresentada={mediaPorRepresentada}
+        />
+      </div>
+
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
         Detalhes dos Pedidos
       </h2>
@@ -306,17 +291,17 @@ const ReportsPage = ({ userRole, userId }) => {
                       {order.id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {clients[order.clientid] || "N/A"}
+                      {clients[orderClientId(order)] || "N/A"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(order.totalprice)}
+                      {formatCurrency(orderTotalPrice(order))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
-                      {formatCurrency(order.total_commission || 0)}
+                      {formatCurrency(orderTotalCommission(order))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {order.finishedat
-                        ? new Date(order.finishedat).toLocaleDateString("pt-BR")
+                      {orderFinishedAt(order)
+                        ? formatOrderDateLabel(orderFinishedAt(order))
                         : "N/A"}
                     </td>
                   </tr>
@@ -336,7 +321,7 @@ const ReportsPage = ({ userRole, userId }) => {
       </h2>
       <p className="text-gray-600 mb-4">
         Este relatório mostra as comissões reais calculadas por marca dos
-        produtos vendidos.
+        produtos vendidos (pedidos do período filtrado acima).
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
