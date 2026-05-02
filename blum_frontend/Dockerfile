@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY . .
 
-ARG REACT_APP_API_URL=http://localhost:3011/api/v1
+ARG REACT_APP_API_URL=http://localhost:3011/api/v2
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV CI=false
 

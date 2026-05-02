@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_URL } from "../services/apiService";
 import apiService from "../services/apiService";
 import ClientsForm from "../components/ClientsForm";
 import SearchBar from "../components/SearchBar";
@@ -23,9 +22,6 @@ const ClientsPage = () => {
   useEffect(() => {
     fetchClients();
   }, []);
-
-  // Exemplo de fetch centralizado:
-  // const response = await fetch(`${API_URL}/api/v1/clients`);
 
   // Filtra clientes baseado no termo de busca
   useEffect(() => {

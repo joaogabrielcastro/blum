@@ -7,6 +7,8 @@
     "test": "npm test --prefix blum_backend && npm run test:ci --prefix blum_frontend",
     "test:backend": "npm test --prefix blum_backend",
     "test:frontend": "npm run test:ci --prefix blum_frontend",
+    "test:e2e": "npm run test:e2e --prefix blum_frontend",
+    "test:integration": "npm run test:integration --prefix blum_backend",
     "build:frontend": "npm run build --prefix blum_frontend"
   },
   "repository": {

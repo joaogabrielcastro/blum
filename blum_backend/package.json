@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "jest",
+    "test:integration": "cross-env RUN_INTEGRATION=1 jest tests/integration --runInBand",
     "test:coverage": "jest --coverage",
     "contract:v2": "node scripts/check_v2_contract.js",
     "perf:explain": "node scripts/perf_explain.js",
@@ -33,7 +34,9 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "jest": "^30.3.0",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "supertest": "^7.2.2"
   }
 }

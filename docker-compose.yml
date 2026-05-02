@@ -5,7 +5,7 @@
 #   (veja env.production.example e blum_backend/.env.example)
 #
 # Abra: http://localhost:8080  (frontend)
-# API:  http://localhost:3011/api/v1
+# API:  http://localhost:3011/api/v2
 #
 # Utilizadores iniciais: criados automaticamente na primeira subida (base vazia).
 # Opcional — sincronizar só os que faltam da lista padrão:
@@ -52,7 +52,7 @@ services:
       context: ./blum_frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: http://localhost:3011/api/v1
+        REACT_APP_API_URL: http://localhost:3011/api/v2
     ports:
       - "8080:80"
     depends_on:

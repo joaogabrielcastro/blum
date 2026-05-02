@@ -4,7 +4,7 @@
 // Uso manual: node blum_backend/migrations/create-users.js
 //   (ou: docker compose exec backend node migrations/create-users.js)
 //
-// Novos vendedores: admin → Equipe (POST /api/v1/auth/users) — não edite este ficheiro.
+// Novos vendedores: admin → Equipe (POST /api/v2/auth/users) — não edite este ficheiro.
 
 require("dotenv").config();
 const { sql } = require("../src/config/database");

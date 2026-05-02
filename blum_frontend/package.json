@@ -8,6 +8,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:ci": "react-scripts test --watchAll=false",
+    "test:e2e": "cross-env RUN_E2E=1 playwright test",
+    "test:e2e:install": "playwright install chromium",
     "eject": "react-scripts eject"
   },
   "dependencies": {
@@ -46,6 +48,8 @@
     ]
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1"

@@ -131,10 +131,6 @@ REDIS_URL=redis://127.0.0.1:6379
 
 # IA (Opcional - para importação inteligente)
 GEMINI_API_KEY=sua_chave_api_gemini
-
-# Versionamento API (opcional)
-# ENABLE_V1_DEPRECATION_HEADERS=true
-# API_V1_SUNSET_DATE=Wed, 31 Dec 2026 23:59:59 GMT
 ```
 
 > Dica: existe um template em `blum_backend/.env.example`.
@@ -159,12 +155,13 @@ Itens ainda não implementados no código (evolução do produto): **billing/pla
 
 ### Frontend
 
-O frontend está configurado para se conectar ao backend em `http://localhost:3000`. Se necessário, altere em:
+A URL da API vem de **`REACT_APP_API_URL`** (lida em `src/services/apiService.jsx`; fallback de desenvolvimento já usa **`/api/v2`**). Crie `blum_frontend/.env` a partir de `blum_frontend/.env.example`.
 
-```javascript
-// src/services/apiService.jsx
-const API_URL = "http://localhost:3000/api/v1";
-```
+Em **produção**, no painel de deploy ou no build Docker, defina por exemplo:
+
+`REACT_APP_API_URL=https://api-blum.jwsoftware.com.br/api/v2`
+
+Importante: no Create React App esta variável é **injeta na hora do build** — alterar só o `.env` em runtime **não** muda o bundle; é preciso **novo build** após corrigir um valor antigo com `/api/v1`.
 
 ## 🐳 Docker (teste local)
 
@@ -175,7 +172,7 @@ docker compose up --build
 ```
 
 - **Frontend:** http://localhost:8080  
-- **API:** http://localhost:3011/api/v1  
+- **API:** http://localhost:3011/api/v2  
 - **PostgreSQL** (opcional, cliente SQL): `localhost:5433` (utilizador `blum`, base `blum`; credenciais definidas no `docker-compose.yml`)
 
 Variáveis opcionais no ambiente do host: `JWT_SECRET`, `GEMINI_API_KEY`. Para Redis em cache distribuído, pode acrescentar um serviço Redis ao compose e definir `REDIS_URL` no serviço `backend`.
@@ -306,65 +303,63 @@ blum/
 
 ### Clientes
 ```
-GET    /api/v1/clients          # Listar clientes
-POST   /api/v1/clients          # Criar cliente
-PUT    /api/v1/clients/:id      # Atualizar cliente
-DELETE /api/v1/clients/:id      # Deletar cliente
+GET    /api/v2/clients          # Listar clientes
+POST   /api/v2/clients          # Criar cliente
+PUT    /api/v2/clients/:id      # Atualizar cliente
+DELETE /api/v2/clients/:id      # Deletar cliente
 ```
 
 ### Produtos
 ```
-GET    /api/v1/products         # Listar produtos
-GET    /api/v1/products/search  # Buscar produtos
-POST   /api/v1/products         # Criar produto
-PUT    /api/v1/products/:id     # Atualizar produto
-DELETE /api/v1/products/:id     # Deletar produto
+GET    /api/v2/products         # Listar produtos
+GET    /api/v2/products/search  # Buscar produtos
+POST   /api/v2/products         # Criar produto
+PUT    /api/v2/products/:id     # Atualizar produto
+DELETE /api/v2/products/:id     # Deletar produto
 ```
 
 ### Pedidos
 ```
-GET    /api/v1/orders                    # Listar pedidos
-GET    /api/v1/orders/seller/:userId     # Pedidos por vendedor
-POST   /api/v1/orders                    # Criar pedido
-PUT    /api/v1/orders/:id                # Atualizar pedido
-PUT    /api/v1/orders/:id/status         # Atualizar status
-DELETE /api/v1/orders/:id                # Deletar pedido
+GET    /api/v2/orders                    # Listar pedidos
+GET    /api/v2/orders/seller/:userId     # Pedidos por vendedor
+POST   /api/v2/orders                    # Criar pedido
+PUT    /api/v2/orders/:id                # Atualizar pedido
+PUT    /api/v2/orders/:id/status         # Atualizar status
+DELETE /api/v2/orders/:id                # Deletar pedido
 ```
 
 ### Representadas (Brands)
 ```
-GET    /api/v1/brands           # Listar representadas
-POST   /api/v1/brands           # Criar representada
-PUT    /api/v1/brands/:name     # Atualizar representada
-DELETE /api/v1/brands/:name     # Deletar representada
+GET    /api/v2/brands           # Listar representadas
+POST   /api/v2/brands           # Criar representada
+PUT    /api/v2/brands/:name     # Atualizar representada
+DELETE /api/v2/brands/:name     # Deletar representada
 ```
 
 ### Compras (Purchase)
 ```
-POST   /api/v1/purchases/process-pdf     # Processar PDF
-POST   /api/v1/purchases/process-csv     # Processar CSV
-POST   /api/v1/purchases/finalize-pdf    # Finalizar importação PDF
-POST   /api/v1/purchases/finalize-csv    # Finalizar importação CSV
-GET    /api/v1/purchases/price-history/:id  # Histórico de preços
+POST   /api/v2/purchases/process-pdf     # Processar PDF
+POST   /api/v2/purchases/process-csv     # Processar CSV
+POST   /api/v2/purchases/finalize-pdf    # Finalizar importação PDF
+POST   /api/v2/purchases/finalize-csv    # Finalizar importação CSV
+GET    /api/v2/purchases/price-history/:id  # Histórico de preços
 ```
 
 ### Relatórios
 ```
-GET    /api/v1/reports/stats            # Estatísticas gerais
-GET    /api/v1/reports/sales-by-rep     # Vendas por representante
+GET    /api/v2/reports/stats            # Estatísticas gerais
+GET    /api/v2/reports/sales-by-rep     # Vendas por representante
 ```
 
 ### Status
 ```
-GET    /api/v1/status                   # Status do servidor
-GET    /api/v2/status                   # Status do servidor (v2)
+GET    /api/v2/status                   # Status público
+GET    /api/v2/status/details          # Métricas (admin)
 ```
 
-### Versionamento de API
+### API
 
-- A API `v1` continua compatível para clientes existentes.
-- A API `v2` está disponível em paralelo com foco em payload camelCase.
-- Guia de rollout/migração: `API_V2_ROLLOUT.md`.
+- Base URL: `/api/v2` (respostas em camelCase quando aplicável).
 
 ## 👥 Usuários e Permissões
 
