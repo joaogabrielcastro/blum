@@ -359,15 +359,14 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         >
           Excluir
         </button>
-        {(isDelivered || isQuote) && (
-          <button
-            onClick={() => handleOpenPdf(order)}
-            disabled={pdfLoadingOrderId === order.id}
-            className="min-h-10 px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
-          >
-            {pdfLoadingOrderId === order.id ? "Carregando..." : "Gerar PDF"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => handleOpenPdf(order)}
+          disabled={pdfLoadingOrderId === order.id}
+          className="min-h-10 px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
+        >
+          {pdfLoadingOrderId === order.id ? "Carregando..." : "Gerar PDF"}
+        </button>
       </div>
     );
   };
