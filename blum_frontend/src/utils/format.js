@@ -36,6 +36,12 @@ export const normalizeOrderLineItems = (items) => {
       Number.isFinite(lineDiscRaw) && lineDiscRaw > 0
         ? Math.min(100, lineDiscRaw)
         : 0;
+    const productcode =
+      line.productCode ??
+      line.productcode ??
+      line.product_code ??
+      "";
+    const subcode = line.subCode ?? line.subcode ?? "";
     return {
       ...line,
       productId: productId != null ? Number(productId) || productId : null,
@@ -44,8 +50,8 @@ export const normalizeOrderLineItems = (items) => {
       quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
       price: Number.isFinite(price) ? price : 0,
       lineDiscount,
-      productcode: line.productcode ?? line.product_code ?? "",
-      subcode: line.subcode ?? "",
+      productcode,
+      subcode,
       availableStock:
         line.availableStock ??
         line.available_stock ??

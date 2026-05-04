@@ -238,9 +238,15 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
       checkPageOverflow(15);
 
       const productName = item.productName || item.name || "Produto";
-      const productCode = item.productcode || item.product_code || "";
-      const productLabel = productCode
-        ? `${productName} (Cod: ${productCode})`
+      const productCode =
+        item.productCode ??
+        item.productcode ??
+        item.product_code ??
+        "";
+      const subCode = item.subCode ?? item.subcode ?? "";
+      const codePart = productCode || subCode;
+      const productLabel = codePart
+        ? `${productName} (Cod: ${codePart})`
         : productName;
       const quantity = Number(item.quantity) || 0;
       const unitPrice = Number(item.unitPrice || item.price || 0);
