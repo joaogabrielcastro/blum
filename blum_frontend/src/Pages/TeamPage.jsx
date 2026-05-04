@@ -19,6 +19,8 @@ const TeamPage = () => {
   const [pwdModalUser, setPwdModalUser] = useState(null);
   const [newPwd, setNewPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
+  const [deleteModalUser, setDeleteModalUser] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -138,6 +140,27 @@ const TeamPage = () => {
     }
   };
 
+  const confirmDeleteUser = async () => {
+    if (!deleteModalUser) return;
+    const removedId = deleteModalUser.id;
+    const removedUsername = deleteModalUser.username;
+    setDeletingUser(true);
+    setError(null);
+    try {
+      await apiService.deleteUser(removedId);
+      toast.success(`Vendedor ${removedUsername} excluído.`);
+      setDeleteModalUser(null);
+      if (brandModalUser?.id === removedId) setBrandModalUser(null);
+      await load();
+    } catch (e) {
+      const msg = e.message || "Erro ao excluir vendedor";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setDeletingUser(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-gray-800 mb-2">Equipe</h1>
@@ -232,26 +255,37 @@ const TeamPage = () => {
                     <td className="py-3 px-4">
                       {u.role === "admin" ? "Administrador" : "Vendedor"}
                     </td>
-                    <td className="py-3 px-4 text-right space-x-2 whitespace-nowrap">
-                      {u.role === "salesperson" && (
+                    <td className="py-3 px-4 text-right">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                        {u.role === "salesperson" && (
+                          <button
+                            type="button"
+                            onClick={() => openBrandModal(u)}
+                            className="text-purple-700 font-medium hover:underline"
+                          >
+                            Representadas
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => openBrandModal(u)}
-                          className="text-purple-700 font-medium hover:underline"
+                          onClick={() => {
+                            setPwdModalUser(u);
+                            setNewPwd("");
+                          }}
+                          className="text-blue-700 font-medium hover:underline"
                         >
-                          Representadas
+                          Nova senha
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPwdModalUser(u);
-                          setNewPwd("");
-                        }}
-                        className="text-blue-700 font-medium hover:underline"
-                      >
-                        Nova senha
-                      </button>
+                        {u.role === "salesperson" && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteModalUser(u)}
+                            className="text-red-600 font-medium hover:underline"
+                          >
+                            Excluir
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -304,6 +338,39 @@ const TeamPage = () => {
                 className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
                 {savingBrands ? "A guardar…" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5">
+            <h3 className="font-semibold text-lg text-gray-900 mb-2">
+              Excluir vendedor
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Tem certeza que deseja excluir{" "}
+              <strong>{deleteModalUser.username}</strong>? Esta ação não pode ser
+              desfeita. Se este vendedor tiver pedidos no sistema, a exclusão
+              será bloqueada.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModalUser(null)}
+                className="px-4 py-2 text-sm border rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteUser}
+                disabled={deletingUser}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingUser ? "A excluir…" : "Excluir"}
               </button>
             </div>
           </div>

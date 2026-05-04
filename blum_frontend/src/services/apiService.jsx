@@ -512,6 +512,12 @@ const apiService = {
     });
   },
 
+  deleteUser: async (userId) => {
+    return apiRequest(`${API_URL}/auth/users/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
   // ==================== REPORTS ====================
   getSalesByRep: async () => {
     return apiRequest(`${API_URL}/reports/sales-by-rep`);

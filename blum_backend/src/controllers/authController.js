@@ -235,6 +235,70 @@ exports.adminResetUserPassword = async (req, res) => {
   }
 };
 
+/** Admin remove vendedor (não remove administradores). */
+exports.deleteUser = async (req, res) => {
+  const targetId = parseInt(req.params.userId, 10);
+
+  try {
+    if (!Number.isInteger(targetId) || targetId < 1) {
+      return res.status(400).json({ error: "ID de usuário inválido" });
+    }
+
+    if (targetId === req.user.userId) {
+      return res
+        .status(400)
+        .json({ error: "Não é possível excluir a própria conta." });
+    }
+
+    const rows = await authRepository.findUserByIdAndTenant(
+      targetId,
+      req.user.tenantId,
+    );
+    if (!rows.length) {
+      return res.status(404).json({ error: "Usuário não encontrado." });
+    }
+
+    if (rows[0].role !== "salesperson") {
+      return res.status(403).json({
+        error: "Só é possível excluir contas de vendedor.",
+      });
+    }
+
+    const orderCount = await authRepository.countOrdersByUserRef(
+      targetId,
+      req.user.tenantId,
+    );
+    if (orderCount > 0) {
+      return res.status(409).json({
+        error: `Este vendedor tem ${orderCount} pedido(s) associado(s). Não é possível excluir.`,
+      });
+    }
+
+    const deleted = await authRepository.deleteSalespersonById(
+      targetId,
+      req.user.tenantId,
+    );
+    if (!deleted.length) {
+      return res.status(404).json({ error: "Usuário não encontrado." });
+    }
+
+    await logAuditEvent({
+      tenantId: req.user.tenantId,
+      actorUserId: req.user.userId,
+      action: "auth.user.delete",
+      resourceType: "user",
+      resourceId: String(targetId),
+      requestId: req.requestId,
+      metadata: { username: deleted[0].username },
+    });
+
+    res.json({ message: "Vendedor excluído com sucesso." });
+  } catch (error) {
+    console.error("deleteUser:", error);
+    res.status(500).json({ error: "Erro ao excluir usuário." });
+  }
+};
+
 // Atualizar senha
 exports.updatePassword = async (req, res) => {
   const { currentPassword, newPassword } = req.body;

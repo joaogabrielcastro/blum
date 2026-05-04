@@ -49,6 +49,13 @@ router.put(
   validateAdminResetUserPassword,
   authController.adminResetUserPassword
 );
+router.delete(
+  "/users/:userId",
+  authenticate,
+  authorize("admin"),
+  validateUserIdParam,
+  authController.deleteUser
+);
 
 router.post(
   "/users",

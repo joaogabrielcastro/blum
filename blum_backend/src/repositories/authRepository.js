@@ -44,10 +44,31 @@ async function updateUserPassword(userId, tenantId, passwordHash) {
   `;
 }
 
+async function countOrdersByUserRef(userId, tenantId) {
+  const rows = await sql`
+    SELECT COUNT(*)::int AS c
+    FROM orders
+    WHERE user_ref = ${userId} AND tenant_id = ${tenantId}
+  `;
+  return rows[0]?.c ?? 0;
+}
+
+async function deleteSalespersonById(userId, tenantId) {
+  return sql`
+    DELETE FROM users
+    WHERE id = ${userId}
+      AND tenant_id = ${tenantId}
+      AND role = 'salesperson'
+    RETURNING id, username
+  `;
+}
+
 module.exports = {
   findUserByUsernameAndTenantSlug,
   findUserByIdAndTenant,
   createUser,
   listUsersByTenant,
   updateUserPassword,
+  countOrdersByUserRef,
+  deleteSalespersonById,
 };
