@@ -336,17 +336,30 @@ class OrderService {
 
   normalizeDocumentAndPayment(orderData, existing = null) {
     let docType;
-    if (orderData.document_type != null) {
-      docType = orderData.document_type === "pedido" ? "pedido" : "orcamento";
-    } else if (existing != null && existing.document_type != null) {
-      docType = existing.document_type === "pedido" ? "pedido" : "orcamento";
+    const incomingDoc =
+      orderData.document_type ?? orderData.documentType ?? null;
+    if (incomingDoc != null) {
+      docType = incomingDoc === "pedido" ? "pedido" : "orcamento";
+    } else if (existing != null) {
+      const exDoc =
+        existing.document_type ?? existing.documentType ?? null;
+      if (exDoc != null) {
+        docType = exDoc === "pedido" ? "pedido" : "orcamento";
+      } else {
+        docType = "orcamento";
+      }
     } else {
       docType = "orcamento";
     }
-    let payment =
-      orderData.payment_method !== undefined
-        ? orderData.payment_method || null
-        : existing?.payment_method ?? null;
+    let payment;
+    if (orderData.payment_method !== undefined) {
+      payment = orderData.payment_method || null;
+    } else if (orderData.paymentMethod !== undefined) {
+      payment = orderData.paymentMethod || null;
+    } else {
+      payment =
+        existing?.payment_method ?? existing?.paymentMethod ?? null;
+    }
     if (payment && !ALLOWED_PAYMENT_METHODS.includes(payment)) payment = null;
     return { docType, payment };
   }
@@ -369,10 +382,12 @@ class OrderService {
   }
 
   resolveSellerUserId(orderData, authUser) {
-    const raw =
-      authUser.role === "admin" && orderData.userid != null
-        ? orderData.userid
-        : authUser.userId;
+    const adminPickedSeller =
+      authUser.role === "admin" &&
+      (orderData.userid != null || orderData.userId != null);
+    const raw = adminPickedSeller
+      ? orderData.userid ?? orderData.userId
+      : authUser.userId;
     const sellerId = parseInt(String(raw), 10);
     if (!Number.isFinite(sellerId) || sellerId < 1) {
       throw new Error("ID do vendedor inválido");
@@ -381,13 +396,17 @@ class OrderService {
   }
 
   async create(orderData, authUser) {
-    const { clientid, description, items, discount } = orderData;
+    const clientid =
+      orderData.clientid ?? orderData.clientId ?? orderData.client_id;
+    const { description, items, discount } = orderData;
     const { docType, payment } = this.normalizeDocumentAndPayment(orderData);
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
     const tenantId = authUser.tenantId || 1;
-    const createdAt = parseCreatedAt(orderData.createdat);
+    const createdAt = parseCreatedAt(
+      orderData.createdat ?? orderData.createdAt,
+    );
 
     if (
       !clientid ||
@@ -453,7 +472,9 @@ class OrderService {
   async update(id, orderData, authUser) {
     const tenantId = authUser.tenantId || 1;
     const existing = await this.findById(id, tenantId);
-    const { clientid, description, items, discount } = orderData;
+    const clientid =
+      orderData.clientid ?? orderData.clientId ?? orderData.client_id;
+    const { description, items, discount } = orderData;
     const { docType, payment } = this.normalizeDocumentAndPayment(
       orderData,
       existing,
@@ -461,9 +482,13 @@ class OrderService {
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
-    const createdAt = parseCreatedAt(orderData.createdat);
+    const createdAt = parseCreatedAt(
+      orderData.createdat ?? orderData.createdAt,
+    );
+    const existingDoc =
+      existing.document_type ?? existing.documentType ?? null;
     const isDeliveredPedido =
-      existing.status === "Entregue" && existing.document_type === "pedido";
+      existing.status === "Entregue" && existingDoc === "pedido";
     const previousControlledStock = aggregateControlledStockQuantities(
       existing.items || [],
     );
@@ -601,7 +626,9 @@ class OrderService {
       throw err;
     }
     const current = await this.findById(id, tenantId);
-    if (current.document_type !== "pedido") {
+    const currentDoc =
+      current.document_type ?? current.documentType ?? null;
+    if (currentDoc !== "pedido") {
       const err = new Error(
         "A forma de pagamento só pode ser definida em pedidos.",
       );
@@ -700,7 +727,8 @@ class OrderService {
 
   async convertToPedido(id, tenantId = 1) {
     const order = await this.findById(id, tenantId);
-    if (order.document_type !== "orcamento") {
+    const orderDoc = order.document_type ?? order.documentType ?? null;
+    if (orderDoc !== "orcamento") {
       const err = new Error(
         "Apenas orçamentos podem ser convertidos em pedido.",
       );
@@ -747,7 +775,9 @@ class OrderService {
 
   async finalize(id, tenantId = 1) {
     const current = await this.findById(id, tenantId);
-    if (current.document_type !== "pedido") {
+    const currentDoc =
+      current.document_type ?? current.documentType ?? null;
+    if (currentDoc !== "pedido") {
       const err = new Error(
         "Converta o orçamento em pedido antes de finalizar a entrega.",
       );

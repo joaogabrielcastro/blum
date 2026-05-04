@@ -108,8 +108,11 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
                           {row.quantity}
                         </td>
                         <td className="px-3 py-2 text-gray-700">
-                          {PAYMENT_LABELS[row.payment_method] ||
+                          {PAYMENT_LABELS[
+                            row.payment_method ?? row.paymentMethod
+                          ] ||
                             row.payment_method ||
+                            row.paymentMethod ||
                             "—"}
                         </td>
                       </tr>

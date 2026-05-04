@@ -35,7 +35,8 @@ export function orderSellerName(order) {
 
 /** ID do vendedor como string para agrupamentos */
 export function orderSellerUserKey(order) {
-  const v = order.user_ref ?? order.userId ?? order.userid;
+  const v =
+    order.user_ref ?? order.userRef ?? order.userId ?? order.userid;
   return v != null ? String(v) : "N/A";
 }
 

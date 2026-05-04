@@ -49,6 +49,28 @@ describe("formatOrderData", () => {
     expect(out.userId).toBe("5");
   });
 
+  it("mapeia resposta v2 (userRef, clientId, documentType)", () => {
+    const out = formatOrderData({
+      id: 99,
+      clientId: 4,
+      userRef: 7,
+      documentType: "pedido",
+      paymentMethod: "pix",
+      totalPrice: 50,
+      items: [],
+      discount: 0,
+      status: "Em aberto",
+      createdAt: "2026-02-01T12:00:00.000Z",
+      finishedAt: null,
+    });
+    expect(out.id).toBe(99);
+    expect(out.clientId).toBe(4);
+    expect(out.userId).toBe(7);
+    expect(out.documentType).toBe("pedido");
+    expect(out.paymentMethod).toBe("pix");
+    expect(out.totalPrice).toBe(50);
+  });
+
   it("normaliza itens em snake_case vindos da API", () => {
     const out = formatOrderData({
       id: 83,

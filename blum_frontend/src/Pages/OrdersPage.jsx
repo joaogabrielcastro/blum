@@ -99,7 +99,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     ? brands.map((brand) => ({
         id: brand.id,
         name: brand.name || "",
-        commission_rate: brand.commission_rate || 0,
+        commission_rate:
+          brand.commission_rate ?? brand.commissionRate ?? 0,
       }))
     : [];
 
@@ -155,13 +156,15 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     try {
       if (type === "delete") {
         await apiService.deleteOrder(orderId);
-        setOrders(orders.filter((order) => order.id !== orderId));
+        setOrders(
+          orders.filter((order) => String(order.id) !== String(orderId)),
+        );
         toast.success("Pedido excluído.");
       } else if (type === "finalize") {
         await apiService.finalizeOrder(orderId);
         setOrders(
           orders.map((order) =>
-            order.id === orderId
+            String(order.id) === String(orderId)
               ? {
                   ...order,
                   status: "Entregue",
@@ -173,16 +176,21 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         toast.success("Entrega finalizada.");
       }
     } catch (error) {
-      const errorMessage =
-        error.message?.includes("404") ||
-        error.message?.includes("não encontrado")
-          ? `${
-              type === "delete" ? "Pedido" : "Pedido"
-            } não encontrado. A lista será atualizada.`
-          : `Falha ao ${
-              type === "delete" ? "excluir" : "finalizar"
-            } pedido. Tente novamente.`;
-      toast.error(errorMessage);
+      const raw = (error?.message || "").trim();
+      const lower = raw.toLowerCase();
+      const notFound =
+        lower.includes("404") || lower.includes("não encontrado");
+      if (notFound) {
+        toast.error("Pedido não encontrado. A lista será atualizada.");
+      } else if (raw) {
+        toast.error(raw);
+      } else {
+        toast.error(
+          type === "delete"
+            ? "Falha ao excluir pedido. Tente novamente."
+            : "Falha ao finalizar pedido. Tente novamente.",
+        );
+      }
       // Recarrega a lista em caso de erro
       await fetchData();
     } finally {

@@ -8,6 +8,10 @@ const {
   validateOrderPaymentMethodUpdate,
   validateClientItemHistoryParams,
 } = require("../middleware/validation");
+const {
+  normalizeOrderPayloadBody,
+  normalizePaymentMethodBody,
+} = require("../middleware/orderBodyCompat");
 
 // Todas as rotas requerem autenticação
 router.get("/", authenticate, ordersController.getAll);
@@ -25,7 +29,13 @@ router.get(
   ordersController.getClientStats
 );
 router.get("/:id", authenticate, validateId, ordersController.getById);
-router.post("/", authenticate, validateOrder, ordersController.create);
+router.post(
+  "/",
+  authenticate,
+  normalizeOrderPayloadBody,
+  validateOrder,
+  ordersController.create,
+);
 router.put(
   "/:id/convert-to-pedido",
   authenticate,
@@ -41,6 +51,7 @@ router.put(
 router.put(
   "/:id/payment-method",
   authenticate,
+  normalizePaymentMethodBody,
   validateOrderPaymentMethodUpdate,
   ordersController.updatePaymentMethod,
 );
@@ -56,7 +67,13 @@ router.put(
   validateId,
   ordersController.updateStatus
 );
-router.put("/:id", authenticate, validateId, ordersController.update);
+router.put(
+  "/:id",
+  authenticate,
+  validateId,
+  normalizeOrderPayloadBody,
+  ordersController.update,
+);
 router.delete(
   "/:id",
   authenticate,

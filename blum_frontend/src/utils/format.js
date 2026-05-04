@@ -69,13 +69,20 @@ const formatCurrency = (value) => {
 
 export const formatOrderData = (order) => {
   if (order == null) return null;
-  const sellerId = order.user_ref ?? order.userid ?? order.userId;
+  const sellerId =
+    order.user_ref ??
+    order.userRef ??
+    order.userid ??
+    order.userId;
   const items = normalizeOrderLineItems(order.items);
   const itemsLen = items.length;
   const documentType =
     order.document_type ?? order.documentType ?? "pedido";
+  const rawId = order.id ?? order.orderId;
+  const numericId = Number(rawId);
+  const id = Number.isFinite(numericId) ? numericId : rawId;
   return {
-    id: order.id,
+    id,
     clientId: order.clientid ?? order.clientId ?? order.client_id,
     userId: sellerId,
     sellerName: order.seller_name ?? order.sellerName,

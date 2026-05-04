@@ -320,7 +320,10 @@ const apiService = {
   updateOrderPaymentMethod: async (orderId, payment_method) => {
     return apiRequest(`${API_URL}/orders/${orderId}/payment-method`, {
       method: "PUT",
-      body: JSON.stringify({ payment_method }),
+      body: JSON.stringify({
+        payment_method,
+        paymentMethod: payment_method,
+      }),
     });
   },
 

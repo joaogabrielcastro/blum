@@ -4,6 +4,16 @@ function resolveExecutor(executor) {
   return executor || { query: (text, values) => sql(text, values) };
 }
 
+/**
+ * Coluna products.stock é inteira; order_items.quantity pode ser DECIMAL.
+ * Nunca passar string decimal a CAST(... AS INTEGER) no PG (22P02).
+ */
+function quantityToIntForStock(quantity) {
+  const n = parseFloat(String(quantity ?? "").trim().replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.max(1, Math.round(n));
+}
+
 async function updateOrderCore(executor, payload) {
   const db = resolveExecutor(executor);
   const {
@@ -94,29 +104,37 @@ async function getOrderLinesForStock(executor, id, tenantId = 1) {
 
 async function decreaseProductStock(executor, { productId, quantity, tenantId = 1 }) {
   const db = resolveExecutor(executor);
+  const qInt = quantityToIntForStock(quantity);
+  if (qInt == null) {
+    return [];
+  }
   const result = await db.query(
     `
       UPDATE products
-      SET stock = stock - CAST($1 AS INTEGER)
+      SET stock = stock - $1::integer
       WHERE id = $2
         AND tenant_id = $3
-        AND stock >= CAST($1 AS INTEGER)
+        AND stock >= $1::integer
       RETURNING id
     `,
-    [quantity, productId, tenantId],
+    [qInt, productId, tenantId],
   );
   return result.rows || result;
 }
 
 async function increaseProductStock(executor, { productId, quantity, tenantId = 1 }) {
   const db = resolveExecutor(executor);
+  const qInt = quantityToIntForStock(quantity);
+  if (qInt == null) {
+    return;
+  }
   await db.query(
     `
       UPDATE products
-      SET stock = stock + CAST($1 AS INTEGER)
+      SET stock = stock + $1::integer
       WHERE id = $2 AND tenant_id = $3
     `,
-    [quantity, productId, tenantId],
+    [qInt, productId, tenantId],
   );
 }
 
