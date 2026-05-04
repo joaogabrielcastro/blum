@@ -64,19 +64,30 @@ const RepresentadaPicker = ({
     e.stopPropagation();
     setEditingBrandId(brand.id);
     setEditCommission(String(brand.commission ?? ""));
-    setEditLogoUrl(brand.logoUrl || brand.raw?.logo_url || "");
+    setEditLogoUrl(
+      brand.logoUrl ||
+        brand.raw?.logo_url ||
+        brand.raw?.logoUrl ||
+        "",
+    );
   };
 
   const handleSaveEdit = async (brandId, e) => {
     e.preventDefault();
     const original = brandsRaw.find((b) => {
       const n = normalizeBrand(b);
-      return n.id === brandId;
+      return String(n.id) === String(brandId);
     });
     if (original) {
+      const parsed = parseFloat(
+        String(editCommission).trim().replace(",", "."),
+      );
+      const commission_rate = Number.isFinite(parsed)
+        ? Math.min(100, Math.max(0, parsed))
+        : 0;
       await onEditBrand(original.name, {
         name: original.name,
-        commission_rate: parseFloat(editCommission) || 0,
+        commission_rate,
         logo_url: editLogoUrl.trim() || null,
       });
     }
@@ -87,9 +98,10 @@ const RepresentadaPicker = ({
 
   const handleCommissionChange = (e) => {
     const value = e.target.value;
+    const normalized = value.replace(",", ".");
     if (
-      /^\d*\.?\d*$/.test(value) &&
-      (value === "" || parseFloat(value) <= 100)
+      /^\d*[.,]?\d*$/.test(value) &&
+      (value === "" || parseFloat(normalized) <= 100)
     ) {
       setEditCommission(value);
     }
@@ -209,7 +221,7 @@ const RepresentadaPicker = ({
         </div>
       )}
 
-      <ul className="divide-y divide-gray-100 max-h-[min(65vh,560px)] overflow-y-auto">
+      <ul className="divide-y divide-gray-100">
         {filtered.length === 0 ? (
           <li className="px-5 py-12 text-center text-gray-500 text-sm">
             Nenhuma representada encontrada para &quot;{query.trim()}&quot;.

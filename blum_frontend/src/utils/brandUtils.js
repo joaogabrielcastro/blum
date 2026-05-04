@@ -18,21 +18,25 @@ export const normalizeBrand = (brand) => {
         ? brand.name.label || brand.name.value || "Nome inválido"
         : String(brand?.name || "Sem nome");
 
+  const rawCommission =
+    brand?.commission_rate ?? brand?.commissionRate ?? brand?.commission;
+
   const commissionValue =
-    typeof brand?.commission_rate === "number"
-      ? brand.commission_rate
-      : typeof brand?.commission_rate === "string"
-        ? parseFloat(brand.commission_rate) || 0
-        : brand?.commission_rate && typeof brand.commission_rate === "object"
+    typeof rawCommission === "number"
+      ? rawCommission
+      : typeof rawCommission === "string"
+        ? parseFloat(rawCommission.replace(",", ".")) || 0
+        : rawCommission && typeof rawCommission === "object"
           ? parseFloat(
-              brand.commission_rate.value || brand.commission_rate.rate,
+              rawCommission.value || rawCommission.rate,
             ) || 0
           : 0;
 
-  const brandId = brand?.id || displayName;
+  const brandId = brand?.id ?? displayName;
+  const rawLogo = brand?.logo_url ?? brand?.logoUrl;
   const logoUrl =
-    typeof brand?.logo_url === "string" && brand.logo_url.trim() !== ""
-      ? brand.logo_url.trim()
+    typeof rawLogo === "string" && rawLogo.trim() !== ""
+      ? rawLogo.trim()
       : null;
 
   return {
