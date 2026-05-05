@@ -32,6 +32,10 @@ const formatQuantityForPdf = (value) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   });
+const formatCnpj = (cnpj) => {
+  const digits = String(cnpj || "").replace(/\D/g, "");
+  if (digits.length !== 14) return "";
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
 };
 
 const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => {
@@ -197,8 +201,16 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     
     const cid = order.clientId ?? order.clientid;
     const clientName = clients[cid] || "N/A";
+    const clientRecord = clientsList.find(
+      (client) => String(client.id ?? client.Id) === String(cid),
+    );
+    const formattedClientCnpj = formatCnpj(clientRecord?.cnpj);
     doc.text(`Cliente: ${clientName}`, margin, yPosition);
     yPosition += 5;
+    if (formattedClientCnpj) {
+      doc.text(`CNPJ: ${formattedClientCnpj}`, margin, yPosition);
+      yPosition += 5;
+    }
 
     const clientRow = clientsList.find(
       (c) => String(c.id ?? c.Id) === String(cid),
