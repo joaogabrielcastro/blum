@@ -15,7 +15,13 @@ const normalizeItems = (items) => {
   return [];
 };
 
-const PdfGenerator = ({ order, clients, brands, onClose }) => {
+const formatCnpj = (cnpj) => {
+  const digits = String(cnpj || "").replace(/\D/g, "");
+  if (digits.length !== 14) return "";
+  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+};
+
+const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => {
   const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
   const [headerImage, setHeaderImage] = useState(null);
@@ -167,9 +173,18 @@ const PdfGenerator = ({ order, clients, brands, onClose }) => {
     doc.setFontSize(10);
     doc.setFont(undefined, "normal");
     
-    const clientName = clients[order.clientId] || "N/A";
+    const clientId = order.clientId ?? order.clientid ?? order.client_id;
+    const clientRecord = clientsList.find(
+      (client) => String(client.id ?? client.Id) === String(clientId),
+    );
+    const clientName = clients[clientId] || "N/A";
+    const formattedClientCnpj = formatCnpj(clientRecord?.cnpj);
     doc.text(`Cliente: ${clientName}`, margin, yPosition);
     yPosition += 6; // ✅ Menos espaço entre linhas
+    if (formattedClientCnpj) {
+      doc.text(`CNPJ: ${formattedClientCnpj}`, margin, yPosition);
+      yPosition += 6;
+    }
 
     // Cabeçalho da tabela - mais próximo do conteúdo
     yPosition += 4;

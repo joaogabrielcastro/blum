@@ -287,8 +287,11 @@ class OrderService {
 
   async update(id, orderData, authUser) {
     const { clientid, description, items, discount } = orderData;
-
-    const sellerUserId = this.resolveSellerUserId(orderData, authUser);
+    const existingOrder = await this.findById(id);
+    const sellerUserId =
+      authUser.role === "admin" && orderData.userid == null
+        ? parseInt(String(existingOrder.user_ref), 10)
+        : this.resolveSellerUserId(orderData, authUser);
 
     if (!clientid || !items || !Array.isArray(items)) {
       throw new Error(

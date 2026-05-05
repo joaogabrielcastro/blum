@@ -216,6 +216,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
         <PdfGenerator
           order={pdfOrder}
           clients={clients}
+          clientsList={clientsList}
           brands={safeBrands}
           onClose={() => setPdfOrder(null)}
         />
