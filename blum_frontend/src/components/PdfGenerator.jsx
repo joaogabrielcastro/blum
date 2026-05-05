@@ -32,6 +32,8 @@ const formatQuantityForPdf = (value) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   });
+};
+
 const formatCnpj = (cnpj) => {
   const digits = String(cnpj || "").replace(/\D/g, "");
   if (digits.length !== 14) return "";
