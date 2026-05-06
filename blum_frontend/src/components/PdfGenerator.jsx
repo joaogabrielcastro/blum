@@ -139,7 +139,6 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
 
     const columns = {
       produto: margin + 2,
-      desc: pageWidth - 88,
       qtd: pageWidth - 70,
       preco: pageWidth - 48,
       subtotal: pageWidth - 15,
@@ -234,9 +233,6 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     doc.rect(margin, yPosition, pageWidth - 2 * margin, 8, "F");
 
     doc.text("PRODUTO", columns.produto, yPosition + 5);
-    doc.setFontSize(8);
-    doc.text("DESC.%", columns.desc, yPosition + 5, { align: "right" });
-    doc.setFontSize(9);
     doc.text("QTD.", columns.qtd, yPosition + 5, { align: "right" });
     doc.text("PREÇO UNIT.", columns.preco, yPosition + 5, { align: "right" });
     doc.text("SUBTOTAL", columns.subtotal, yPosition + 5, { align: "right" });
@@ -273,7 +269,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
         doc.rect(margin, yPosition, pageWidth - 2 * margin, 12, "F");
       }
 
-      const maxWidth = columns.desc - columns.produto - 4;
+      const maxWidth = columns.qtd - columns.produto - 4;
       const productLines = doc.splitTextToSize(productLabel, maxWidth);
 
       const lineHeight = Math.max(12, productLines.length * 4);
@@ -282,12 +278,6 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
         doc.text(line, columns.produto, yPosition + 4 + lineIndex * 4);
       });
 
-      doc.text(
-        ld > 0 ? `${Number(ld).toFixed(1)}%` : "—",
-        columns.desc,
-        yPosition + 5,
-        { align: "right" },
-      );
       doc.text(formatQuantityForPdf(quantity), columns.qtd, yPosition + 5, {
         align: "right",
       });
