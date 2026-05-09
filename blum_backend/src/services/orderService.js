@@ -481,7 +481,10 @@ class OrderService {
     );
     this.enforceDiscountRules(discount, payment);
 
-    const sellerUserId = this.resolveSellerUserId(orderData, authUser);
+    const sellerUserId =
+      authUser.role === "admin" && orderData.userid == null
+        ? parseInt(String(existing.user_ref), 10)
+        : this.resolveSellerUserId(orderData, authUser);
     const createdAt = parseCreatedAt(
       orderData.createdat ?? orderData.createdAt,
     );

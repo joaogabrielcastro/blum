@@ -483,9 +483,15 @@ const OrdersForm = ({
     }
 
     try {
+      const originalSellerId =
+        editingOrder?.userId ?? editingOrder?.userid ?? editingOrder?.user_ref;
+      const normalizedOriginalSellerId = parseInt(String(originalSellerId), 10);
       const orderData = {
         clientid: parseInt(clientId),
-        userid: userId,
+        userid:
+          editingOrder && Number.isFinite(normalizedOriginalSellerId)
+            ? normalizedOriginalSellerId
+            : userId,
         description: description,
         items: items.map((item) => ({
           ...item,
