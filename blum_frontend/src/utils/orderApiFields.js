@@ -33,6 +33,10 @@ export function orderSellerName(order) {
   return order.sellerName ?? order.seller_name ?? "";
 }
 
+export function orderSellerUsername(order) {
+  return order.sellerUsername ?? order.seller_username ?? "";
+}
+
 /** ID do vendedor como string para agrupamentos */
 export function orderSellerUserKey(order) {
   const v =

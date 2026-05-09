@@ -10,6 +10,8 @@ import {
   orderClientId,
   orderSellerUserKey,
   orderSellerName,
+  orderSellerUsername,
+  orderRepresentadas,
   formatOrderDateLabel,
   accumulateSalesByRepresentada,
   brandBarsFromSalesMap,
@@ -21,20 +23,34 @@ const ReportsPage = ({ userRole, userId }) => {
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState("all");
   const [clients, setClients] = useState({});
+  /** Fallback nome/login do vendedor quando o pedido não traz seller (edge cases) */
+  const [usersById, setUsersById] = useState({});
   const monthlyTarget = 80000;
   const mountedRef = useRef(false);
 
   const fetchReports = useCallback(async (opts = { showSpinner: true }) => {
     try {
       if (opts.showSpinner) setLoading(true);
-      const ordersData = await apiService.getOrders({});
-      const clientsData = await apiService.getClients();
+      const [ordersData, clientsData, usersData] = await Promise.all([
+        apiService.getOrders({}),
+        apiService.getClients(),
+        userRole === "admin"
+          ? apiService.getUsers().catch(() => [])
+          : Promise.resolve([]),
+      ]);
       const clientsMap = {};
       clientsData.forEach((client) => {
         const cid = client.id;
         clientsMap[cid] = client.companyName || client.companyname;
       });
       setClients(clientsMap);
+      const teamMap = {};
+      if (Array.isArray(usersData)) {
+        usersData.forEach((u) => {
+          if (u?.id != null) teamMap[String(u.id)] = u;
+        });
+      }
+      setUsersById(teamMap);
       const finishedOrders = ordersData.filter(
         (order) => order.status === "Entregue",
       );
@@ -44,7 +60,7 @@ const ReportsPage = ({ userRole, userId }) => {
     } finally {
       if (opts.showSpinner) setLoading(false);
     }
-  }, []);
+  }, [userRole]);
 
   useEffect(() => {
     if (userId && userRole) {
@@ -113,34 +129,61 @@ const ReportsPage = ({ userRole, userId }) => {
     marcasComVenda > 0 ? totalSales / marcasComVenda : 0;
 
   const commissionsByRep = useMemo(() => {
-    const salesMap = {};
-    const commissionsMap = {};
+    const agg = {};
     for (const order of ordersToDisplay) {
       const repId = orderSellerUserKey(order);
-      salesMap[repId] = (salesMap[repId] || 0) + orderTotalPrice(order);
-      commissionsMap[repId] =
-        (commissionsMap[repId] || 0) + orderTotalCommission(order);
+      if (!agg[repId]) {
+        agg[repId] = {
+          totalSales: 0,
+          totalCommission: 0,
+          orderCount: 0,
+        };
+      }
+      agg[repId].totalSales += orderTotalPrice(order);
+      agg[repId].totalCommission += orderTotalCommission(order);
+      agg[repId].orderCount += 1;
     }
-    return Object.keys(commissionsMap).map((repId) => {
+
+    const rows = Object.keys(agg).map((repId) => {
       const sample = ordersToDisplay.find(
         (o) => orderSellerUserKey(o) === repId,
       );
-      const ts = salesMap[repId] || 0;
-      const tc = commissionsMap[repId] || 0;
+      const team = usersById[repId];
+      const nameFromOrder = orderSellerName(sample);
+      const usernameFromOrder = orderSellerUsername(sample);
+      const displayName =
+        nameFromOrder ||
+        team?.name ||
+        team?.username ||
+        (repId !== "N/A" ? `Usuário #${repId}` : "N/A");
+      const username =
+        usernameFromOrder || (team?.username ? String(team.username) : "");
+
+      const ts = agg[repId].totalSales;
+      const tc = agg[repId].totalCommission;
+      const n = agg[repId].orderCount;
+
       return {
         userId: repId,
-        displayName: orderSellerName(sample) || repId,
+        displayName,
+        username,
+        orderCount: n,
         totalCommission: tc,
         totalSales: ts,
-        commissionRate:
-          ts > 0 ? ((tc / ts) * 100).toFixed(2) : "0.00",
+        avgTicket: n > 0 ? ts / n : 0,
+        commissionRate: ts > 0 ? ((tc / ts) * 100).toFixed(2) : "0.00",
       };
     });
-  }, [ordersToDisplay]);
 
-  const getRepName = (sale) => {
-    if (sale?.displayName) return sale.displayName;
-    return sale?.userId || "N/A";
+    rows.sort((a, b) => b.totalSales - a.totalSales);
+    return rows;
+  }, [ordersToDisplay, usersById]);
+
+  const formatRepLabel = (sale) => {
+    if (!sale) return "N/A";
+    const u = sale.username?.trim();
+    if (sale.displayName && u) return `${sale.displayName} (@${u})`;
+    return sale.displayName || sale.userId || "N/A";
   };
 
   if (loading)
@@ -258,7 +301,7 @@ const ReportsPage = ({ userRole, userId }) => {
       </div>
 
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        Detalhes dos Pedidos
+        Detalhes dos Pedidos (entregues no período)
       </h2>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200 mb-8">
@@ -267,45 +310,78 @@ const ReportsPage = ({ userRole, userId }) => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pedido ID
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pedido
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cliente
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Total
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Representante
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Representadas
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Valor total
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Comissão
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data de Finalização
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Finalizado em
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {ordersToDisplay.map((order) => (
-                  <tr key={order.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {clients[orderClientId(order)] || "N/A"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatCurrency(orderTotalPrice(order))}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
-                      {formatCurrency(orderTotalCommission(order))}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {orderFinishedAt(order)
-                        ? formatOrderDateLabel(orderFinishedAt(order))
-                        : "N/A"}
-                    </td>
-                  </tr>
-                ))}
+                {ordersToDisplay.map((order) => {
+                  const repKey = orderSellerUserKey(order);
+                  const team = usersById[repKey];
+                  const repName =
+                    orderSellerName(order) ||
+                    team?.name ||
+                    (repKey !== "N/A" ? `Usuário #${repKey}` : "");
+                  const repUser =
+                    orderSellerUsername(order) || team?.username || "";
+                  const repCell =
+                    repName && repUser
+                      ? `${repName} (@${repUser})`
+                      : repName || repUser || repKey;
+                  const brandsLabel = orderRepresentadas(order);
+                  return (
+                    <tr key={order.id}>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{order.id}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-700 max-w-[220px]">
+                        {clients[orderClientId(order)] || "N/A"}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-800 whitespace-nowrap">
+                        {repCell}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-600 max-w-[260px]">
+                        {brandsLabel ? (
+                          <span className="line-clamp-2" title={brandsLabel}>
+                            {brandsLabel}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                        {formatCurrency(orderTotalPrice(order))}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-semibold text-right">
+                        {formatCurrency(orderTotalCommission(order))}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {orderFinishedAt(order)
+                          ? formatOrderDateLabel(orderFinishedAt(order))
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -317,11 +393,17 @@ const ReportsPage = ({ userRole, userId }) => {
       </div>
 
       <h2 className="text-2xl font-bold text-gray-800 mb-4">
-        Comissões por Representante
+        Resumo por representante (vendedor)
       </h2>
-      <p className="text-gray-600 mb-4">
-        Este relatório mostra as comissões reais calculadas por marca dos
-        produtos vendidos (pedidos do período filtrado acima).
+      <p className="text-gray-600 mb-4 max-w-3xl">
+        Cada linha é um <strong>vendedor</strong> que lançou o pedido (
+        <code className="text-sm bg-gray-100 px-1 rounded">user_ref</code>
+        ). Os valores somam apenas pedidos <strong>Entregue</strong> no período
+        acima. A comissão é a soma do campo{" "}
+        <strong>total_commission</strong> de cada pedido (já calculada por linha
+        conforme a taxa da representada). A coluna &quot;% efetivo&quot; é{" "}
+        <em>comissão ÷ vendas</em> daquele representante (não é a taxa única de
+        uma marca).
       </p>
 
       <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
@@ -330,38 +412,82 @@ const ReportsPage = ({ userRole, userId }) => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Representante
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Total de Vendas
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Pedidos
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Comissão Real
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vendas totais
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    % Comissão
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Ticket médio
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Comissão total
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    % efetivo
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {commissionsByRep.map((sale, index) => (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getRepName(sale)}
+                {commissionsByRep.map((sale) => (
+                  <tr key={sale.userId}>
+                    <td className="px-4 py-4 text-sm text-gray-900">
+                      <span className="font-medium">{formatRepLabel(sale)}</span>
+                      {sale.userId !== "N/A" && (
+                        <span className="block text-xs text-gray-400 mt-0.5">
+                          ID {sale.userId}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 text-right tabular-nums">
+                      {sale.orderCount}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 text-right font-medium tabular-nums">
                       {formatCurrency(sale.totalSales)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 text-right tabular-nums">
+                      {formatCurrency(sale.avgTicket)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-semibold text-right tabular-nums">
                       {formatCurrency(sale.totalCommission)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 text-right tabular-nums">
                       {sale.commissionRate}%
                     </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                <tr>
+                  <td className="px-4 py-3 text-sm font-semibold text-gray-800">
+                    Todos os representantes
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-semibold tabular-nums">
+                    {ordersToDisplay.length}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-semibold tabular-nums">
+                    {formatCurrency(totalSales)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-500 tabular-nums">
+                    {ordersToDisplay.length > 0
+                      ? formatCurrency(totalSales / ordersToDisplay.length)
+                      : formatCurrency(0)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-semibold text-green-800 tabular-nums">
+                    {formatCurrency(totalCommissions)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-600 tabular-nums">
+                    {totalSales > 0
+                      ? ((totalCommissions / totalSales) * 100).toFixed(2)
+                      : "0.00"}
+                    %
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         ) : (
