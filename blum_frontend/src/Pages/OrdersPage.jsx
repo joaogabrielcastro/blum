@@ -10,6 +10,11 @@ import {
   getClientDisplayName,
   normalizeClientsResponse,
 } from "../utils/clients";
+import {
+  orderSellerUserKey,
+  orderSellerName,
+  orderSellerUsername,
+} from "../utils/orderApiFields";
 
 const PAYMENT_LABELS = {
   carteira: "Carteira (em aberto)",
@@ -91,6 +96,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
   const [orderSearch, setOrderSearch] = useState("");
+  const [sellerFilterKey, setSellerFilterKey] = useState("");
   const [listFetchError, setListFetchError] = useState(null);
   const [visibleDayGroups, setVisibleDayGroups] = useState(10);
 
@@ -110,7 +116,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
   useEffect(() => {
     setVisibleDayGroups(10);
-  }, [orderSearch, orders.length]);
+  }, [orderSearch, orders.length, sellerFilterKey]);
 
   const fetchData = async () => {
     try {
@@ -371,7 +377,33 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     );
   };
 
-  const ordersByDay = useMemo(() => groupOrdersByDay(orders), [orders]);
+  const sellerOptions = useMemo(() => {
+    const byKey = new Map();
+    for (const order of orders) {
+      const key = orderSellerUserKey(order);
+      if (byKey.has(key)) continue;
+      const name = orderSellerName(order);
+      const user = orderSellerUsername(order);
+      const label =
+        name && user ? `${name} (@${user})` : name || user || key;
+      byKey.set(key, { key, label });
+    }
+    return [...byKey.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, "pt-BR"),
+    );
+  }, [orders]);
+
+  const ordersForList = useMemo(() => {
+    if (!sellerFilterKey) return orders;
+    return orders.filter(
+      (o) => orderSellerUserKey(o) === sellerFilterKey,
+    );
+  }, [orders, sellerFilterKey]);
+
+  const ordersByDay = useMemo(
+    () => groupOrdersByDay(ordersForList),
+    [ordersForList],
+  );
   const filteredOrdersByDay = useMemo(() => {
     const term = orderSearch.trim().toLocaleLowerCase("pt-BR");
     if (!term) return ordersByDay;
@@ -518,14 +550,38 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           + Novo orçamento
         </button>
       </div>
-      <div className="mb-5">
-        <input
-          type="search"
-          value={orderSearch}
-          onChange={(e) => setOrderSearch(e.target.value)}
-          placeholder="Buscar pedido por numero, cliente, representante, representada..."
-          className="w-full min-h-11 rounded-lg border border-gray-300 p-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+        <div className="flex-1 min-w-0">
+          <input
+            type="search"
+            value={orderSearch}
+            onChange={(e) => setOrderSearch(e.target.value)}
+            placeholder="Buscar pedido por numero, cliente, representante, representada..."
+            className="w-full min-h-11 rounded-lg border border-gray-300 p-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+          <label
+            htmlFor="orders-seller-filter"
+            className="text-sm font-medium text-gray-700 whitespace-nowrap"
+          >
+            Representante
+          </label>
+          <select
+            id="orders-seller-filter"
+            value={sellerFilterKey}
+            onChange={(e) => setSellerFilterKey(e.target.value)}
+            aria-label="Filtrar lista por representante"
+            className="min-h-11 w-full sm:w-[min(100%,280px)] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Todos</option>
+            {sellerOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {listFetchError && (
