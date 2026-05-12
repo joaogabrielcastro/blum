@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
 import {
-  getClientDisplayName,
+  buildClientOrderSearchOption,
   normalizeClientsResponse,
 } from "../utils/clients";
 import { normalizeOrderLineItems } from "../utils/format";
@@ -10,6 +11,8 @@ import { productMatchesFlexible } from "../utils/productSearch";
 import ClientItemPriceHistoryModal from "./ClientItemPriceHistoryModal";
 
 const DECIMAL_QUANTITY_BRANDS = new Set(["solo fino", "colombocal"]);
+const MAX_CLIENT_SEARCH_RESULTS = 60;
+const MOBILE_CLIENT_BROWSE_COUNT = 50;
 
 const normalizeBrandName = (brand) =>
   String(brand || "")
@@ -65,6 +68,9 @@ const OrdersForm = ({
   const [isSearching, setIsSearching] = useState(false);
   const [mobileProductPickerOpen, setMobileProductPickerOpen] =
     useState(false);
+  const [mobileClientPickerOpen, setMobileClientPickerOpen] =
+    useState(false);
+  const [desktopClientListOpen, setDesktopClientListOpen] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [historyModalItem, setHistoryModalItem] = useState(null);
@@ -244,22 +250,25 @@ const OrdersForm = ({
   }, [productSearch, products, selectedBrand]);
 
   useEffect(() => {
-    if (!mobileProductPickerOpen) return;
+    if (!mobileProductPickerOpen && !mobileClientPickerOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [mobileProductPickerOpen]);
+  }, [mobileProductPickerOpen, mobileClientPickerOpen]);
 
   useEffect(() => {
-    if (!mobileProductPickerOpen) return;
+    if (!mobileProductPickerOpen && !mobileClientPickerOpen) return;
     const onKey = (e) => {
-      if (e.key === "Escape") setMobileProductPickerOpen(false);
+      if (e.key === "Escape") {
+        setMobileProductPickerOpen(false);
+        setMobileClientPickerOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mobileProductPickerOpen]);
+  }, [mobileProductPickerOpen, mobileClientPickerOpen]);
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...items];
@@ -363,46 +372,59 @@ const OrdersForm = ({
         .map((c) => {
           const id = c.id ?? c.Id;
           if (id == null) return null;
-          const label =
-            getClientDisplayName(c) ||
-            (c.cnpj != null && String(c.cnpj).trim()
-              ? `CNPJ ${String(c.cnpj).trim()}`
-              : `Cliente #${id}`);
-          return { id: String(id), label };
+          return buildClientOrderSearchOption(c, id);
         })
         .filter(Boolean)
         .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
     }
     return Object.entries(clients || {})
-      .map(([id, name]) => ({
-        id: String(id),
-        label:
+      .map(([id, name]) => {
+        const label =
           name != null && String(name).trim() !== ""
             ? String(name)
-            : `Cliente #${id}`,
-      }))
+            : `Cliente #${id}`;
+        const lower = `${label} ${id}`.toLowerCase();
+        return {
+          id: String(id),
+          label,
+          primary: label,
+          secondary: "",
+          filterBlob: lower,
+        };
+      })
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [clientsList, clients]);
 
+  const mobileClientBrowseSlice = useMemo(
+    () => clientOptions.slice(0, MOBILE_CLIENT_BROWSE_COUNT),
+    [clientOptions],
+  );
+
   const filteredClientOptions = useMemo(() => {
     const term = clientSearchTerm.trim().toLowerCase();
-    if (!term) return clientOptions.slice(0, 200);
+    if (!term) return [];
     return clientOptions
-      .filter(({ label, id }) => {
-        const lower = String(label).toLowerCase();
-        return lower.includes(term) || String(id).includes(term);
-      })
-      .slice(0, 200);
+      .filter(
+        (opt) =>
+          opt.filterBlob.includes(term) || String(opt.id).includes(term),
+      )
+      .slice(0, MAX_CLIENT_SEARCH_RESULTS);
   }, [clientOptions, clientSearchTerm]);
 
   useEffect(() => {
-    if (!clientId) {
-      setClientSearchTerm("");
-      return;
-    }
-    const selected = clientOptions.find((option) => option.id === String(clientId));
+    if (!clientId) return;
+    const selected = clientOptions.find(
+      (option) => option.id === String(clientId),
+    );
     if (selected) setClientSearchTerm(selected.label);
   }, [clientId, clientOptions]);
+
+  const selectClientOption = (opt) => {
+    setClientId(opt.id);
+    setClientSearchTerm(opt.label);
+    setDesktopClientListOpen(false);
+    setMobileClientPickerOpen(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -596,6 +618,48 @@ const OrdersForm = ({
     </div>
   );
 
+  const renderClientOptionRow = (opt) => (
+    <button
+      key={opt.id}
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => selectClientOption(opt)}
+      className="flex w-full flex-col gap-1 border-b border-gray-100 bg-white px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-indigo-50 active:bg-indigo-100"
+    >
+      <span className="text-sm font-medium leading-snug text-gray-900">
+        {opt.primary}
+      </span>
+      {opt.secondary ? (
+        <span className="flex items-start gap-2 text-xs leading-snug text-gray-600">
+          <svg
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
+            />
+          </svg>
+          {opt.secondary}
+        </span>
+      ) : null}
+    </button>
+  );
+
+  const mobileClientDisplayList = clientSearchTerm.trim()
+    ? filteredClientOptions
+    : mobileClientBrowseSlice;
+
   return (
     <>
       <div className="w-full max-w-none md:max-w-[1400px] md:mx-auto px-0 sm:px-0 md:px-8 lg:px-12">
@@ -636,33 +700,93 @@ const OrdersForm = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Cliente *
               </label>
-              <input
-                type="text"
-                value={clientSearchTerm}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setClientSearchTerm(value);
-                  const exact = clientOptions.find(
-                    ({ label }) =>
-                      label.toLowerCase().trim() === value.toLowerCase().trim(),
-                  );
-                  if (exact) {
-                    setClientId(exact.id);
-                  } else {
-                    setClientId("");
-                  }
-                }}
-                list="orders-client-options"
-                placeholder="Digite para buscar cliente"
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <datalist id="orders-client-options">
-                {filteredClientOptions.map(({ id, label }) => (
-                  <option key={id} value={label} />
-                ))}
-              </datalist>
+
+              <div className="md:hidden space-y-2">
+                <button
+                  type="button"
+                  aria-expanded={mobileClientPickerOpen}
+                  aria-haspopup="dialog"
+                  onClick={() => setMobileClientPickerOpen(true)}
+                  className="w-full min-h-12 p-3.5 border border-gray-300 rounded-lg text-base text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <span
+                    className={
+                      clientId ? "text-gray-900 line-clamp-2" : "text-gray-400"
+                    }
+                  >
+                    {clientId
+                      ? (clientOptions.find((o) => o.id === String(clientId))
+                          ?.label ?? "Cliente selecionado")
+                      : "Toque para buscar cliente (nome ou CNPJ)"}
+                  </span>
+                </button>
+                {clientId ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-blue-700 hover:underline"
+                    onClick={() => {
+                      setClientId("");
+                      setClientSearchTerm("");
+                    }}
+                  >
+                    Limpar cliente
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="relative hidden md:block">
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={clientSearchTerm}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setClientSearchTerm(value);
+                    const exact = clientOptions.find(
+                      ({ label }) =>
+                        label.toLowerCase().trim() ===
+                        value.toLowerCase().trim(),
+                    );
+                    if (exact) setClientId(exact.id);
+                    else setClientId("");
+                    setDesktopClientListOpen(true);
+                  }}
+                  onFocus={() => setDesktopClientListOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(
+                      () => setDesktopClientListOpen(false),
+                      180,
+                    );
+                  }}
+                  placeholder="Nome, fantasia ou CNPJ..."
+                  className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {desktopClientListOpen &&
+                  clientSearchTerm.trim().length > 0 &&
+                  filteredClientOptions.length > 0 && (
+                    <div
+                      className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white shadow-xl"
+                      role="listbox"
+                    >
+                      {filteredClientOptions.map((opt) =>
+                        renderClientOptionRow(opt),
+                      )}
+                    </div>
+                  )}
+                {desktopClientListOpen &&
+                  clientSearchTerm.trim().length > 0 &&
+                  filteredClientOptions.length === 0 &&
+                  clientOptions.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500 shadow-lg">
+                      Nenhum cliente encontrado. Ajuste nome ou CNPJ.
+                    </div>
+                  )}
+              </div>
+
               <p className="mt-1 text-xs text-gray-500">
-                Digite nome/CNPJ para filtrar clientes.
+                {clientOptions.length > 0
+                  ? "A lista mostra CNPJ e local (cidade/UF) quando estão no cadastro."
+                  : null}
               </p>
               {clientOptions.length === 0 && (
                 <p className="mt-1 text-sm text-amber-700">
@@ -1320,6 +1444,83 @@ const OrdersForm = ({
           </div>
         </div>
       )}
+
+      {mobileClientPickerOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex flex-col bg-white md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Buscar cliente"
+        >
+          <div className="flex items-center gap-2 border-b border-gray-200 p-3 pt-[max(12px,env(safe-area-inset-top,0px))]">
+            <button
+              type="button"
+              onClick={() => setMobileClientPickerOpen(false)}
+              className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
+            >
+              Voltar
+            </button>
+            <div className="relative flex-1 min-w-0">
+              <input
+                type="search"
+                placeholder="Nome, fantasia ou CNPJ..."
+                value={clientSearchTerm}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setClientSearchTerm(value);
+                  const exact = clientOptions.find(
+                    ({ label }) =>
+                      label.toLowerCase().trim() ===
+                      value.toLowerCase().trim(),
+                  );
+                  if (exact) setClientId(exact.id);
+                  else setClientId("");
+                }}
+                className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto overscroll-contain">
+            {!clientSearchTerm.trim() && clientOptions.length > 0 && (
+              <p className="border-b border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                Mostrando os primeiros {MOBILE_CLIENT_BROWSE_COUNT} clientes em
+                ordem alfabética. Digite para filtrar.
+              </p>
+            )}
+            {clientSearchTerm.trim().length > 0 &&
+              mobileClientDisplayList.length === 0 &&
+              clientOptions.length > 0 && (
+                <div className="p-6 text-center text-sm text-gray-500">
+                  Nenhum cliente encontrado para &quot;{clientSearchTerm}&quot;
+                </div>
+              )}
+            {clientOptions.length === 0 && (
+              <p className="p-6 text-center text-sm text-amber-800">
+                Nenhum cliente cadastrado.
+              </p>
+            )}
+            {mobileClientDisplayList.map((opt) => renderClientOptionRow(opt))}
+          </div>
+
+          <Link
+            to="/clients"
+            className="flex shrink-0 items-center gap-2 border-t border-gray-200 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+            style={{
+              paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
+            }}
+            onClick={() => setMobileClientPickerOpen(false)}
+          >
+            <span className="text-lg leading-none" aria-hidden>
+              +
+            </span>
+            Cadastrar novo cliente
+          </Link>
+        </div>
+      )}
+
       {historyModalItem && (
         <ClientItemPriceHistoryModal
           clientId={clientId}
