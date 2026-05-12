@@ -54,6 +54,8 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: /api/v2
+    environment:
+      BACKEND_PROXY_HOST: backend
     ports:
       - "8080:80"
     depends_on:

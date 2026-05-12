@@ -164,6 +164,11 @@ Em **produção**, no painel de deploy ou no build Docker, defina por exemplo:
 
 `REACT_APP_API_URL=https://api-blum.jwsoftware.com.br/api/v2`
 
+**Coolify / dois serviços separados:** se o login devolver **502** em `.../api/v2/auth/login` no mesmo domínio do site, o Nginx do container **frontend** está a tentar encaminhar para um host Docker chamado `backend` — nesse painel o serviço da API quase nunca tem esse nome. Faça **uma** das duas:
+
+1. No serviço do **frontend**, defina a variável de ambiente **`BACKEND_PROXY_HOST`** com o **hostname interno** do container da API (o que o Docker/Coolify mostra na rede, por ex. o nome do serviço ou stack + serviço), **e** faça **redeploy** do frontend; ou  
+2. Faça build do frontend com **`REACT_APP_API_URL=https://…/api/v2`** (URL **público** da API). O browser fala direto com a API e o proxy `/api/` do Nginx deixa de ser usado para esses pedidos.
+
 Importante: no Create React App esta variável é **injeta na hora do build** — alterar só o `.env` em runtime **não** muda o bundle; é preciso **novo build** após corrigir um valor antigo com `/api/v1`.
 
 ## 🐳 Docker (teste local)

@@ -48,6 +48,9 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:?defina REACT_APP_API_URL}
+    environment:
+      # Nome DNS do serviço da API na rede Docker (Coolify: ver hostname interno do container da API).
+      BACKEND_PROXY_HOST: ${BACKEND_PROXY_HOST:-backend}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:

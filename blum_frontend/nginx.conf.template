@@ -22,11 +22,11 @@ server {
         add_header Cache-Control "public";
     }
 
-    # Resolver do Docker (127.0.0.11) + host em variável: o Nginx não resolve
-    # "backend" no arranque (evita host not found se o DNS ainda não existir).
+    # Host da API no Docker: no compose local é "backend"; no Coolify/outro painel
+    # costuma ser outro nome — defina BACKEND_PROXY_HOST no serviço do frontend.
     location /api/ {
         resolver 127.0.0.11 valid=10s ipv6=off;
-        set $blum_api_upstream backend;
+        set $blum_api_upstream ${BACKEND_PROXY_HOST};
         proxy_pass http://$blum_api_upstream:3011$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
