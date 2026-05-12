@@ -4,8 +4,9 @@
 # Produção: modelo com segredos obrigatórios → docker-compose.prod.yml
 #   (veja env.production.example e blum_backend/.env.example)
 #
-# Abra: http://localhost:8080  (frontend)
-# API:  http://localhost:3011/api/v2
+# Abra no PC: http://localhost:8080
+# No telefone (mesma rede Wi‑Fi): http://<IP_DO_PC>:8080  (ex.: ipconfig / ifconfig)
+# A API é servida pelo mesmo host (/api/v2 via Nginx → backend), não use localhost:3011 no build.
 #
 # Utilizadores iniciais: criados automaticamente na primeira subida (base vazia).
 # Opcional — sincronizar só os que faltam da lista padrão:
@@ -52,7 +53,7 @@ services:
       context: ./blum_frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: http://localhost:3011/api/v2
+        REACT_APP_API_URL: /api/v2
     ports:
       - "8080:80"
     depends_on:

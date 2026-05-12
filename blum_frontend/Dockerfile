@@ -7,7 +7,8 @@ RUN npm ci
 
 COPY . .
 
-ARG REACT_APP_API_URL=http://localhost:3011/api/v2
+# Relativo: Nginx (este container) encaminha /api/* para o serviço backend no Docker.
+ARG REACT_APP_API_URL=/api/v2
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV CI=false
 

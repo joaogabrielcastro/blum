@@ -155,7 +155,10 @@ Itens ainda não implementados no código (evolução do produto): **billing/pla
 
 ### Frontend
 
-A URL da API vem de **`REACT_APP_API_URL`** (lida em `src/services/apiService.jsx`; fallback de desenvolvimento já usa **`/api/v2`**). Crie `blum_frontend/.env` a partir de `blum_frontend/.env.example`.
+A URL da API vem de **`REACT_APP_API_URL`** (em `src/services/apiService.jsx`; se omitida no build, o fallback é o domínio de produção). Crie `blum_frontend/.env` a partir de `blum_frontend/.env.example`.
+
+- **`/api/v2`** (URL relativa): o browser chama o **mesmo host** da página (recomendado no Docker com Nginx e em `npm start` com `src/setupProxy.js`). Assim o login funciona no **telefone** ao abrir `http://<IP-do-PC>:8080` ou `:3000`.
+- **`http://localhost:3011/api/v2`**: só serve no **mesmo computador** que expõe a API; no celular `localhost` é o próprio telefone e o login falha.
 
 Em **produção**, no painel de deploy ou no build Docker, defina por exemplo:
 
@@ -171,8 +174,9 @@ Na raiz do repositório (Docker Desktop ou Engine instalado):
 docker compose up --build
 ```
 
-- **Frontend:** http://localhost:8080  
-- **API:** http://localhost:3011/api/v2  
+- **Frontend:** http://localhost:8080 (no telefone na mesma Wi‑Fi: `http://<IP-do-PC>:8080`)
+- **API no browser:** mesmo host que o frontend, caminho `/api/v2/...` (o Nginx do container `frontend` encaminha para o `backend`)
+- **API direta no PC** (Postman, curl): http://localhost:3011/api/v2
 - **PostgreSQL** (opcional, cliente SQL): `localhost:5433` (utilizador `blum`, base `blum`; credenciais definidas no `docker-compose.yml`)
 
 Variáveis opcionais no ambiente do host: `JWT_SECRET`, `GEMINI_API_KEY`. Para Redis em cache distribuído, pode acrescentar um serviço Redis ao compose e definir `REDIS_URL` no serviço `backend`.
