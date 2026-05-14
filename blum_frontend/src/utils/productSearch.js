@@ -10,6 +10,16 @@ export function normalizeSearchText(value) {
     .toLowerCase();
 }
 
+/** Catálogo v2 (camelCase) ou legado: expõe sempre productcode / subcode para o pedido */
+export function mergeProductCodeFields(product) {
+  if (!product || typeof product !== "object") return product;
+  return {
+    ...product,
+    productcode: product.productcode ?? product.productCode ?? "",
+    subcode: product.subcode ?? product.subCode ?? "",
+  };
+}
+
 /**
  * @param {object} product
  * @param {string} searchQuery
@@ -24,8 +34,10 @@ export function productMatchesFlexible(product, searchQuery, brandFilter) {
 
   const tokens = raw.split(/\s+/).filter(Boolean);
   const name = normalizeSearchText(product.name);
-  const code = normalizeSearchText(product.productcode || "");
-  const sub = normalizeSearchText(product.subcode || "");
+  const code = normalizeSearchText(
+    product.productcode ?? product.productCode ?? "",
+  );
+  const sub = normalizeSearchText(product.subcode ?? product.subCode ?? "");
 
   return tokens.every((tok) => {
     const t = normalizeSearchText(tok);

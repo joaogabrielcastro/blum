@@ -6,7 +6,10 @@ import {
   normalizeClientsResponse,
 } from "../utils/clients";
 import { normalizeOrderLineItems } from "../utils/format";
-import { productMatchesFlexible } from "../utils/productSearch";
+import {
+  productMatchesFlexible,
+  mergeProductCodeFields,
+} from "../utils/productSearch";
 import ClientItemPriceHistoryModal from "./ClientItemPriceHistoryModal";
 
 const DECIMAL_QUANTITY_BRANDS = new Set(["solo fino", "colombocal"]);
@@ -142,8 +145,8 @@ const OrdersForm = ({
         if (!p) return item;
         return {
           ...item,
-          productcode: item.productcode || p.productcode,
-          subcode: item.subcode ?? p.subcode,
+          productcode: item.productcode || p.productcode || p.productCode,
+          subcode: item.subcode ?? p.subcode ?? p.subCode,
           availableStock:
             item.availableStock != null ? item.availableStock : p.stock,
           brand: item.brand || p.brand,
@@ -162,7 +165,7 @@ const OrdersForm = ({
 
         // ✅ GARANTIR QUE SEMPRE SEJA UM ARRAY
         const safeProducts = Array.isArray(productsData) ? productsData : [];
-        setProducts(safeProducts);
+        setProducts(safeProducts.map(mergeProductCodeFields));
       } catch (error) {
         console.error("Erro ao buscar produtos:", error);
         setProducts([]); // ✅ Em caso de erro, define array vazio
@@ -203,22 +206,18 @@ const OrdersForm = ({
         const sortedResults = filtered.sort((a, b) => {
           const aNameMatch = firstTok && a.name.toLowerCase().includes(firstTok);
           const bNameMatch = firstTok && b.name.toLowerCase().includes(firstTok);
+          const aCode = String(a.productcode ?? a.productCode ?? "");
+          const bCode = String(b.productcode ?? b.productCode ?? "");
+          const aSub = String(a.subcode ?? a.subCode ?? "");
+          const bSub = String(b.subcode ?? b.subCode ?? "");
           const aCodeMatch =
-            firstTok &&
-            a.productcode &&
-            a.productcode.toLowerCase().includes(firstTok);
+            firstTok && aCode.toLowerCase().includes(firstTok);
           const bCodeMatch =
-            firstTok &&
-            b.productcode &&
-            b.productcode.toLowerCase().includes(firstTok);
+            firstTok && bCode.toLowerCase().includes(firstTok);
           const aSubcodeMatch =
-            firstTok &&
-            a.subcode &&
-            a.subcode.toLowerCase().includes(firstTok);
+            firstTok && aSub.toLowerCase().includes(firstTok);
           const bSubcodeMatch =
-            firstTok &&
-            b.subcode &&
-            b.subcode.toLowerCase().includes(firstTok);
+            firstTok && bSub.toLowerCase().includes(firstTok);
 
           if (aSubcodeMatch && !bSubcodeMatch) return -1;
           if (!aSubcodeMatch && bSubcodeMatch) return 1;
@@ -332,8 +331,8 @@ const OrdersForm = ({
           price: product.price,
           lineDiscount: 0,
           productId: product.id,
-          productcode: product.productcode,
-          subcode: product.subcode,
+          productcode: product.productcode ?? product.productCode ?? "",
+          subcode: product.subcode ?? product.subCode ?? "",
           availableStock: product.stock, // Armazena estoque disponível
         };
         setItems((prevItems) => [...prevItems, newItem]);
