@@ -148,6 +148,11 @@ export const login = async (username, password) => {
   }
 
   if (!response.ok) {
+    if (response.status >= 502 && response.status <= 504) {
+      throw new Error(
+        `A API não foi alcançada (${response.status}). Reveja o proxy/Nginx ou a variável BACKEND_PROXY_HOST; não indica senha errada.`,
+      );
+    }
     const error = await response.json().catch(() => ({}));
     const fromServer =
       (typeof error.error === "string" && error.error.trim()) ||
