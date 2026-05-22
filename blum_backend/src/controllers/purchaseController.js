@@ -128,11 +128,7 @@ exports.processCsv = async (req, res) => {
         description: p.name || `Produto ${index + 1}`,
         quantity: Number(p.stock || 1),
         unitPrice: Number(p.price || 0),
-        subCode: p.subCode || p.subcode || p.productCode || `CSV-${index + 1}`,
       };
-      if (!mapOptions.camelOnly) {
-        item.subcode = item.subCode;
-      }
       return item;
     });
 

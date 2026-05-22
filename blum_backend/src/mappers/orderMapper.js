@@ -28,7 +28,6 @@ function mapOrderItemsWithProducts(lines) {
     commission_rate: parseFloat(row.commission_rate) || 0,
     commission_amount: parseFloat(row.commission_amount) || 0,
     productcode: row.productcode || "",
-    subcode: row.subcode || "",
   }));
 }
 

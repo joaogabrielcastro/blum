@@ -13,8 +13,7 @@ async function findPriceHistoryByProductAndTenant(productId, tenantId) {
       ph.purchase_date,
       ph.created_at,
       p.name as product_name,
-      p.productcode,
-      p.subcode
+      p.productcode
     FROM price_history ph
     JOIN products p ON COALESCE(ph.product_id, ph.productid) = p.id
     WHERE COALESCE(ph.product_id, ph.productid) = ${productId}

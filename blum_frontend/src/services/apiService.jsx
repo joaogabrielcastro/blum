@@ -274,18 +274,6 @@ const apiService = {
     );
   },
 
-  findProductBySubcode: async (subcode) => {
-    try {
-      const products = await apiRequest(
-        `${API_URL}/products?subcode=${encodeURIComponent(subcode)}`
-      );
-      return products.length > 0 ? products[0] : null;
-    } catch (error) {
-      console.error("Erro ao buscar produto por subcódigo:", error);
-      return null;
-    }
-  },
-
   // ==================== ORDERS ====================
   getOrders: async (params = {}) => {
     const query = new URLSearchParams(params).toString();

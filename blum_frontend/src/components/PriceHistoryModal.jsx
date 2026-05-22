@@ -54,7 +54,6 @@ const PriceHistoryModal = ({ product, onClose }) => {
               <p className="text-blue-100">
                 {product?.name} 
                 {product?.productcode && ` (Código: ${product.productcode})`}
-                {product?.subcode && ` [Subcódigo: ${product.subcode}]`}
               </p>
             </div>
             <button

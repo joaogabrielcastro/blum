@@ -307,7 +307,7 @@ class OrderService {
     const order = result[0];
     const lines =
       await sql`
-        SELECT oi.*, p.productcode, p.subcode
+        SELECT oi.*, p.productcode
         FROM order_items oi
         LEFT JOIN products p ON p.id = oi.product_id
         WHERE oi.order_id = ${id} AND oi.tenant_id = ${tenantId}

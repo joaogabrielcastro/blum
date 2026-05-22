@@ -1,32 +1,41 @@
+function omitSubcodeFields(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  const clone = { ...obj };
+  delete clone.subcode;
+  delete clone.subCode;
+  return clone;
+}
+
 function maybeStripLegacy(obj, legacyKeys, options = {}) {
   if (!options.camelOnly || !obj || typeof obj !== "object") return obj;
   const clone = { ...obj };
   for (const key of legacyKeys) {
     delete clone[key];
   }
+  delete clone.subcode;
+  delete clone.subCode;
   return clone;
 }
 
 function mapProductResponse(product, options = {}) {
   if (!product || typeof product !== "object") return product;
-  const mapped = {
+  const mapped = omitSubcodeFields({
     ...product,
     tenantId: product.tenantId ?? product.tenant_id ?? null,
     brandId: product.brandId ?? product.brand_id ?? null,
     productCode: product.productcode ?? product.productCode ?? "",
-    subCode: product.subcode ?? product.subCode ?? "",
     minStock: product.minstock ?? product.minStock ?? 0,
     createdAt: product.createdat ?? product.createdAt ?? null,
-  };
+  });
   return maybeStripLegacy(
     mapped,
     [
       "tenant_id",
       "brand_id",
       "productcode",
-      "subcode",
       "minstock",
       "createdat",
+      "subcode",
     ],
     options,
   );
@@ -64,7 +73,7 @@ function mapClientsPayload(clients, options = {}) {
 
 function mapOrderItemResponse(item, options = {}) {
   if (!item || typeof item !== "object") return item;
-  const mapped = {
+  const mapped = omitSubcodeFields({
     ...item,
     tenantId: item.tenantId ?? item.tenant_id ?? null,
     productId: item.productId ?? item.product_id ?? null,
@@ -75,8 +84,7 @@ function mapOrderItemResponse(item, options = {}) {
     commissionRate: item.commissionRate ?? item.commission_rate ?? 0,
     commissionAmount: item.commissionAmount ?? item.commission_amount ?? 0,
     productCode: item.productCode ?? item.productcode ?? "",
-    subCode: item.subCode ?? item.subcode ?? "",
-  };
+  });
   return maybeStripLegacy(
     mapped,
     [
@@ -255,7 +263,6 @@ function mapPurchaseHistoryRow(row, options = {}) {
     createdAt: row.createdAt ?? row.created_at ?? null,
     productName: row.productName ?? row.product_name ?? "",
     productCode: row.productCode ?? row.productcode ?? "",
-    subCode: row.subCode ?? row.subcode ?? "",
   };
   return maybeStripLegacy(
     mapped,
@@ -266,7 +273,6 @@ function mapPurchaseHistoryRow(row, options = {}) {
       "created_at",
       "product_name",
       "productcode",
-      "subcode",
     ],
     options,
   );

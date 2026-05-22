@@ -10,13 +10,13 @@ export function normalizeSearchText(value) {
     .toLowerCase();
 }
 
-/** Catálogo v2 (camelCase) ou legado: expõe sempre productcode / subcode para o pedido */
+/** Catálogo v2 (camelCase) ou legado: expõe sempre productcode para o pedido */
 export function mergeProductCodeFields(product) {
   if (!product || typeof product !== "object") return product;
+  const { subcode: _s, subCode: _sc, ...rest } = product;
   return {
-    ...product,
+    ...rest,
     productcode: product.productcode ?? product.productCode ?? "",
-    subcode: product.subcode ?? product.subCode ?? "",
   };
 }
 
@@ -37,11 +37,9 @@ export function productMatchesFlexible(product, searchQuery, brandFilter) {
   const code = normalizeSearchText(
     product.productcode ?? product.productCode ?? "",
   );
-  const sub = normalizeSearchText(product.subcode ?? product.subCode ?? "");
-
   return tokens.every((tok) => {
     const t = normalizeSearchText(tok);
     if (!t) return true;
-    return name.includes(t) || code.includes(t) || sub.includes(t);
+    return name.includes(t) || code.includes(t);
   });
 }

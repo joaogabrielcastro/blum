@@ -453,7 +453,6 @@ const ProductsPage = ({ userRole }) => {
                       </h3>
                       <p className="text-xs text-gray-500 mb-1">
                         Código: {product.productcode || "N/A"}
-                        {product.subcode && ` | Sub: ${product.subcode}`}
                       </p>
                       <p className="text-xs text-blue-600 font-medium">
                         {product.brand}

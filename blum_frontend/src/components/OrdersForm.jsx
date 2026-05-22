@@ -137,7 +137,7 @@ const OrdersForm = ({
     }
   }, [editingOrder, brands, clients]);
 
-  // Preenche código/subcódigo/estoque a partir do catálogo ao editar
+  // Preenche código/estoque a partir do catálogo ao editar
   useEffect(() => {
     if (!editingOrder?.id || !Array.isArray(products) || products.length === 0) {
       return;
@@ -152,7 +152,6 @@ const OrdersForm = ({
         return {
           ...item,
           productcode: item.productcode || p.productcode || p.productCode,
-          subcode: item.subcode ?? p.subcode ?? p.subCode,
           availableStock:
             item.availableStock != null ? item.availableStock : p.stock,
           brand: item.brand || p.brand,
@@ -185,7 +184,7 @@ const OrdersForm = ({
     setTotalPrice(netTotal);
   }, [items, discount, netTotal]);
 
-  // ✅ NOVA FUNÇÃO: Busca avançada por nome, código ou subcódigo
+  // Busca por nome ou código do produto
   useEffect(() => {
     const searchProducts = async () => {
       if (!productSearch || productSearch.trim().length < 2) {
@@ -214,19 +213,11 @@ const OrdersForm = ({
           const bNameMatch = firstTok && b.name.toLowerCase().includes(firstTok);
           const aCode = String(a.productcode ?? a.productCode ?? "");
           const bCode = String(b.productcode ?? b.productCode ?? "");
-          const aSub = String(a.subcode ?? a.subCode ?? "");
-          const bSub = String(b.subcode ?? b.subCode ?? "");
           const aCodeMatch =
             firstTok && aCode.toLowerCase().includes(firstTok);
           const bCodeMatch =
             firstTok && bCode.toLowerCase().includes(firstTok);
-          const aSubcodeMatch =
-            firstTok && aSub.toLowerCase().includes(firstTok);
-          const bSubcodeMatch =
-            firstTok && bSub.toLowerCase().includes(firstTok);
 
-          if (aSubcodeMatch && !bSubcodeMatch) return -1;
-          if (!aSubcodeMatch && bSubcodeMatch) return 1;
           if (aCodeMatch && !bCodeMatch) return -1;
           if (!aCodeMatch && bCodeMatch) return 1;
           if (aNameMatch && !bNameMatch) return -1;
@@ -341,7 +332,6 @@ const OrdersForm = ({
           lineDiscount: 0,
           productId: product.id,
           productcode: product.productcode ?? product.productCode ?? "",
-          subcode: product.subcode ?? product.subCode ?? "",
           availableStock: product.stock, // Armazena estoque disponível
         };
         setItems((prevItems) => [...prevItems, newItem]);
@@ -591,11 +581,6 @@ const OrdersForm = ({
             <span className="bg-gray-100 px-2 py-1 rounded text-xs">
               Codigo: {product.productcode}
             </span>
-            {product.subcode && (
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                Sub: {product.subcode}
-              </span>
-            )}
           </div>
           <div className="text-sm text-gray-500 mt-1">{product.brand}</div>
         </div>
@@ -962,7 +947,7 @@ const OrdersForm = ({
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Digite nome, codigo do produto ou subcodigo..."
+                    placeholder="Digite nome ou código do produto..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
                     disabled={!selectedBrand}
@@ -1005,7 +990,7 @@ const OrdersForm = ({
                         &quot;
                       </div>
                       <div className="text-xs text-gray-400 mt-2 text-center">
-                        Tente buscar por nome, codigo do produto ou subcodigo
+                        Tente buscar por nome ou código do produto
                       </div>
                     </div>
                   )}
@@ -1033,11 +1018,6 @@ const OrdersForm = ({
                         <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
                           Codigo: {item.productcode}
                         </span>
-                        {item.subcode && (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
-                            Sub: {item.subcode}
-                          </span>
-                        )}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">{item.brand}</p>
                     </div>
@@ -1188,16 +1168,10 @@ const OrdersForm = ({
                               {item.productName}
                             </div>
                             <div className="text-sm text-gray-500 space-y-1">
-                              {/* ✅ MOSTRA CÓDIGO E SUBCÓDIGO NA TABELA */}
                               <div className="flex flex-wrap gap-1">
                                 <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
                                   Código: {item.productcode}
                                 </span>
-                                {item.subcode && (
-                                  <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
-                                    Sub: {item.subcode}
-                                  </span>
-                                )}
                               </div>
                               <div title={item.brand}>{item.brand}</div>
                             </div>
@@ -1397,7 +1371,7 @@ const OrdersForm = ({
                 type="search"
                 placeholder={
                   selectedBrand
-                    ? "Nome, codigo ou subcodigo..."
+                    ? "Nome ou código do produto..."
                     : "Selecione uma representada"
                 }
                 value={productSearch}

@@ -46,13 +46,6 @@ async function processCsvData(csvText, selectedBrand) {
             "quantity",
           ]),
         ) || 0,
-      subcode: getValueByHeader(headers, values, [
-        "subcode",
-        "subcodigo",
-        "subcódigo",
-        "codigointerno",
-        "interno",
-      ]),
       brand: selectedBrand,
       category: getValueByHeader(headers, values, [
         "categoria",
@@ -96,9 +89,6 @@ async function importProductsToDatabase(products, tenantId = 1) {
         price: Number(product.price || 0),
         stock: Number(product.stock || 0),
         brand: String(product.brand || "").trim(),
-        subcode:
-          String(product.subcode || "").trim() ||
-          `CSV-${productCode}-${(index + 1).toString(36)}`,
       };
     })
     .filter(Boolean);
@@ -121,7 +111,6 @@ async function importProductsToDatabase(products, tenantId = 1) {
           name TEXT,
           price NUMERIC,
           stock NUMERIC,
-          subcode TEXT,
           brand TEXT
         )
       )
@@ -144,7 +133,6 @@ async function importProductsToDatabase(products, tenantId = 1) {
           name TEXT,
           price NUMERIC,
           stock NUMERIC,
-          subcode TEXT,
           brand TEXT
         )
       )
@@ -153,8 +141,7 @@ async function importProductsToDatabase(products, tenantId = 1) {
         name = i.name,
         price = i.price,
         stock = p.stock + i.stock::INT,
-        brand = i.brand,
-        subcode = i.subcode
+        brand = i.brand
       FROM input i
       WHERE p.productcode = i.product_code
         AND p.tenant_id = $2
@@ -171,15 +158,14 @@ async function importProductsToDatabase(products, tenantId = 1) {
           name TEXT,
           price NUMERIC,
           stock NUMERIC,
-          subcode TEXT,
           brand TEXT
         )
       )
       INSERT INTO products (
-        name, productcode, subcode, price, stock, brand, minstock, tenant_id, createdat
+        name, productcode, price, stock, brand, minstock, tenant_id, createdat
       )
       SELECT
-        i.name, i.product_code, i.subcode, i.price, i.stock::INT, i.brand, 0, $2, NOW()
+        i.name, i.product_code, i.price, i.stock::INT, i.brand, 0, $2, NOW()
       FROM input i
       LEFT JOIN products p
         ON p.productcode = i.product_code AND p.tenant_id = $2

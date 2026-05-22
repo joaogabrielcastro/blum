@@ -425,7 +425,6 @@ createdat    TIMESTAMP
 id          SERIAL PRIMARY KEY
 name        VARCHAR(255) NOT NULL
 productcode VARCHAR(255)
-subcode     VARCHAR(255)
 price       DECIMAL(10,2) NOT NULL
 stock       INTEGER NOT NULL
 brand       VARCHAR(255)

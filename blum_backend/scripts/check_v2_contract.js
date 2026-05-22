@@ -8,7 +8,6 @@ const LEGACY_KEYS = new Set([
   "userid",
   "clientid",
   "representadas",
-  "subcode",
 ]);
 
 function findLegacyKeysDeep(value, path = "root", acc = []) {

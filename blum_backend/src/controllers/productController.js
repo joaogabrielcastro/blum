@@ -17,7 +17,6 @@ exports.getAll = async (req, res) => {
     const {
       brand,
       productcode,
-      subcode,
       name,
       q,
       page = 1,
@@ -46,7 +45,6 @@ exports.getAll = async (req, res) => {
       tenantId: req.user.tenantId,
       brand,
       productcode,
-      subcode,
       name,
       q,
       page,

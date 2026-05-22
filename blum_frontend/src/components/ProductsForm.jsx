@@ -11,7 +11,6 @@ const ProductsForm = ({
   const [formData, setFormData] = useState({
     name: "",
     productcode: "",
-    subcode: "",
     price: "",
     brand: "",
     stock: "",
@@ -19,6 +18,7 @@ const ProductsForm = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // ✅ CORREÇÃO: Use useEffect para inicializar os dados quando o produto mudar
   useEffect(() => {
@@ -27,7 +27,6 @@ const ProductsForm = ({
       setFormData({
         name: product.name || "",
         productcode: product.productcode || "",
-        subcode: product.subcode || "",
         price: product.price?.toString() || "",
         brand: product.brand || "",
         stock: product.stock?.toString() || "",
@@ -38,7 +37,6 @@ const ProductsForm = ({
       setFormData({
         name: "",
         productcode: "",
-        subcode: "",
         price: "",
         brand: defaultBrand || "",
         stock: "",
@@ -53,7 +51,6 @@ const ProductsForm = ({
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!formData.productcode.trim())
       newErrors.productcode = "Código é obrigatório";
-    if (!formData.subcode.trim()) newErrors.subcode = "Subcódigo é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
@@ -77,7 +74,6 @@ const ProductsForm = ({
       const productData = {
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
-        subcode: formData.subcode.trim(), // ✅ INCLUI SUBCÓDIGO NO PAYLOAD
         price: parseFloat(formData.price.replace(",", ".")) || 0,
         brand: formData.brand,
         stock: parseInt(formData.stock) || 0,
@@ -169,46 +165,21 @@ const ProductsForm = ({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700 mb-2">
-              Código do Produto:
-            </label>
-            <input
-              type="text"
-              name="productcode"
-              value={formData.productcode}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.productcode ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Código do fabricante"
-            />
-            {errors.productcode && (
-              <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-gray-700 mb-2">Subcódigo *</label>
-            <input
-              type="text"
-              name="subcode"
-              value={formData.subcode}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.subcode ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Código interno"
-            />
-            {errors.subcode ? (
-              <p className="text-red-500 text-xs mt-1">{errors.subcode}</p>
-            ) : (
-              <p className="text-gray-500 text-xs mt-1">
-                Código único para identificação interna
-              </p>
-            )}
-          </div>
+        <div>
+          <label className="block text-gray-700 mb-2">Código do Produto:</label>
+          <input
+            type="text"
+            name="productcode"
+            value={formData.productcode}
+            onChange={handleChange}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.productcode ? "border-red-500" : "border-gray-300"
+            }`}
+            placeholder="Código do fabricante (único no catálogo)"
+          />
+          {errors.productcode && (
+            <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
+          )}
         </div>
 
         <div>

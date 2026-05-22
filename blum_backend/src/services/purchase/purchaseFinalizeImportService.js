@@ -15,30 +15,15 @@ async function finalizePurchaseFromImport(req, res) {
     return res.status(400).json({ error: "ID da marca é obrigatório." });
   }
 
-  const missingSubcodes = items.filter(
-    (item) => !item.subcode || item.subcode.trim() === "",
-  );
-  if (missingSubcodes.length > 0) {
-    return res.status(400).json({
-      error: "Subcódigo é obrigatório para todos os produtos.",
-      details: `${missingSubcodes.length} itens sem subcódigo`,
-    });
-  }
-
-  const subcodes = items.map((item) => item.subcode.trim());
-  const duplicateSubcodes = subcodes.filter(
-    (code, index) => subcodes.indexOf(code) !== index,
-  );
-  if (duplicateSubcodes.length > 0) {
-    return res.status(400).json({
-      error: "Subcódigos duplicados encontrados.",
-      details: `Códigos repetidos: ${duplicateSubcodes.join(", ")}`,
-    });
-  }
-
   const productCodes = items
     .map((item) => String(item.productCode || "").trim())
     .filter(Boolean);
+  if (productCodes.length !== items.length) {
+    return res.status(400).json({
+      error: "Código de produto é obrigatório para todos os itens.",
+    });
+  }
+
   const duplicateProductCodes = productCodes.filter(
     (code, index) => productCodes.indexOf(code) !== index,
   );
@@ -82,23 +67,6 @@ async function finalizePurchaseFromImport(req, res) {
       .map((item) => Number.parseInt(item.mappedProductId, 10))
       .filter((id) => Number.isInteger(id) && id > 0);
     const uniqueMappedIds = [...new Set(mappedIds)];
-    const existingBySubcode = await sql`
-      SELECT id, name, subcode FROM products
-      WHERE subcode = ANY(${subcodes})
-        AND tenant_id = ${tenantId}
-    `;
-    for (const row of existingBySubcode) {
-      const ownerItem = items.find(
-        (item) =>
-          item.subcode?.trim() === row.subcode &&
-          Number.parseInt(item.mappedProductId, 10) === row.id,
-      );
-      if (ownerItem) continue;
-      return res.status(400).json({
-        error: `Subcódigo "${row.subcode}" já está em uso.`,
-        details: `Usado pelo produto: ${row.name}`,
-      });
-    }
 
     const existingMappedProducts =
       uniqueMappedIds.length > 0
@@ -113,13 +81,7 @@ async function finalizePurchaseFromImport(req, res) {
       existingMappedProducts.map((row) => [Number(row.id), row]),
     );
 
-    const uniqueProductCodes = [
-      ...new Set(
-        items
-          .map((item) => String(item.productCode || "").trim())
-          .filter(Boolean),
-      ),
-    ];
+    const uniqueProductCodes = [...new Set(productCodes)];
     const existingByProductCode =
       uniqueProductCodes.length > 0
         ? await sql`
@@ -140,7 +102,6 @@ async function finalizePurchaseFromImport(req, res) {
 
         const quantity = parseInt(item.quantity, 10);
         const price = parseFloat(item.unitPrice);
-        const subcode = item.subcode.trim();
 
         if (isNaN(quantity) || quantity <= 0) {
           throw new Error(`Quantidade inválida: ${item.quantity}`);
@@ -167,8 +128,7 @@ async function finalizePurchaseFromImport(req, res) {
           await sql`
             UPDATE products 
             SET stock = stock + ${quantity}, 
-                price = ${price},
-                subcode = ${subcode}
+                price = ${price}
             WHERE id = ${productId} AND tenant_id = ${tenantId}
           `;
 
@@ -188,8 +148,7 @@ async function finalizePurchaseFromImport(req, res) {
             await sql`
               UPDATE products 
               SET stock = stock + ${quantity}, 
-                  price = ${price},
-                  subcode = ${subcode}
+                  price = ${price}
               WHERE productcode = ${item.productCode} AND tenant_id = ${tenantId}
             `;
 
@@ -206,7 +165,6 @@ async function finalizePurchaseFromImport(req, res) {
               INSERT INTO products (
                 name, 
                 productcode, 
-                subcode,
                 price, 
                 stock, 
                 brand,
@@ -216,7 +174,6 @@ async function finalizePurchaseFromImport(req, res) {
               ) VALUES (
                 ${item.description},
                 ${item.productCode},
-                ${subcode},
                 ${price},
                 ${quantity},
                 ${brandName},
@@ -224,7 +181,7 @@ async function finalizePurchaseFromImport(req, res) {
                 ${tenantId},
                 NOW()
               )
-              RETURNING id, name, productcode, brand, subcode
+              RETURNING id, name, productcode, brand
             `;
 
             await sql`
@@ -240,7 +197,6 @@ async function finalizePurchaseFromImport(req, res) {
               name: newProduct[0].name,
               productcode: newProduct[0].productcode,
               brand: newProduct[0].brand,
-              subcode: newProduct[0].subcode,
             });
           }
         } else {

@@ -97,16 +97,6 @@ const VerificationTable = ({
                         </option>
                       ))}
                     </select>
-                    {it.subcode !== undefined && (
-                      <input
-                        placeholder="Subcódigo"
-                        value={it.subcode || ""}
-                        onChange={(e) =>
-                          handleChange(idx, "subcode", e.target.value)
-                        }
-                        className="mt-2 w-40 p-1 border rounded"
-                      />
-                    )}
                   </td>
                 </tr>
               ))}

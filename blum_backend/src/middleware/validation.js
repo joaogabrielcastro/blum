@@ -35,7 +35,6 @@ exports.validateProduct = [
 
   body("productcode").optional().trim(),
 
-  body("subcode").optional().trim(),
 
   body("minstock")
     .optional()

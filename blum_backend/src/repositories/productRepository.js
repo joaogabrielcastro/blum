@@ -18,24 +18,9 @@ async function findByProductCodeExcludingId(productcode, id) {
   `;
 }
 
-async function findBySubcode(subcode) {
-  return sql`
-    SELECT id, name FROM products
-    WHERE subcode = ${subcode}
-  `;
-}
-
-async function findBySubcodeExcludingId(subcode, id) {
-  return sql`
-    SELECT id, name FROM products
-    WHERE subcode = ${subcode} AND id != ${id}
-  `;
-}
-
 async function insertProduct({
   name,
   productcode,
-  subcode,
   price,
   stock,
   brand,
@@ -43,24 +28,24 @@ async function insertProduct({
   tenant_id,
 }) {
   const rows = await sql(
-    `INSERT INTO products (name, productcode, subcode, price, stock, brand, minstock, tenant_id, createdat)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+    `INSERT INTO products (name, productcode, price, stock, brand, minstock, tenant_id, createdat)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
      RETURNING *`,
-    [name, productcode, subcode || "", price, stock, brand, minstock || 0, tenant_id || 1],
+    [name, productcode, price, stock, brand, minstock || 0, tenant_id || 1],
   );
   return rows[0];
 }
 
 async function updateProduct(
   id,
-  { name, productcode, subcode, price, stock, brand, minstock },
+  { name, productcode, price, stock, brand, minstock },
 ) {
   return sql(
     `UPDATE products
-     SET name = $1, productcode = $2, subcode = $3, price = $4, stock = $5, brand = $6, minstock = $7
-     WHERE id = $8
+     SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6
+     WHERE id = $7
      RETURNING *`,
-    [name, productcode, subcode || "", price, stock, brand, minstock || 0, id],
+    [name, productcode, price, stock, brand, minstock || 0, id],
   );
 }
 
@@ -89,8 +74,6 @@ module.exports = {
   findById,
   findByProductCode,
   findByProductCodeExcludingId,
-  findBySubcode,
-  findBySubcodeExcludingId,
   insertProduct,
   updateProduct,
   deleteProduct,

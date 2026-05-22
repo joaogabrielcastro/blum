@@ -7,10 +7,6 @@ import PurchaseTabs from "../components/purchases/PurchaseTabs";
 import PurchaseDateSection from "../components/purchases/PurchaseDateSection";
 import PurchaseActions from "../components/purchases/PurchaseActions";
 
-function normalizeSubcode(value) {
-  return String(value ?? "").trim();
-}
-
 /** Comparação estável do código de produto (CSV vs catálogo). */
 function normalizeProductCode(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -37,41 +33,41 @@ async function fetchCatalogForPurchases() {
   return list;
 }
 
-/** Subcódigos repetidos na lista (trim), sem duplicar na resposta. */
-function getDuplicateSubcodesFromItems(items) {
-  const subcodes = (items || [])
-    .map((i) => normalizeSubcode(i.subcode))
+/** Códigos de produto repetidos na lista (normalizados). */
+function getDuplicateProductCodesFromItems(items) {
+  const codes = (items || [])
+    .map((i) => normalizeProductCode(i.productCode))
     .filter(Boolean);
-  const repeated = subcodes.filter((c, idx) => subcodes.indexOf(c) !== idx);
+  const repeated = codes.filter((c, idx) => codes.indexOf(c) !== idx);
   return [...new Set(repeated)];
 }
 
 /**
- * Junta linhas com o mesmo subcódigo: soma quantidades, preço unitário = média ponderada,
- * mantém ordem da primeira ocorrência e o vínculo do catálogo da primeira linha do grupo.
+ * Junta linhas com o mesmo código de produto: soma quantidades, preço = média ponderada,
+ * mantém vínculo do catálogo da primeira linha do grupo.
  */
-function mergePurchaseItemsBySubcode(items) {
+function mergePurchaseItemsByProductCode(items) {
   if (!Array.isArray(items) || items.length === 0) return items;
-  const bySub = new Map();
+  const byCode = new Map();
   for (const it of items) {
-    const s = normalizeSubcode(it.subcode);
-    if (!s) continue;
-    if (!bySub.has(s)) bySub.set(s, []);
-    bySub.get(s).push(it);
+    const c = normalizeProductCode(it.productCode);
+    if (!c) continue;
+    if (!byCode.has(c)) byCode.set(c, []);
+    byCode.get(c).push(it);
   }
   const out = [];
   const seen = new Set();
   for (const it of items) {
-    const s = normalizeSubcode(it.subcode);
-    if (!s) {
+    const c = normalizeProductCode(it.productCode);
+    if (!c) {
       out.push({ ...it });
       continue;
     }
-    if (seen.has(s)) continue;
-    seen.add(s);
-    const grp = bySub.get(s);
+    if (seen.has(c)) continue;
+    seen.add(c);
+    const grp = byCode.get(c);
     if (grp.length === 1) out.push({ ...grp[0] });
-    else out.push(mergeOneSubcodeGroup(grp));
+    else out.push(mergeOneProductCodeGroup(grp));
   }
   return out;
 }
@@ -104,7 +100,7 @@ function PurchaseInlineNotice({ message, onDismiss, variant = "error" }) {
   );
 }
 
-function mergeOneSubcodeGroup(grp) {
+function mergeOneProductCodeGroup(grp) {
   const base = { ...grp[0] };
   let totalQty = 0;
   let totalVal = 0;
@@ -219,8 +215,8 @@ const CsvImportSection = ({ purchaseLogic }) => {
   const [selectedCsvBrandId, setSelectedCsvBrandId] = useState("");
   const [isCsvProcessing, setIsCsvProcessing] = useState(false);
 
-  const csvDuplicateSubcodes = useMemo(
-    () => getDuplicateSubcodesFromItems(parsedCsvItems),
+  const csvDuplicateProductCodes = useMemo(
+    () => getDuplicateProductCodesFromItems(parsedCsvItems),
     [parsedCsvItems],
   );
 
@@ -232,7 +228,6 @@ const CsvImportSection = ({ purchaseLogic }) => {
   }, [brands, selectedCsvBrandId]);
 
   // ✅ Função para processar CSV (DEFINIDA ANTES DE SER USADA)
-  // ✅ CORREÇÃO: Atualize a função handleCsvProcess para buscar por subcódigo
   const handleCsvProcess = async () => {
     if (!csvFile) {
       setError("Por favor, selecione um arquivo CSV.");
@@ -269,8 +264,6 @@ const CsvImportSection = ({ purchaseLogic }) => {
           description: item.description || item.nome || `Produto ${index + 1}`,
           quantity: Number(item.quantity || item.estoque || item.stock || 1),
           unitPrice: Number(item.unitPrice || item.preco || item.price || 0),
-          // ✅ INICIALMENTE: subcode vazio (será preenchido se produto existir)
-          subcode: "", // ← COMEÇA VAZIO
           ...item,
         };
 
@@ -289,11 +282,6 @@ const CsvImportSection = ({ purchaseLogic }) => {
           foundProduct = catalog.find(
             (p) => p.name && p.name.toLowerCase().includes(searchName),
           );
-        }
-
-        // ✅ CORREÇÃO CRÍTICA: SE ENCONTROU PRODUTO, USA O SUBCÓDIGO DO BANCO
-        if (foundProduct) {
-          safeItem.subcode = foundProduct.subcode || ""; // ← PEGA O SUBCÓDIGO DO BANCO
         }
 
         return {
@@ -346,26 +334,26 @@ const CsvImportSection = ({ purchaseLogic }) => {
     }
 
     let rows = [...parsedCsvItems];
-    const duplicateSubcodes = getDuplicateSubcodesFromItems(rows);
-    if (duplicateSubcodes.length > 0) {
+    const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
+    if (duplicateProductCodes.length > 0) {
       const ok = window.confirm(
-        `Subcódigos repetidos na lista: ${duplicateSubcodes.join(", ")}.\n\n` +
+        `Códigos de produto repetidos na lista: ${duplicateProductCodes.join(", ")}.\n\n` +
           "Unificar automaticamente?\n" +
           "• Soma as quantidades\n" +
           "• Preço unitário = média ponderada\n" +
-          "• Usa o produto do catálogo da primeira linha de cada subcódigo\n\n" +
+          "• Usa o produto do catálogo da primeira linha de cada código\n\n" +
           "Cancelar = interrompe a importação (pode usar o botão «Unificar…» na barra abaixo).",
       );
       if (!ok) return;
-      rows = mergePurchaseItemsBySubcode(rows);
+      rows = mergePurchaseItemsByProductCode(rows);
       setParsedCsvItems(rows);
     }
 
-    const missingSubcodes = rows.filter(
-      (item) => !normalizeSubcode(item.subcode),
+    const missingProductCodes = rows.filter(
+      (item) => !normalizeProductCode(item.productCode),
     );
-    if (missingSubcodes.length > 0) {
-      setError("Todos os itens devem ter um subcódigo preenchido.");
+    if (missingProductCodes.length > 0) {
+      setError("Todos os itens devem ter um código de produto preenchido.");
       return;
     }
 
@@ -401,7 +389,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
       }
     }
 
-    rows = mergePurchaseItemsBySubcode(rows);
+    rows = mergePurchaseItemsByProductCode(rows);
     setParsedCsvItems(rows);
 
     setIsLoading(true);
@@ -417,7 +405,6 @@ const CsvImportSection = ({ purchaseLogic }) => {
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          subcode: normalizeSubcode(item.subcode),
         })),
       };
 
@@ -494,11 +481,6 @@ const CsvImportSection = ({ purchaseLogic }) => {
               <div>
                 <strong className="text-blue-800">{item.productCode}</strong> -{" "}
                 {item.description}
-                {item.subcode && (
-                  <span className="text-green-600 ml-2">
-                    [Subcódigo: {item.subcode}]
-                  </span>
-                )}
               </div>
             </div>
           ))}
@@ -551,9 +533,9 @@ const CsvImportSection = ({ purchaseLogic }) => {
               {parsedCsvItems.length} itens encontrados. Verifique e confirme os
               dados abaixo.
             </p>
-            {csvDuplicateSubcodes.length > 0 && (
+            {csvDuplicateProductCodes.length > 0 && (
               <p className="text-amber-800 text-sm mt-2 font-medium">
-                Há subcódigos repetidos na lista. Use «Unificar subcódigos
+                Há códigos de produto repetidos na lista. Use «Unificar códigos
                 duplicados» ou confirme a importação — será perguntado se deseja
                 agrupar automaticamente (soma quantidades e média ponderada do
                 preço).
@@ -578,7 +560,7 @@ const CsvImportSection = ({ purchaseLogic }) => {
             onItemChange={handleCsvItemChange}
             userProducts={userProducts}
             title="Verifique os Itens do CSV"
-            description="Mapeie os itens para produtos existentes e insira o subcódigo obrigatório para cada produto."
+            description="Mapeie os itens para produtos existentes e confira código, quantidade e preço."
             source="CSV"
           />
 
@@ -592,14 +574,14 @@ const CsvImportSection = ({ purchaseLogic }) => {
             isLoading={isLoading}
             confirmLabel="Confirmar e Importar Produtos"
             secondaryAction={
-              csvDuplicateSubcodes.length > 0
+              csvDuplicateProductCodes.length > 0
                 ? {
-                    label: "Unificar subcódigos duplicados",
+                    label: "Unificar códigos duplicados",
                     onClick: () => {
                       setError(null);
                       setSuccessMessage(null);
                       setParsedCsvItems(
-                        mergePurchaseItemsBySubcode(parsedCsvItems),
+                        mergePurchaseItemsByProductCode(parsedCsvItems),
                       );
                     },
                   }
@@ -641,8 +623,8 @@ const PurchasesPage = () => {
     setSuccessMessage(null);
   }, [activeTab, setSuccessMessage]);
 
-  const pdfDuplicateSubcodes = useMemo(
-    () => getDuplicateSubcodesFromItems(parsedItems),
+  const pdfDuplicateProductCodes = useMemo(
+    () => getDuplicateProductCodesFromItems(parsedItems),
     [parsedItems],
   );
 
@@ -703,7 +685,6 @@ const PurchasesPage = () => {
           ...item,
           mappedProductId: foundProduct ? foundProduct.id : "",
           isNewProduct: !foundProduct,
-          subcode: foundProduct ? foundProduct.subcode || "" : "", // ✅ Pega o subcódigo do produto existente
         };
       });
 
@@ -728,26 +709,26 @@ const PurchasesPage = () => {
     }
 
     let rows = [...parsedItems];
-    const duplicateSubcodes = getDuplicateSubcodesFromItems(rows);
-    if (duplicateSubcodes.length > 0) {
+    const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
+    if (duplicateProductCodes.length > 0) {
       const ok = window.confirm(
-        `Subcódigos repetidos na lista: ${duplicateSubcodes.join(", ")}.\n\n` +
+        `Códigos de produto repetidos na lista: ${duplicateProductCodes.join(", ")}.\n\n` +
           "Unificar automaticamente?\n" +
           "• Soma as quantidades\n" +
           "• Preço unitário = média ponderada\n" +
-          "• Usa o produto do catálogo da primeira linha de cada subcódigo\n\n" +
+          "• Usa o produto do catálogo da primeira linha de cada código\n\n" +
           "Cancelar = interrompe (pode usar o botão «Unificar…» na barra abaixo).",
       );
       if (!ok) return;
-      rows = mergePurchaseItemsBySubcode(rows);
+      rows = mergePurchaseItemsByProductCode(rows);
       setParsedItems(rows);
     }
 
-    const missingSubcodes = rows.filter(
-      (item) => !normalizeSubcode(item.subcode),
+    const missingProductCodes = rows.filter(
+      (item) => !normalizeProductCode(item.productCode),
     );
-    if (missingSubcodes.length > 0) {
-      setError("Todos os itens devem ter um subcódigo preenchido.");
+    if (missingProductCodes.length > 0) {
+      setError("Todos os itens devem ter um código de produto preenchido.");
       return;
     }
 
@@ -783,7 +764,7 @@ const PurchasesPage = () => {
       }
     }
 
-    rows = mergePurchaseItemsBySubcode(rows);
+    rows = mergePurchaseItemsByProductCode(rows);
     setParsedItems(rows);
 
     setIsLoading(true);
@@ -799,7 +780,6 @@ const PurchasesPage = () => {
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          subcode: normalizeSubcode(item.subcode),
         })),
       };
 
@@ -896,11 +876,11 @@ const PurchasesPage = () => {
                 {parsedItems.length} itens encontrados. Verifique e confirme os
                 dados abaixo.
               </p>
-              {pdfDuplicateSubcodes.length > 0 && (
+              {pdfDuplicateProductCodes.length > 0 && (
                 <p className="text-amber-800 text-sm mt-2 font-medium">
-                  Há subcódigos repetidos. Use «Unificar subcódigos duplicados»
-                  ou confirme — será perguntado se deseja agrupar (soma
-                  quantidades e média ponderada do preço).
+                  Há códigos repetidos. Use «Unificar códigos duplicados» ou
+                  confirme — será perguntado se deseja agrupar (soma quantidades
+                  e média ponderada do preço).
                 </p>
               )}
             </div>
@@ -925,14 +905,14 @@ const PurchasesPage = () => {
               isLoading={isLoading}
               confirmLabel="Confirmar e Atualizar Estoque"
               secondaryAction={
-                pdfDuplicateSubcodes.length > 0
+                pdfDuplicateProductCodes.length > 0
                   ? {
-                      label: "Unificar subcódigos duplicados",
+                      label: "Unificar códigos duplicados",
                       onClick: () => {
                         setError(null);
                         setSuccessMessage(null);
                         setParsedItems(
-                          mergePurchaseItemsBySubcode(parsedItems),
+                          mergePurchaseItemsByProductCode(parsedItems),
                         );
                       },
                     }

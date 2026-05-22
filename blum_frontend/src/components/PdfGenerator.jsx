@@ -253,8 +253,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
         item.productcode ??
         item.product_code ??
         "";
-      const subCode = item.subCode ?? item.subcode ?? "";
-      const codePart = productCode || subCode;
+      const codePart = productCode;
       const productLabel = codePart
         ? `${productName} (Cod: ${codePart})`
         : productName;

@@ -41,9 +41,9 @@ export const normalizeOrderLineItems = (items) => {
       line.productcode ??
       line.product_code ??
       "";
-    const subcode = line.subCode ?? line.subcode ?? "";
+    const { subcode: _s, subCode: _sc, ...restLine } = line;
     return {
-      ...line,
+      ...restLine,
       productId: productId != null ? Number(productId) || productId : null,
       productName: String(productName),
       brand: String(brand),
@@ -51,7 +51,6 @@ export const normalizeOrderLineItems = (items) => {
       price: Number.isFinite(price) ? price : 0,
       lineDiscount,
       productcode,
-      subcode,
       availableStock:
         line.availableStock ??
         line.available_stock ??
