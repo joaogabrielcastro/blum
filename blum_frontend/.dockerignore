@@ -5,3 +5,9 @@ npm-debug.log
 .gitignore
 *.md
 .DS_Store
+e2e/
+coverage/
+**/*.test.js
+**/*.spec.js
+playwright-report/
+test-results/

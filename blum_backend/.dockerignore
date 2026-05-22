@@ -7,3 +7,8 @@ npm-debug.log
 .DS_Store
 temp/
 *.log
+tests/
+coverage/
+jest.config.js
+**/*.test.js
+**/*.spec.js
