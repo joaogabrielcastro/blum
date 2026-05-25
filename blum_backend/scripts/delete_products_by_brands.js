@@ -6,16 +6,16 @@
  *   node scripts/delete_products_by_brands.js
  *   node scripts/delete_products_by_brands.js --dry-run
  *   node scripts/delete_products_by_brands.js --confirm
- *   node scripts/delete_products_by_brands.js --brands="Bl1um Distribuição" --confirm
+ *   node scripts/delete_products_by_brands.js --brands="Zagonel" --confirm
  *
- * Por padrão procura apenas: Bl1um Distribuição (e variantes próximas no catálogo brands).
+ * Por padrão procura apenas: Zagonel (e variantes próximas no catálogo brands).
  * Sem --confirm: apenas lista contagens. Com --confirm: apaga em transação.
  */
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const { Pool } = require("pg");
 
-const DEFAULT_BRAND_HINTS = ["Bl1um Distribuição"];
+const DEFAULT_BRAND_HINTS = ["Zagonel"];
 
 function norm(s) {
   return String(s || "")
