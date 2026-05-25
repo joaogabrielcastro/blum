@@ -272,15 +272,17 @@ class ProductService {
       throw new Error("Nome, preço e estoque são obrigatórios");
     }
 
-    if (productcode) {
+    if (productcode && brand) {
       const existing = await sql`
         SELECT id, name FROM products
-        WHERE productcode = ${productcode} AND tenant_id = ${tenantId}
+        WHERE productcode = ${productcode}
+          AND brand = ${brand}
+          AND tenant_id = ${tenantId}
       `;
 
       if (existing.length > 0) {
         throw new Error(
-          `Já existe um produto com o código "${productcode}": ${existing[0].name}`,
+          `Já existe um produto com o código "${productcode}" nesta representada: ${existing[0].name}`,
         );
       }
     }
@@ -311,15 +313,18 @@ class ProductService {
       throw new Error("Nome, preço e estoque são obrigatórios");
     }
 
-    if (productcode) {
+    if (productcode && brand) {
       const existing = await sql`
         SELECT id, name FROM products
-        WHERE productcode = ${productcode} AND id != ${id} AND tenant_id = ${tenantId}
+        WHERE productcode = ${productcode}
+          AND brand = ${brand}
+          AND id != ${id}
+          AND tenant_id = ${tenantId}
       `;
 
       if (existing.length > 0) {
         throw new Error(
-          `O código "${productcode}" já está em uso pelo produto: ${existing[0].name}`,
+          `O código "${productcode}" já está em uso nesta representada pelo produto: ${existing[0].name}`,
         );
       }
     }

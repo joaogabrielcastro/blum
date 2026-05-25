@@ -1,7 +1,9 @@
 const { sql } = require("../../config/database");
+const { invalidateProductsCache } = require("../../config/cache");
 
 /**
  * Finalização de importação CSV ou PDF (mesma regra de negócio).
+ * Produtos são sempre vinculados à representada escolhida (brandId).
  */
 async function finalizePurchaseFromImport(req, res) {
   const { brandId, purchaseDate, items } = req.body;
@@ -71,7 +73,7 @@ async function finalizePurchaseFromImport(req, res) {
     const existingMappedProducts =
       uniqueMappedIds.length > 0
         ? await sql`
-            SELECT id, name, price as current_price
+            SELECT id, name, brand, price as current_price
             FROM products
             WHERE id = ANY(${uniqueMappedIds})
               AND tenant_id = ${tenantId}
@@ -85,14 +87,18 @@ async function finalizePurchaseFromImport(req, res) {
     const existingByProductCode =
       uniqueProductCodes.length > 0
         ? await sql`
-            SELECT id, productcode FROM products
+            SELECT id, productcode, brand
+            FROM products
             WHERE productcode = ANY(${uniqueProductCodes})
+              AND brand = ${brandName}
               AND tenant_id = ${tenantId}
           `
         : [];
     const productsByCode = new Map(
       existingByProductCode.map((row) => [String(row.productcode), row]),
     );
+
+    const purchaseDateIso = purchaseDate || new Date().toISOString();
 
     for (const item of items) {
       try {
@@ -102,6 +108,7 @@ async function finalizePurchaseFromImport(req, res) {
 
         const quantity = parseInt(item.quantity, 10);
         const price = parseFloat(item.unitPrice);
+        const code = String(item.productCode || "").trim();
 
         if (isNaN(quantity) || quantity <= 0) {
           throw new Error(`Quantidade inválida: ${item.quantity}`);
@@ -111,69 +118,80 @@ async function finalizePurchaseFromImport(req, res) {
           throw new Error(`Preço unitário inválido: ${item.unitPrice}`);
         }
 
-        if (item.mappedProductId && item.mappedProductId !== "") {
-          const productId = parseInt(item.mappedProductId, 10);
+        let handled = false;
 
+        const mappedIdRaw = item.mappedProductId;
+        if (mappedIdRaw && mappedIdRaw !== "") {
+          const productId = parseInt(mappedIdRaw, 10);
           if (isNaN(productId)) {
-            throw new Error(`ID do produto inválido: ${item.mappedProductId}`);
+            throw new Error(`ID do produto inválido: ${mappedIdRaw}`);
           }
 
-          const existingProduct = mappedProductsById.get(productId);
-          if (!existingProduct) {
+          const mapped = mappedProductsById.get(productId);
+          if (!mapped) {
             throw new Error(`Produto não encontrado com ID: ${productId}`);
           }
 
-          const currentPrice = existingProduct.current_price;
+          if (String(mapped.brand || "").trim() !== brandName) {
+            throw new Error(
+              `O produto mapeado (ID ${productId}) pertence à representada "${mapped.brand}", não a "${brandName}".`,
+            );
+          }
+
+          const currentPrice = mapped.current_price;
 
           await sql`
-            UPDATE products 
-            SET stock = stock + ${quantity}, 
-                price = ${price}
+            UPDATE products
+            SET stock = stock + ${quantity},
+                price = ${price},
+                brand = ${brandName},
+                name = ${item.description || mapped.name}
             WHERE id = ${productId} AND tenant_id = ${tenantId}
           `;
 
           if (currentPrice !== price) {
             await sql`
               INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
-              VALUES (${productId}, ${tenantId}, ${price}, ${quantity}, ${
-                purchaseDate || new Date().toISOString()
-              })
+              VALUES (${productId}, ${tenantId}, ${price}, ${quantity}, ${purchaseDateIso})
             `;
           }
 
           results.updated++;
-        } else if (item.productCode && item.description) {
-          const existingWithCode = productsByCode.get(String(item.productCode));
+          handled = true;
+        }
+
+        if (!handled && code && item.description) {
+          const existingWithCode = productsByCode.get(code);
           if (existingWithCode) {
             await sql`
-              UPDATE products 
-              SET stock = stock + ${quantity}, 
-                  price = ${price}
-              WHERE productcode = ${item.productCode} AND tenant_id = ${tenantId}
+              UPDATE products
+              SET stock = stock + ${quantity},
+                  price = ${price},
+                  brand = ${brandName},
+                  name = ${item.description}
+              WHERE id = ${existingWithCode.id} AND tenant_id = ${tenantId}
             `;
 
             await sql`
               INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
-              VALUES (${existingWithCode.id}, ${tenantId}, ${price}, ${quantity}, ${
-                purchaseDate || new Date().toISOString()
-              })
+              VALUES (${existingWithCode.id}, ${tenantId}, ${price}, ${quantity}, ${purchaseDateIso})
             `;
 
             results.updated++;
           } else {
             const newProduct = await sql`
               INSERT INTO products (
-                name, 
-                productcode, 
-                price, 
-                stock, 
+                name,
+                productcode,
+                price,
+                stock,
                 brand,
                 minstock,
                 tenant_id,
                 createdat
               ) VALUES (
                 ${item.description},
-                ${item.productCode},
+                ${code},
                 ${price},
                 ${quantity},
                 ${brandName},
@@ -186,9 +204,7 @@ async function finalizePurchaseFromImport(req, res) {
 
             await sql`
               INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
-              VALUES (${newProduct[0].id}, ${tenantId}, ${price}, ${quantity}, ${
-                purchaseDate || new Date().toISOString()
-              })
+              VALUES (${newProduct[0].id}, ${tenantId}, ${price}, ${quantity}, ${purchaseDateIso})
             `;
 
             results.created++;
@@ -198,8 +214,9 @@ async function finalizePurchaseFromImport(req, res) {
               productcode: newProduct[0].productcode,
               brand: newProduct[0].brand,
             });
+            productsByCode.set(code, newProduct[0]);
           }
-        } else {
+        } else if (!handled) {
           throw new Error("Item sem código de produto ou descrição");
         }
       } catch (error) {
@@ -211,10 +228,12 @@ async function finalizePurchaseFromImport(req, res) {
       }
     }
 
+    await invalidateProductsCache();
+
     res.status(200).json({
       message: `Importação processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados na marca ${brandName}.`,
       type: "success",
-      results: results,
+      results,
       brandUsed: brandName,
     });
   } catch (error) {

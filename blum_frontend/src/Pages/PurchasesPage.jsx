@@ -12,25 +12,44 @@ function normalizeProductCode(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function findCatalogProductByCode(products, rawCode) {
+function findCatalogProductByCode(products, rawCode, brandName) {
   const want = normalizeProductCode(rawCode);
   if (!want) return null;
+  const brandNorm = brandName ? String(brandName).trim() : "";
   return (
-    products.find(
-      (p) =>
-        p.productcode && normalizeProductCode(p.productcode) === want,
-    ) || null
+    products.find((p) => {
+      if (brandNorm && String(p.brand || "").trim() !== brandNorm) return false;
+      return (
+        p.productcode && normalizeProductCode(p.productcode) === want
+      );
+    }) || null
   );
 }
 
-async function fetchCatalogForPurchases() {
-  const productsResponse = await apiService.getProducts("all", 1, 10000);
+async function fetchCatalogForPurchases(brandName) {
+  const brandFilter = brandName ? String(brandName).trim() : "all";
+  const productsResponse = await apiService.getProducts(brandFilter, 1, 10000);
   const list = Array.isArray(productsResponse?.data)
     ? productsResponse.data
     : Array.isArray(productsResponse)
       ? productsResponse
       : [];
   return list;
+}
+
+function buildImportSuccessSummary(result, selectedBrand, purchaseDate, rowCount) {
+  const updated = result?.results?.updated ?? 0;
+  const created = result?.results?.created ?? 0;
+  const brandLabel = result?.brandUsed || selectedBrand?.name || "—";
+  return (
+    `✅ ${result?.message || "Importação concluída."}\n\n` +
+    `Resumo da importação:\n` +
+    `• ${updated} produtos atualizados\n` +
+    `• ${created} novos produtos criados\n` +
+    `• Representada: ${brandLabel}\n` +
+    `• Data da compra: ${purchaseDate}\n` +
+    `• Linhas importadas: ${rowCount}`
+  );
 }
 
 /** Códigos de produto repetidos na lista (normalizados). */
@@ -254,7 +273,11 @@ const CsvImportSection = ({ purchaseLogic }) => {
         throw new Error("Nenhum dado válido retornado do servidor");
       }
 
-      const catalog = await fetchCatalogForPurchases();
+      const selectedBrand = brands.find(
+        (b) => String(b.id) === String(selectedCsvBrandId),
+      );
+      const brandName = selectedBrand?.name || "";
+      const catalog = await fetchCatalogForPurchases(brandName);
       setUserProducts(catalog);
 
       const preMappedItems = itemsFromAI.map((item, index) => {
@@ -271,16 +294,23 @@ const CsvImportSection = ({ purchaseLogic }) => {
 
         // 1. Busca por PRODUCTCODE (mais confiável; ignora maiúsculas/minúsculas)
         if (safeItem.productCode && safeItem.productCode.trim() !== "") {
-          foundProduct = findCatalogProductByCode(catalog, safeItem.productCode);
+          foundProduct = findCatalogProductByCode(
+            catalog,
+            safeItem.productCode,
+            brandName,
+          );
         }
 
-        // 2. Busca por NOME (backup)
+        // 2. Busca por NOME (backup, mesma representada)
         if (!foundProduct && safeItem.description) {
           const searchName = safeItem.description
             .toLowerCase()
             .substring(0, 25);
           foundProduct = catalog.find(
-            (p) => p.name && p.name.toLowerCase().includes(searchName),
+            (p) =>
+              p.name &&
+              p.name.toLowerCase().includes(searchName) &&
+              (!brandName || String(p.brand || "").trim() === brandName),
           );
         }
 
@@ -411,23 +441,23 @@ const CsvImportSection = ({ purchaseLogic }) => {
       // ✅ Usar a função específica para CSV
       const result = await apiService.finalizePurchaseFromCsv(payload);
 
-      const summary =
-        `✅ ${result.message}\n\n` +
-          `Resumo da importação:\n` +
-          `• ${rows.length - newProductsCount} produtos atualizados\n` +
-          `• ${newProductsCount} novos produtos criados\n` +
-          `• Representada: ${selectedBrand?.name}\n` +
-          `• Data da compra: ${purchaseDate}\n` +
-          `• Linhas importadas: ${rows.length}`;
-
       setError(null);
-      setSuccessMessage(summary);
+      setSuccessMessage(
+        buildImportSuccessSummary(
+          result,
+          selectedBrand,
+          purchaseDate,
+          rows.length,
+        ),
+      );
 
       // Limpa a tela
       setParsedCsvItems([]);
       setCsvFile(null);
 
-      const updatedProducts = await fetchCatalogForPurchases();
+      const updatedProducts = await fetchCatalogForPurchases(
+        selectedBrand?.name,
+      );
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao confirmar importação CSV:", err);
@@ -665,12 +695,20 @@ const PurchasesPage = () => {
 
       const itemsFromAI = await apiService.processPurchasePdf(formData);
 
-      const catalog = await fetchCatalogForPurchases();
+      const selectedBrand = brands.find(
+        (b) => String(b.id) === String(selectedBrandId),
+      );
+      const brandName = selectedBrand?.name || "";
+      const catalog = await fetchCatalogForPurchases(brandName);
       setUserProducts(catalog);
 
-      // Pré-mapeia os produtos existentes
+      // Pré-mapeia os produtos existentes (somente da representada escolhida)
       const preMappedItems = itemsFromAI.map((item, index) => {
-        let foundProduct = findCatalogProductByCode(catalog, item.productCode);
+        let foundProduct = findCatalogProductByCode(
+          catalog,
+          item.productCode,
+          brandName,
+        );
         if (
           !foundProduct &&
           item.description &&
@@ -678,7 +716,10 @@ const PurchasesPage = () => {
         ) {
           const sn = item.description.toLowerCase().substring(0, 15);
           foundProduct = catalog.find(
-            (p) => p.name && p.name.toLowerCase().includes(sn),
+            (p) =>
+              p.name &&
+              p.name.toLowerCase().includes(sn) &&
+              (!brandName || String(p.brand || "").trim() === brandName),
           );
         }
         return {
@@ -785,23 +826,23 @@ const PurchasesPage = () => {
 
       const result = await apiService.finalizePurchaseFromPdf(payload);
 
-      const summary =
-        `✅ ${result.message}\n\n` +
-          `Resumo:\n` +
-          `• ${rows.length - newProductsCount} produtos atualizados\n` +
-          `• ${newProductsCount} novos produtos criados\n` +
-          `• Representada: ${selectedBrand?.name}\n` +
-          `• Data da compra: ${purchaseDate}\n` +
-          `• Linhas importadas: ${rows.length}`;
-
       setError(null);
-      setSuccessMessage(summary);
+      setSuccessMessage(
+        buildImportSuccessSummary(
+          result,
+          selectedBrand,
+          purchaseDate,
+          rows.length,
+        ),
+      );
 
       // Limpa a tela
       setParsedItems([]);
       setSelectedFile(null);
 
-      const updatedProducts = await fetchCatalogForPurchases();
+      const updatedProducts = await fetchCatalogForPurchases(
+        selectedBrand?.name,
+      );
       setUserProducts(updatedProducts);
     } catch (err) {
       console.error("💥 Erro ao processar PDF:", err);
