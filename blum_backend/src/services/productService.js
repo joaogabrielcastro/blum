@@ -13,7 +13,80 @@ function brandSql(names) {
   };
 }
 
+async function resolveBrandId(brandName, tenantId = 1) {
+  const name = String(brandName || "").trim();
+  if (!name) return null;
+  const rows = await sql`
+    SELECT id FROM brands
+    WHERE name = ${name} AND tenant_id = ${tenantId}
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
 class ProductService {
+  /**
+   * Busca exata por código na representada (nome ou brand_id).
+   */
+  async findByProductCodeInBrand({
+    productcode,
+    brand,
+    brandId,
+    tenantId = 1,
+    allowedBrandNames = null,
+  }) {
+    const code = String(productcode ?? "").trim();
+    if (!code) return null;
+
+    let brandName = brand ? String(brand).trim() : "";
+    let brandIdNum =
+      brandId != null && brandId !== "" ? parseInt(brandId, 10) : null;
+
+    if (Number.isInteger(brandIdNum) && brandIdNum > 0 && !brandName) {
+      const rows = await sql`
+        SELECT name FROM brands
+        WHERE id = ${brandIdNum} AND tenant_id = ${tenantId}
+        LIMIT 1
+      `;
+      brandName = rows[0]?.name || "";
+    }
+    if (!Number.isInteger(brandIdNum) && brandName) {
+      brandIdNum = await resolveBrandId(brandName, tenantId);
+    }
+
+    if (!brandName && !Number.isInteger(brandIdNum)) return null;
+
+    if (
+      allowedBrandNames &&
+      brandName &&
+      !allowedBrandNames.includes(brandName)
+    ) {
+      return null;
+    }
+
+    const bc = brandSql(allowedBrandNames);
+    const rows =
+      Number.isInteger(brandIdNum) && brandIdNum > 0
+        ? await sql`
+            SELECT * FROM products
+            WHERE productcode = ${code}
+              AND tenant_id = ${tenantId}
+              AND (brand_id = ${brandIdNum} OR brand = ${brandName})
+              ${bc}
+            LIMIT 1
+          `
+        : await sql`
+            SELECT * FROM products
+            WHERE productcode = ${code}
+              AND brand = ${brandName}
+              AND tenant_id = ${tenantId}
+              ${bc}
+            LIMIT 1
+          `;
+
+    return rows[0] ?? null;
+  }
+
   /**
    * Busca produtos com filtros opcionais e paginação
    * @param {Object} filters - Filtros de busca (brand, productcode, name, page, limit, allowedBrandNames)
@@ -22,6 +95,7 @@ class ProductService {
   async findAll(filters = {}) {
     const {
       brand,
+      brandId,
       productcode,
       name,
       q,
@@ -30,6 +104,8 @@ class ProductService {
       allowedBrandNames,
       tenantId = 1,
     } = filters;
+    const brandIdNum =
+      brandId != null && brandId !== "" ? parseInt(brandId, 10) : null;
     const offset = (page - 1) * limit;
     const bc = brandSql(allowedBrandNames);
 
@@ -75,15 +151,43 @@ class ProductService {
       query = flex.data;
       countQuery = flex.countRows;
     }
-    // Busca por BRAND
-    else if (brand && brand !== "all") {
-      query = await sql`
-        SELECT * FROM products
-        WHERE brand = ${brand} AND tenant_id = ${tenantId} ${bc}
-        ORDER BY createdat DESC
-        LIMIT ${limit} OFFSET ${offset}`;
-      countQuery =
-        await sql`SELECT COUNT(*) as count FROM products WHERE brand = ${brand} AND tenant_id = ${tenantId} ${bc}`;
+    // Busca por representada (brand_id preferencial)
+    else if (
+      (Number.isInteger(brandIdNum) && brandIdNum > 0) ||
+      (brand && brand !== "all")
+    ) {
+      let brandName = brand && brand !== "all" ? String(brand).trim() : "";
+      if (!brandName && Number.isInteger(brandIdNum)) {
+        const brandRow = await sql`
+          SELECT name FROM brands
+          WHERE id = ${brandIdNum} AND tenant_id = ${tenantId}
+          LIMIT 1
+        `;
+        brandName = brandRow[0]?.name || "";
+      }
+      if (Number.isInteger(brandIdNum) && brandIdNum > 0) {
+        query = await sql`
+          SELECT * FROM products
+          WHERE tenant_id = ${tenantId}
+            AND (brand_id = ${brandIdNum} OR brand = ${brandName})
+            ${bc}
+          ORDER BY createdat DESC
+          LIMIT ${limit} OFFSET ${offset}`;
+        countQuery = await sql`
+          SELECT COUNT(*) as count FROM products
+          WHERE tenant_id = ${tenantId}
+            AND (brand_id = ${brandIdNum} OR brand = ${brandName})
+            ${bc}`;
+      } else {
+        query = await sql`
+          SELECT * FROM products
+          WHERE brand = ${brandName} AND tenant_id = ${tenantId} ${bc}
+          ORDER BY createdat DESC
+          LIMIT ${limit} OFFSET ${offset}`;
+        countQuery = await sql`
+          SELECT COUNT(*) as count FROM products
+          WHERE brand = ${brandName} AND tenant_id = ${tenantId} ${bc}`;
+      }
     }
     // Busca TODOS
     else {
@@ -273,19 +377,19 @@ class ProductService {
     }
 
     if (productcode && brand) {
-      const existing = await sql`
-        SELECT id, name FROM products
-        WHERE productcode = ${productcode}
-          AND brand = ${brand}
-          AND tenant_id = ${tenantId}
-      `;
-
-      if (existing.length > 0) {
+      const existing = await this.findByProductCodeInBrand({
+        productcode,
+        brand,
+        tenantId,
+      });
+      if (existing) {
         throw new Error(
-          `Já existe um produto com o código "${productcode}" nesta representada: ${existing[0].name}`,
+          `Já existe um produto com o código "${productcode}" nesta representada: ${existing.name}`,
         );
       }
     }
+
+    const brand_id = brand ? await resolveBrandId(brand, tenantId) : null;
 
     return productRepository.insertProduct({
       name,
@@ -293,6 +397,7 @@ class ProductService {
       price,
       stock,
       brand,
+      brand_id,
       minstock,
       tenant_id: tenantId,
     });
@@ -314,27 +419,36 @@ class ProductService {
     }
 
     if (productcode && brand) {
-      const existing = await sql`
-        SELECT id, name FROM products
-        WHERE productcode = ${productcode}
-          AND brand = ${brand}
-          AND id != ${id}
-          AND tenant_id = ${tenantId}
-      `;
-
-      if (existing.length > 0) {
+      const existing = await this.findByProductCodeInBrand({
+        productcode,
+        brand,
+        tenantId,
+      });
+      if (existing && Number(existing.id) !== Number(id)) {
         throw new Error(
-          `O código "${productcode}" já está em uso nesta representada pelo produto: ${existing[0].name}`,
+          `O código "${productcode}" já está em uso nesta representada pelo produto: ${existing.name}`,
         );
       }
     }
 
+    const brand_id = brand ? await resolveBrandId(brand, tenantId) : null;
+
     const result = await sql(
       `UPDATE products
-       SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6
-       WHERE id = $7 AND tenant_id = $8
+       SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6, brand_id = $7
+       WHERE id = $8 AND tenant_id = $9
        RETURNING *`,
-      [name, productcode, price, stock, brand, minstock || 0, id, tenantId],
+      [
+        name,
+        productcode,
+        price,
+        stock,
+        brand,
+        minstock || 0,
+        brand_id,
+        id,
+        tenantId,
+      ],
     );
 
     if (result.length === 0) {

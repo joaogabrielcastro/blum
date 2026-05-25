@@ -24,14 +24,24 @@ async function insertProduct({
   price,
   stock,
   brand,
+  brand_id,
   minstock,
   tenant_id,
 }) {
   const rows = await sql(
-    `INSERT INTO products (name, productcode, price, stock, brand, minstock, tenant_id, createdat)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+    `INSERT INTO products (name, productcode, price, stock, brand, brand_id, minstock, tenant_id, createdat)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
      RETURNING *`,
-    [name, productcode, price, stock, brand, minstock || 0, tenant_id || 1],
+    [
+      name,
+      productcode,
+      price,
+      stock,
+      brand,
+      brand_id ?? null,
+      minstock || 0,
+      tenant_id || 1,
+    ],
   );
   return rows[0];
 }

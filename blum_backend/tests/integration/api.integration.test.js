@@ -87,4 +87,20 @@ describeIntegration("API v2 integration", () => {
       .send({ refreshToken: refreshToken2 })
       .expect(401);
   });
+
+  it("GET /api/v2/products/by-code retorna 404 para código inexistente", async () => {
+    const loginRes = await request(app)
+      .post("/api/v2/auth/login")
+      .send({ username: user, password, tenantSlug })
+      .expect(200);
+
+    const token = loginRes.body.token;
+
+    await request(app)
+      .get(
+        "/api/v2/products/by-code?productcode=__codigo_inexistente_teste__",
+      )
+      .set("Authorization", `Bearer ${token}`)
+      .expect(404);
+  });
 });

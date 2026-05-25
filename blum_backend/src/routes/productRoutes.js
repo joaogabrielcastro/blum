@@ -11,6 +11,7 @@ const {
 // Rotas públicas (com autenticação mas sem restrição de role)
 router.get("/", authenticate, productsController.getAll);
 router.get("/search", authenticate, productsController.search);
+router.get("/by-code", authenticate, productsController.lookupByCode);
 
 // Rotas que requerem autenticação (qualquer usuário autenticado)
 router.get("/:id", authenticate, validateId, productsController.getById);

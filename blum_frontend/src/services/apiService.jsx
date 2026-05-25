@@ -234,9 +234,17 @@ const apiService = {
   },
 
   // ==================== PRODUCTS ====================
-  getProducts: async (brand = "all", page = 1, limit = 50, q = "") => {
+  getProducts: async (
+    brand = "all",
+    page = 1,
+    limit = 50,
+    q = "",
+    brandId,
+  ) => {
     const params = new URLSearchParams();
     if (brand && brand !== "all") params.append("brand", brand);
+    if (brandId != null && brandId !== "")
+      params.append("brandId", String(brandId));
     params.append("page", page);
     params.append("limit", limit);
     const qt = typeof q === "string" ? q.trim() : "";
@@ -265,12 +273,32 @@ const apiService = {
     });
   },
 
+  getProductById: async (productId) => {
+    return apiRequest(`${API_URL}/products/${productId}`);
+  },
+
+  /** Busca exata por código na representada (nome ou brandId). */
+  lookupProductByCode: async (productCode, brand, brandId) => {
+    const code = String(productCode ?? "").trim();
+    if (!code) return null;
+    const params = new URLSearchParams();
+    params.append("productcode", code);
+    if (brand && brand !== "all") params.append("brand", brand);
+    if (brandId != null && brandId !== "") params.append("brandId", String(brandId));
+    try {
+      return await apiRequest(`${API_URL}/products/by-code?${params.toString()}`);
+    } catch (err) {
+      if (err?.status === 404) return null;
+      throw err;
+    }
+  },
+
   searchProducts: async (searchTerm) => {
     if (!searchTerm || searchTerm.trim() === "") {
       return [];
     }
     return apiRequest(
-      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm)}`
+      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm.trim())}`,
     );
   },
 

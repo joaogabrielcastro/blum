@@ -64,6 +64,7 @@ async function finalizePurchaseFromImport(req, res) {
     }
 
     const brandName = brandResult[0].name;
+    const brandIdResolved = brandIdInt;
 
     const mappedIds = items
       .map((item) => Number.parseInt(item.mappedProductId, 10))
@@ -90,8 +91,8 @@ async function finalizePurchaseFromImport(req, res) {
             SELECT id, productcode, brand
             FROM products
             WHERE productcode = ANY(${uniqueProductCodes})
-              AND brand = ${brandName}
               AND tenant_id = ${tenantId}
+              AND (brand = ${brandName} OR brand_id = ${brandIdResolved})
           `
         : [];
     const productsByCode = new Map(
@@ -145,6 +146,7 @@ async function finalizePurchaseFromImport(req, res) {
             SET stock = stock + ${quantity},
                 price = ${price},
                 brand = ${brandName},
+                brand_id = ${brandIdResolved},
                 name = ${item.description || mapped.name}
             WHERE id = ${productId} AND tenant_id = ${tenantId}
           `;
@@ -168,6 +170,7 @@ async function finalizePurchaseFromImport(req, res) {
               SET stock = stock + ${quantity},
                   price = ${price},
                   brand = ${brandName},
+                  brand_id = ${brandIdResolved},
                   name = ${item.description}
               WHERE id = ${existingWithCode.id} AND tenant_id = ${tenantId}
             `;
@@ -186,6 +189,7 @@ async function finalizePurchaseFromImport(req, res) {
                 price,
                 stock,
                 brand,
+                brand_id,
                 minstock,
                 tenant_id,
                 createdat
@@ -195,6 +199,7 @@ async function finalizePurchaseFromImport(req, res) {
                 ${price},
                 ${quantity},
                 ${brandName},
+                ${brandIdResolved},
                 0,
                 ${tenantId},
                 NOW()

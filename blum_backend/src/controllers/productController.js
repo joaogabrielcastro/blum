@@ -16,6 +16,7 @@ exports.getAll = async (req, res) => {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };
     const {
       brand,
+      brandId,
       productcode,
       name,
       q,
@@ -30,11 +31,21 @@ exports.getAll = async (req, res) => {
         req.user.tenantId,
       );
 
+    let brandNameForAccess = brand && brand !== "all" ? String(brand).trim() : "";
+    if (!brandNameForAccess && brandId) {
+      const { sql } = require("../config/database");
+      const rows = await sql`
+        SELECT name FROM brands
+        WHERE id = ${parseInt(brandId, 10)}
+          AND tenant_id = ${req.user.tenantId}
+        LIMIT 1
+      `;
+      brandNameForAccess = rows[0]?.name || "";
+    }
     if (
       allowedBrandNames &&
-      brand &&
-      brand !== "all" &&
-      !allowedBrandNames.includes(brand)
+      brandNameForAccess &&
+      !allowedBrandNames.includes(brandNameForAccess)
     ) {
       return res.status(403).json({
         error: "Sem permissão para consultar produtos desta representada",
@@ -44,6 +55,7 @@ exports.getAll = async (req, res) => {
     const filters = {
       tenantId: req.user.tenantId,
       brand,
+      brandId,
       productcode,
       name,
       q,
@@ -73,6 +85,44 @@ exports.getAll = async (req, res) => {
     res
       .status(500)
       .json({ error: error.message || "Erro ao buscar produtos." });
+  }
+};
+
+exports.lookupByCode = async (req, res) => {
+  try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const productcode = req.query.productcode ?? req.query.productCode;
+    const { brand, brandId } = req.query;
+
+    if (!productcode || String(productcode).trim() === "") {
+      return res.status(400).json({ error: "productcode é obrigatório" });
+    }
+
+    const allowedBrandNames =
+      await brandAccessService.getRestrictedBrandNamesOrNull(
+        req.user.userId,
+        req.user.role,
+        req.user.tenantId,
+      );
+
+    const product = await productService.findByProductCodeInBrand({
+      productcode,
+      brand,
+      brandId,
+      tenantId: req.user.tenantId,
+      allowedBrandNames,
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Produto não encontrado" });
+    }
+
+    res.status(200).json(mapProductResponse(product, mapOptions));
+  } catch (error) {
+    console.error("Erro ao buscar produto por código:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Erro ao buscar produto por código." });
   }
 };
 

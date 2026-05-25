@@ -1,52 +1,26 @@
-import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
-import {
-  buildClientOrderSearchOption,
-  normalizeClientsResponse,
-} from "../utils/clients";
 import { normalizeOrderLineItems } from "../utils/format";
-import {
-  productMatchesFlexible,
-  mergeProductCodeFields,
-} from "../utils/productSearch";
 import ClientItemPriceHistoryModal from "./ClientItemPriceHistoryModal";
-
-const DECIMAL_QUANTITY_BRANDS = new Set(["solo fino", "colombocal"]);
-const MAX_CLIENT_SEARCH_RESULTS = 60;
-const MOBILE_CLIENT_BROWSE_COUNT = 50;
-
-const normalizeBrandName = (brand) =>
-  String(brand || "")
-    .trim()
-    .toLocaleLowerCase("pt-BR");
-
-const allowsDecimalQuantityBrand = (brand) =>
-  DECIMAL_QUANTITY_BRANDS.has(normalizeBrandName(brand));
-
-const parseQuantityByBrand = (value, brand) => {
-  const raw = String(value ?? "")
-    .trim()
-    .replace(",", ".");
-  const parsed = parseFloat(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-  if (allowsDecimalQuantityBrand(brand)) {
-    return Math.round(parsed * 1000) / 1000;
-  }
-  return Math.max(1, Math.round(parsed));
-};
-
-const toDateTimeLocalValue = (dateInput) => {
-  const dt = dateInput ? new Date(dateInput) : new Date();
-  if (Number.isNaN(dt.getTime())) return "";
-  const year = dt.getFullYear();
-  const month = String(dt.getMonth() + 1).padStart(2, "0");
-  const day = String(dt.getDate()).padStart(2, "0");
-  const hours = String(dt.getHours()).padStart(2, "0");
-  const minutes = String(dt.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
+import { useOrderCatalogSearch } from "../hooks/useOrderCatalogSearch";
+import { useOrderEditHydration } from "../hooks/useOrderEditHydration";
+import { useOrderFormClients } from "../hooks/useOrderFormClients";
+import { useOrderFormItems } from "../hooks/useOrderFormItems";
+import { computeOrderTotals } from "../utils/orderLineTotals";
+import {
+  allowsDecimalQuantityBrand,
+  parseQuantityByBrand,
+  toDateTimeLocalValue,
+} from "../utils/orderFormUtils";
+import OrderFormLineItems from "./orders/OrderFormLineItems";
+import OrderFormMetaSection from "./orders/OrderFormMetaSection";
+import OrderFormProductSearch from "./orders/OrderFormProductSearch";
+import OrderFormTotals from "./orders/OrderFormTotals";
+import {
+  OrderMobileClientPicker,
+  OrderMobileProductPicker,
+} from "./orders/OrderMobilePickers";
 
 const OrdersForm = ({
   userId,
@@ -59,51 +33,55 @@ const OrdersForm = ({
   editingOrder,
 }) => {
   const toast = useToast();
-  const [clientId, setClientId] = useState("");
+  const {
+    clientId,
+    setClientId,
+    clientSearchTerm,
+    setClientSearchTerm,
+    desktopClientListOpen,
+    setDesktopClientListOpen,
+    mobileClientPickerOpen,
+    setMobileClientPickerOpen,
+    clientOptions,
+    filteredClientOptions,
+    mobileClientDisplayList,
+    selectClientOption,
+    resetClient,
+    MOBILE_CLIENT_BROWSE_COUNT,
+  } = useOrderFormClients(clients, clientsList);
+
   const [description, setDescription] = useState("");
   const [items, setItems] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [totalPrice, setTotalPrice] = useState(0);
-  const [products, setProducts] = useState([]);
   const [productSearch, setProductSearch] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const {
+    searchResults,
+    setSearchResults,
+    isSearching,
+    clearSearch,
+  } = useOrderCatalogSearch(apiService, { selectedBrand, productSearch });
   const [mobileProductPickerOpen, setMobileProductPickerOpen] =
     useState(false);
-  const [mobileClientPickerOpen, setMobileClientPickerOpen] =
-    useState(false);
-  const [desktopClientListOpen, setDesktopClientListOpen] = useState(false);
-  const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [historyModalItem, setHistoryModalItem] = useState(null);
   const [orderDateTime, setOrderDateTime] = useState(
     toDateTimeLocalValue(new Date()),
   );
 
-  // Função segura para toFixed
-  const safeToFixed = (value, decimals = 2) => {
-    const num = parseFloat(value);
-    if (isNaN(num)) return "0.00";
-    return num.toFixed(decimals);
-  };
+  const { subtotalAfterLineDiscounts, discountAmount, netTotal } =
+    computeOrderTotals(items, discount);
 
-  const lineNetTotal = (item) => {
-    const price = parseFloat(item.price) || 0;
-    const quantity = parseQuantityByBrand(item.quantity, item.brand);
-    const ld = parseFloat(item.lineDiscount) || 0;
-    const factor = 1 - Math.min(100, Math.max(0, ld)) / 100;
-    return price * (quantity > 0 ? quantity : 0) * factor;
-  };
-
-  const subtotalAfterLineDiscounts = items.reduce(
-    (total, item) => total + lineNetTotal(item),
-    0,
+  const { handleItemChange, handleProductSelect, removeItem } = useOrderFormItems(
+    items,
+    setItems,
+    {
+      setProductSearch,
+      setSearchResults,
+      setMobileProductPickerOpen,
+    },
   );
-
-  const discountAmount =
-    subtotalAfterLineDiscounts * (parseFloat(discount) / 100);
-  const netTotal = subtotalAfterLineDiscounts - discountAmount;
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
   const canEditUnitPrice = userRole === "admin";
@@ -137,107 +115,12 @@ const OrdersForm = ({
     }
   }, [editingOrder, brands, clients]);
 
-  // Preenche código/estoque a partir do catálogo ao editar
-  useEffect(() => {
-    if (!editingOrder?.id || !Array.isArray(products) || products.length === 0) {
-      return;
-    }
-    setItems((prev) => {
-      if (!prev.length) return prev;
-      return prev.map((item) => {
-        const pid = item.productId;
-        if (pid == null) return item;
-        const p = products.find((x) => String(x.id) === String(pid));
-        if (!p) return item;
-        return {
-          ...item,
-          productcode: item.productcode || p.productcode || p.productCode,
-          availableStock:
-            item.availableStock != null ? item.availableStock : p.stock,
-          brand: item.brand || p.brand,
-        };
-      });
-    });
-  }, [editingOrder?.id, products]);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        // ✅ BUSCAR TODOS OS PRODUTOS (sem paginação limitada)
-        const productsResponse = await apiService.getProducts("all", 1, 10000);
-        // ✅ COMPATIBILIDADE: Verifica se tem paginação ou array direto
-        const productsData = productsResponse?.data || productsResponse;
-
-        // ✅ GARANTIR QUE SEMPRE SEJA UM ARRAY
-        const safeProducts = Array.isArray(productsData) ? productsData : [];
-        setProducts(safeProducts.map(mergeProductCodeFields));
-      } catch (error) {
-        console.error("Erro ao buscar produtos:", error);
-        setProducts([]); // ✅ Em caso de erro, define array vazio
-      }
-    };
-    fetchProducts();
-  }, []);
+  useOrderEditHydration(apiService, editingOrder, items, setItems);
 
   useEffect(() => {
     // Atualiza o total sempre que items ou discount mudar
     setTotalPrice(netTotal);
   }, [items, discount, netTotal]);
-
-  // Busca por nome ou código do produto
-  useEffect(() => {
-    const searchProducts = async () => {
-      if (!productSearch || productSearch.trim().length < 2) {
-        setSearchResults([]);
-        return;
-      }
-
-      setIsSearching(true);
-      try {
-        // ✅ GARANTIR QUE PRODUCTS É ARRAY
-        if (!Array.isArray(products)) {
-          setSearchResults([]);
-          setIsSearching(false);
-          return;
-        }
-
-        const filtered = products.filter((product) =>
-          productMatchesFlexible(product, productSearch, selectedBrand),
-        );
-
-        const firstTok =
-          productSearch.toLowerCase().trim().split(/\s+/)[0] || "";
-
-        const sortedResults = filtered.sort((a, b) => {
-          const aNameMatch = firstTok && a.name.toLowerCase().includes(firstTok);
-          const bNameMatch = firstTok && b.name.toLowerCase().includes(firstTok);
-          const aCode = String(a.productcode ?? a.productCode ?? "");
-          const bCode = String(b.productcode ?? b.productCode ?? "");
-          const aCodeMatch =
-            firstTok && aCode.toLowerCase().includes(firstTok);
-          const bCodeMatch =
-            firstTok && bCode.toLowerCase().includes(firstTok);
-
-          if (aCodeMatch && !bCodeMatch) return -1;
-          if (!aCodeMatch && bCodeMatch) return 1;
-          if (aNameMatch && !bNameMatch) return -1;
-          if (!aNameMatch && bNameMatch) return 1;
-
-          return a.name.localeCompare(b.name);
-        });
-
-        setSearchResults(sortedResults);
-      } catch (error) {
-        console.error("Erro na busca:", error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-
-    const timeoutId = setTimeout(searchProducts, 300); // Debounce de 300ms
-    return () => clearTimeout(timeoutId);
-  }, [productSearch, products, selectedBrand]);
 
   useEffect(() => {
     if (!mobileProductPickerOpen && !mobileClientPickerOpen) return;
@@ -260,159 +143,38 @@ const OrdersForm = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileProductPickerOpen, mobileClientPickerOpen]);
 
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...items];
-
-    // Valida quantidade contra estoque disponível
-    if (field === "quantity") {
-      const itemBrand = newItems[index].brand;
-      const raw = String(value ?? "").trim();
-      if (raw === "") {
-        newItems[index][field] = "";
-        setItems(newItems);
-        return;
-      }
-      const parsedQty = parseQuantityByBrand(value, itemBrand);
-      if (!parsedQty) {
-        toast.warning(
-          allowsDecimalQuantityBrand(itemBrand)
-            ? "Informe uma quantidade válida maior que zero."
-            : "Informe uma quantidade inteira maior que zero.",
-        );
-        return;
-      }
-      if (
-        newItems[index].availableStock &&
-        !allowsDecimalQuantityBrand(itemBrand) &&
-        parsedQty > newItems[index].availableStock
-      ) {
-        toast.warning(
-          `Quantidade solicitada (${parsedQty}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
-        );
-        return;
-      }
-      newItems[index][field] = parsedQty;
-      setItems(newItems);
-      return;
-    }
-
-    if (field === "lineDiscount") {
-      let v = parseFloat(value);
-      if (!Number.isFinite(v)) v = 0;
-      v = Math.min(100, Math.max(0, v));
-      newItems[index][field] = v;
-    } else if (field === "price") {
-      const price = parseFloat(String(value).replace(",", "."));
-      if (!Number.isFinite(price) || price <= 0) return;
-      newItems[index][field] = price;
-    } else newItems[index][field] = value;
-    setItems(newItems);
-  };
-
-  const handleProductSelect = (product) => {
-    if (product) {
-      const existingItem = items.find(
-        (item) =>
-          (item.productId != null &&
-            String(item.productId) === String(product.id)) ||
-          (!item.productId && item.productName === product.name),
-      );
-      if (!existingItem) {
-        // Verifica se há estoque disponível
-        if (product.stock <= 0 && !allowsDecimalQuantityBrand(product.brand)) {
-          toast.warning(`Produto "${product.name}" sem estoque disponível!`);
-          return;
-        }
-
-        const newItem = {
-          productName: product.name,
-          brand: product.brand,
-          quantity: "",
-          price: product.price,
-          lineDiscount: 0,
-          productId: product.id,
-          productcode: product.productcode ?? product.productCode ?? "",
-          availableStock: product.stock, // Armazena estoque disponível
-        };
-        setItems((prevItems) => [...prevItems, newItem]);
-      } else {
-        toast.warning("Este produto já foi adicionado ao pedido.");
-      }
-    }
+  const resetProductSearch = () => {
     setProductSearch("");
-    setSearchResults([]);
-    setMobileProductPickerOpen(false);
+    clearSearch();
   };
 
-  const removeItem = (index) => {
-    setItems((prevItems) => prevItems.filter((_, i) => i !== index));
-  };
-
-  // ✅ FUNÇÃO AUXILIAR: Limpar busca
-  const clearSearch = () => {
-    setProductSearch("");
-    setSearchResults([]);
-  };
-
-  const clientOptions = useMemo(() => {
-    const list = normalizeClientsResponse(clientsList);
-    if (list.length > 0) {
-      return list
-        .map((c) => {
-          const id = c.id ?? c.Id;
-          if (id == null) return null;
-          return buildClientOrderSearchOption(c, id);
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-    }
-    return Object.entries(clients || {})
-      .map(([id, name]) => {
-        const label =
-          name != null && String(name).trim() !== ""
-            ? String(name)
-            : `Cliente #${id}`;
-        const lower = `${label} ${id}`.toLowerCase();
-        return {
-          id: String(id),
-          label,
-          primary: label,
-          secondary: "",
-          filterBlob: lower,
-        };
-      })
-      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [clientsList, clients]);
-
-  const mobileClientBrowseSlice = useMemo(
-    () => clientOptions.slice(0, MOBILE_CLIENT_BROWSE_COUNT),
-    [clientOptions],
-  );
-
-  const filteredClientOptions = useMemo(() => {
-    const term = clientSearchTerm.trim().toLowerCase();
-    if (!term) return [];
-    return clientOptions
-      .filter(
-        (opt) =>
-          opt.filterBlob.includes(term) || String(opt.id).includes(term),
-      )
-      .slice(0, MAX_CLIENT_SEARCH_RESULTS);
-  }, [clientOptions, clientSearchTerm]);
-
-  useEffect(() => {
-    if (!clientId) return;
-    const selected = clientOptions.find(
-      (option) => option.id === String(clientId),
+  const handleClientSearchTermChange = (value) => {
+    setClientSearchTerm(value);
+    const exact = clientOptions.find(
+      ({ label }) =>
+        label.toLowerCase().trim() === value.toLowerCase().trim(),
     );
-    if (selected) setClientSearchTerm(selected.label);
-  }, [clientId, clientOptions]);
+    if (exact) setClientId(exact.id);
+    else setClientId("");
+    setDesktopClientListOpen(true);
+  };
 
-  const selectClientOption = (opt) => {
-    setClientId(opt.id);
-    setClientSearchTerm(opt.label);
-    setDesktopClientListOpen(false);
-    setMobileClientPickerOpen(false);
+  const handlePaymentMethodChange = (nextMethod) => {
+    setPaymentMethod(nextMethod);
+    const currentDiscount = parseFloat(discount) || 0;
+    if (nextMethod === "pix" || nextMethod === "dinheiro") {
+      if (currentDiscount > 2) {
+        setDiscount(2);
+        toast.info(
+          "Para PIX ou dinheiro, o desconto geral foi ajustado para o máximo de 2%.",
+        );
+      }
+    } else if (currentDiscount > 0) {
+      setDiscount(0);
+      toast.info(
+        "Para esta forma de pagamento, desconto geral não é permitido.",
+      );
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -560,90 +322,6 @@ const OrdersForm = ({
     }
   };
 
-  const renderProductResultRow = (product) => (
-    <div
-      key={product.id}
-      role="button"
-      tabIndex={0}
-      onClick={() => handleProductSelect(product)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleProductSelect(product);
-        }
-      }}
-      className="p-3 cursor-pointer hover:bg-blue-50 active:bg-blue-100 border-b border-gray-100 last:border-b-0"
-    >
-      <div className="flex justify-between items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-gray-900">{product.name}</div>
-          <div className="text-sm text-gray-600 mt-1 flex flex-wrap gap-1">
-            <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-              Codigo: {product.productcode}
-            </span>
-          </div>
-          <div className="text-sm text-gray-500 mt-1">{product.brand}</div>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="font-medium text-green-600">
-            R$ {safeToFixed(product.price)}
-          </div>
-          <span
-            className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
-              product.stock > 0
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            Estoque: {product.stock}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderClientOptionRow = (opt) => (
-    <button
-      key={opt.id}
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => selectClientOption(opt)}
-      className="flex w-full flex-col gap-1 border-b border-gray-100 bg-white px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-indigo-50 active:bg-indigo-100"
-    >
-      <span className="text-sm font-medium leading-snug text-gray-900">
-        {opt.primary}
-      </span>
-      {opt.secondary ? (
-        <span className="flex items-start gap-2 text-xs leading-snug text-gray-600">
-          <svg
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"
-            />
-          </svg>
-          {opt.secondary}
-        </span>
-      ) : null}
-    </button>
-  );
-
-  const mobileClientDisplayList = clientSearchTerm.trim()
-    ? filteredClientOptions
-    : mobileClientBrowseSlice;
-
   return (
     <>
       <div className="w-full max-w-none md:max-w-[1400px] md:mx-auto px-0 sm:px-0 md:px-8 lg:px-12">
@@ -669,246 +347,31 @@ const OrdersForm = ({
             onSubmit={handleSubmit}
             className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-5 md:p-10 lg:p-12 space-y-8 sm:space-y-10 w-full pb-28 md:pb-10"
           >
-          <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5 md:p-6 space-y-6">
-          <div>
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-              Dados do pedido
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Preencha cliente, representada, pagamento e demais informações.
-            </p>
-          </div>
-          {/* --- Cliente e Representada --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cliente *
-              </label>
-
-              <div className="md:hidden space-y-2">
-                <button
-                  type="button"
-                  aria-expanded={mobileClientPickerOpen}
-                  aria-haspopup="dialog"
-                  onClick={() => setMobileClientPickerOpen(true)}
-                  className="w-full min-h-12 p-3.5 border border-gray-300 rounded-lg text-base text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <span
-                    className={
-                      clientId ? "text-gray-900 line-clamp-2" : "text-gray-400"
-                    }
-                  >
-                    {clientId
-                      ? (clientOptions.find((o) => o.id === String(clientId))
-                          ?.label ?? "Cliente selecionado")
-                      : "Toque para buscar cliente (nome ou CNPJ)"}
-                  </span>
-                </button>
-                {clientId ? (
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-blue-700 hover:underline"
-                    onClick={() => {
-                      setClientId("");
-                      setClientSearchTerm("");
-                    }}
-                  >
-                    Limpar cliente
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="relative hidden md:block">
-                <input
-                  type="text"
-                  autoComplete="off"
-                  value={clientSearchTerm}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setClientSearchTerm(value);
-                    const exact = clientOptions.find(
-                      ({ label }) =>
-                        label.toLowerCase().trim() ===
-                        value.toLowerCase().trim(),
-                    );
-                    if (exact) setClientId(exact.id);
-                    else setClientId("");
-                    setDesktopClientListOpen(true);
-                  }}
-                  onFocus={() => setDesktopClientListOpen(true)}
-                  onBlur={() => {
-                    window.setTimeout(
-                      () => setDesktopClientListOpen(false),
-                      180,
-                    );
-                  }}
-                  placeholder="Nome, fantasia ou CNPJ..."
-                  className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                {desktopClientListOpen &&
-                  clientSearchTerm.trim().length > 0 &&
-                  filteredClientOptions.length > 0 && (
-                    <div
-                      className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white shadow-xl"
-                      role="listbox"
-                    >
-                      {filteredClientOptions.map((opt) =>
-                        renderClientOptionRow(opt),
-                      )}
-                    </div>
-                  )}
-                {desktopClientListOpen &&
-                  clientSearchTerm.trim().length > 0 &&
-                  filteredClientOptions.length === 0 &&
-                  clientOptions.length > 0 && (
-                    <div className="absolute z-50 left-0 right-0 mt-1 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500 shadow-lg">
-                      Nenhum cliente encontrado. Ajuste nome ou CNPJ.
-                    </div>
-                  )}
-              </div>
-
-              <p className="mt-1 text-xs text-gray-500">
-                {clientOptions.length > 0
-                  ? "A lista mostra CNPJ e local (cidade/UF) quando estão no cadastro."
-                  : null}
-              </p>
-              {clientOptions.length === 0 && (
-                <p className="mt-1 text-sm text-amber-700">
-                  Nenhum cliente cadastrado. Cadastre clientes em Clientes.
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Representada *
-              </label>
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Selecione uma representada</option>
-                {Array.isArray(brands) &&
-                  brands.map((brand) => (
-                    <option
-                      key={brand.id ?? brand.name}
-                      value={brand.name}
-                    >
-                      {brand.name}
-                    </option>
-                  ))}
-              </select>
-              {Array.isArray(brands) && brands.length === 0 && (
-                <p className="mt-1 text-sm text-amber-700">
-                  Nenhuma representada cadastrada. Cadastre em Produtos.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* --- Descrição, pagamento e desconto --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Condição / forma de pagamento
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => {
-                  const nextMethod = e.target.value;
-                  setPaymentMethod(nextMethod);
-                  const currentDiscount = parseFloat(discount) || 0;
-                  if (nextMethod === "pix" || nextMethod === "dinheiro") {
-                    if (currentDiscount > 2) {
-                      setDiscount(2);
-                      toast.info(
-                        "Para PIX ou dinheiro, o desconto geral foi ajustado para o máximo de 2%.",
-                      );
-                    }
-                  } else if (currentDiscount > 0) {
-                    setDiscount(0);
-                    toast.info(
-                      "Para esta forma de pagamento, desconto geral não é permitido.",
-                    );
-                  }
-                }}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Selecione (opcional)</option>
-                <option value="carteira">Carteira (não pago / em aberto)</option>
-                <option value="boleto">Pagamento em boleto</option>
-                <option value="pix">Pagamento via PIX</option>
-                <option value="cheque">Pagamento via cheque</option>
-                <option value="dinheiro">Pagamento em dinheiro</option>
-              </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Desconto geral só é permitido em PIX ou dinheiro.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data do pedido
-              </label>
-              <input
-                type="datetime-local"
-                value={orderDateTime}
-                onChange={(e) => setOrderDateTime(e.target.value)}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Use esta data para lançar pedidos antigos no sistema.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Descrição
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Descrição do pedido (opcional)"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Desconto geral no pedido (%)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max={canApplyGeneralDiscount ? "2" : "0"}
-                step="0.01"
-                value={discount}
-                onChange={(e) => {
-                  const raw = parseFloat(e.target.value) || 0;
-                  const capped = canApplyGeneralDiscount
-                    ? Math.min(2, Math.max(0, raw))
-                    : 0;
-                  setDiscount(capped);
-                }}
-                className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                disabled={!canApplyGeneralDiscount}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Aplicado sobre o subtotal já com descontos por item.
-              </p>
-              {canApplyGeneralDiscount ? (
-                <p className="mt-1 text-xs font-medium text-amber-700">
-                  Para PIX ou dinheiro, desconto geral limitado a 2%.
-                </p>
-              ) : (
-                <p className="mt-1 text-xs font-medium text-gray-500">
-                  Para esta forma de pagamento, desconto geral deve ser 0%.
-                </p>
-              )}
-            </div>
-          </div>
-          </section>
+          <OrderFormMetaSection
+            brands={brands}
+            clientId={clientId}
+            clientOptions={clientOptions}
+            clientSearchTerm={clientSearchTerm}
+            onClientSearchTermChange={handleClientSearchTermChange}
+            onOpenMobileClientPicker={() => setMobileClientPickerOpen(true)}
+            onResetClient={resetClient}
+            mobileClientPickerOpen={mobileClientPickerOpen}
+            desktopClientListOpen={desktopClientListOpen}
+            onDesktopClientListOpen={setDesktopClientListOpen}
+            filteredClientOptions={filteredClientOptions}
+            onSelectClient={selectClientOption}
+            selectedBrand={selectedBrand}
+            onBrandChange={setSelectedBrand}
+            paymentMethod={paymentMethod}
+            onPaymentMethodChange={handlePaymentMethodChange}
+            orderDateTime={orderDateTime}
+            onOrderDateTimeChange={setOrderDateTime}
+            description={description}
+            onDescriptionChange={setDescription}
+            discount={discount}
+            onDiscountChange={setDiscount}
+            canApplyGeneralDiscount={canApplyGeneralDiscount}
+          />
 
           {/* --- Seção de Produtos (mobile: tela cheia; desktop: dropdown) --- */}
           <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 md:p-6 space-y-5">
@@ -920,391 +383,34 @@ const OrdersForm = ({
                 Busque e adicione itens, depois ajuste quantidade, desconto e preço.
               </p>
             </div>
-          <div className="space-y-5 pt-1">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Buscar produto (várias palavras, sem precisar igual ao cadastro)
-              </label>
+          <OrderFormProductSearch
+            selectedBrand={selectedBrand}
+            productSearch={productSearch}
+            onProductSearchChange={setProductSearch}
+            isSearching={isSearching}
+            searchResults={searchResults}
+            onResetSearch={resetProductSearch}
+            onOpenMobilePicker={() => setMobileProductPickerOpen(true)}
+            onProductSelect={handleProductSelect}
+          />
 
-              <button
-                type="button"
-                className="md:hidden w-full min-h-12 p-3.5 border border-gray-300 rounded-lg text-base text-left focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
-                disabled={!selectedBrand}
-                onClick={() => setMobileProductPickerOpen(true)}
-              >
-                <span
-                  className={
-                    productSearch.trim() ? "text-gray-900" : "text-gray-400"
-                  }
-                >
-                  {productSearch.trim()
-                    ? productSearch
-                    : "Toque para buscar e adicionar produto"}
-                </span>
-              </button>
+          <OrderFormLineItems
+            items={items}
+            clientId={clientId}
+            canEditUnitPrice={canEditUnitPrice}
+            onItemChange={handleItemChange}
+            onRemoveItem={removeItem}
+            onOpenHistory={setHistoryModalItem}
+          />
 
-              <div className="relative hidden md:block">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Digite nome ou código do produto..."
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    disabled={!selectedBrand}
-                    className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    autoComplete="off"
-                  />
-
-                  {isSearching && (
-                    <div className="absolute right-3 top-3">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
-                    </div>
-                  )}
-
-                  {productSearch && !isSearching && (
-                    <button
-                      type="button"
-                      onClick={clearSearch}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                      aria-label="Limpar busca"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {searchResults.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {searchResults.map((product) =>
-                      renderProductResultRow(product),
-                    )}
-                  </div>
-                )}
-
-                {productSearch &&
-                  searchResults.length === 0 &&
-                  !isSearching && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
-                      <div className="text-center text-gray-500">
-                        Nenhum produto encontrado para &quot;{productSearch}
-                        &quot;
-                      </div>
-                      <div className="text-xs text-gray-400 mt-2 text-center">
-                        Tente buscar por nome ou código do produto
-                      </div>
-                    </div>
-                  )}
-              </div>
-            </div>
-          </div>
-
-          {/* --- Tabela de Itens Adicionados --- */}
-          {items.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-xl font-semibold text-gray-800 mb-4">
-                Itens do Pedido
-              </h3>
-              <div className="space-y-3 md:hidden">
-                {items.map((item, index) => (
-                  <div
-                    key={item.productId || index}
-                    className="border border-gray-200 rounded-lg p-3 space-y-3"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {item.productName}
-                      </p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                          Codigo: {item.productcode}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">{item.brand}</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 items-end">
-                      <div>
-                        <label className="text-xs text-gray-500 block mb-1">
-                          Quantidade
-                        </label>
-                        <input
-                          type="number"
-                          step={
-                            allowsDecimalQuantityBrand(item.brand)
-                              ? "0.001"
-                              : "1"
-                          }
-                          max={
-                            allowsDecimalQuantityBrand(item.brand)
-                              ? undefined
-                              : item.availableStock || undefined
-                          }
-                          value={
-                            item.quantity === "" || item.quantity == null
-                              ? ""
-                              : item.quantity
-                          }
-                          placeholder="—"
-                          onChange={(e) =>
-                            handleItemChange(
-                              index,
-                              "quantity",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                        {item.availableStock && (
-                          <span className="text-xs text-gray-500 mt-1 inline-block">
-                            Disponivel: {item.availableStock}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="h-11 px-3 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors"
-                        title="Remover Item"
-                      >
-                        Remover item
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-500 block">
-                        Desconto no item (%)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={item.lineDiscount ?? 0}
-                        onChange={(e) =>
-                          handleItemChange(
-                            index,
-                            "lineDiscount",
-                            e.target.value,
-                          )
-                        }
-                        className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-500 block">
-                        Preço unitário (R$)
-                      </label>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={item.price}
-                        onChange={(e) =>
-                          handleItemChange(index, "price", e.target.value)
-                        }
-                        disabled={!canEditUnitPrice}
-                        className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base disabled:bg-gray-100 disabled:text-gray-500"
-                      />
-                      {!canEditUnitPrice && (
-                        <p className="text-xs text-gray-400">
-                          Somente administrador pode alterar o preço.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">
-                        Unitário: R$ {safeToFixed(item.price)}
-                      </span>
-                      <span className="font-semibold text-gray-900">
-                        Subtotal: R$ {safeToFixed(lineNetTotal(item))}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setHistoryModalItem(item)}
-                      disabled={!clientId || !item.productId}
-                      className="w-full rounded-md border border-blue-300 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Ver histórico deste produto no cliente
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg hidden md:block">
-                <table className="w-full min-w-[980px] divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">
-                        Produto
-                      </th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[110px]">
-                        Qtd.
-                      </th>
-                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">
-                        Desc. %
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[140px]">
-                        Preço Unit.
-                      </th>
-                      <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[130px]">
-                        Subtotal
-                      </th>
-                      <th className="sticky right-0 z-10 bg-gray-50 px-5 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-l border-gray-200">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {items.map((item, index) => (
-                      <tr key={item.productId || index}>
-                        <td className="px-5 py-4">
-                          <div className="max-w-[300px]">
-                            <div
-                              className="text-sm font-medium text-gray-900 truncate"
-                              title={item.productName}
-                            >
-                              {item.productName}
-                            </div>
-                            <div className="text-sm text-gray-500 space-y-1">
-                              <div className="flex flex-wrap gap-1">
-                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
-                                  Código: {item.productcode}
-                                </span>
-                              </div>
-                              <div title={item.brand}>{item.brand}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex flex-col items-center gap-1">
-                            <input
-                              type="number"
-                              step={
-                                allowsDecimalQuantityBrand(item.brand)
-                                  ? "0.001"
-                                  : "1"
-                              }
-                              max={
-                                allowsDecimalQuantityBrand(item.brand)
-                                  ? undefined
-                                  : item.availableStock || undefined
-                              }
-                              value={
-                                item.quantity === "" || item.quantity == null
-                                  ? ""
-                                  : item.quantity
-                              }
-                              placeholder="—"
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "quantity",
-                                  e.target.value,
-                                )
-                              }
-                            className="w-full min-w-[82px] p-2 border border-gray-300 rounded-md text-center text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            {item.availableStock && (
-                              <span className="text-xs text-gray-500">
-                                Disponível: {item.availableStock}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-4 whitespace-nowrap text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.01"
-                            value={item.lineDiscount ?? 0}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "lineDiscount",
-                                e.target.value,
-                              )
-                            }
-                            className="w-full min-w-[78px] p-2 border border-gray-300 rounded-md text-center text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-right">
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            value={item.price}
-                            onChange={(e) =>
-                              handleItemChange(index, "price", e.target.value)
-                            }
-                            disabled={!canEditUnitPrice}
-                            className="w-full min-w-[105px] p-2 border border-gray-300 rounded-md text-right text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-                          />
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-right">
-                          <span className="text-sm font-semibold text-gray-900">
-                            R$ {safeToFixed(lineNetTotal(item))}
-                          </span>
-                        </td>
-                        <td className="sticky right-0 z-10 bg-white px-5 py-4 whitespace-nowrap text-center border-l border-gray-100">
-                          <div className="flex flex-col gap-2">
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="px-3 py-1.5 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors text-sm font-medium"
-                              title="Remover Item"
-                            >
-                              Excluir
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setHistoryModalItem(item)}
-                              disabled={!clientId || !item.productId}
-                              className="px-2 py-1 border border-blue-200 text-blue-700 rounded-md hover:bg-blue-50 transition-colors text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Histórico cliente
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
           </section>
 
-          {/* --- Total --- */}
-          <section className="mt-8 bg-green-50/50 p-5 sm:p-7 rounded-xl border border-green-100">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">
-              Resumo financeiro
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-gray-600">
-                <span>Subtotal (após descontos nos itens)</span>
-                <span className="font-medium">
-                  R$ {safeToFixed(subtotalAfterLineDiscounts)}
-                </span>
-              </div>
-              {discount > 0 && (
-                <div className="flex justify-between items-center text-gray-600">
-                  <span>Desconto geral ({discount}%)</span>
-                  <span className="font-medium text-red-500">
-                    - R$ {safeToFixed(discountAmount)}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between items-center text-gray-900 pt-3 border-t">
-                <span className="text-lg sm:text-xl font-bold">Total do Pedido</span>
-                <span className="text-xl sm:text-2xl font-bold text-green-700">
-                  R$ {safeToFixed(totalPrice)}
-                </span>
-              </div>
-            </div>
-          </section>
+          <OrderFormTotals
+            subtotalAfterLineDiscounts={subtotalAfterLineDiscounts}
+            discount={discount}
+            discountAmount={discountAmount}
+            totalPrice={totalPrice}
+          />
 
           {/* --- Ações (desktop) --- */}
           <div className="hidden md:flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-2">
@@ -1351,148 +457,35 @@ const OrdersForm = ({
       </div>
     </div>
 
-      {mobileProductPickerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-white md:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Buscar produto"
-        >
-          <div className="flex items-center gap-2 border-b border-gray-200 p-3 pt-[max(12px,env(safe-area-inset-top,0px))]">
-            <button
-              type="button"
-              onClick={() => setMobileProductPickerOpen(false)}
-              className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
-            >
-              Voltar
-            </button>
-            <div className="relative flex-1 min-w-0">
-              <input
-                type="search"
-                placeholder={
-                  selectedBrand
-                    ? "Nome ou código do produto..."
-                    : "Selecione uma representada"
-                }
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                disabled={!selectedBrand}
-                className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                autoComplete="off"
-                autoFocus
-              />
-              {isSearching && (
-                <div className="absolute right-3 top-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
-                </div>
-              )}
-            </div>
-          </div>
+      <OrderMobileProductPicker
+        open={mobileProductPickerOpen}
+        onClose={() => setMobileProductPickerOpen(false)}
+        selectedBrand={selectedBrand}
+        productSearch={productSearch}
+        onProductSearchChange={setProductSearch}
+        isSearching={isSearching}
+        searchResults={searchResults}
+        onProductSelect={handleProductSelect}
+      />
 
-          <div className="flex-1 overflow-y-auto overscroll-contain">
-            {!selectedBrand && (
-              <p className="p-4 text-center text-gray-500">
-                Selecione uma representada para buscar produtos.
-              </p>
-            )}
-            {selectedBrand &&
-              productSearch.trim().length > 0 &&
-              productSearch.trim().length < 2 && (
-                <p className="p-4 text-center text-gray-500">
-                  Digite pelo menos 2 caracteres.
-                </p>
-              )}
-            {selectedBrand &&
-              productSearch.trim().length >= 2 &&
-              searchResults.length > 0 &&
-              searchResults.map((product) => renderProductResultRow(product))}
-            {selectedBrand &&
-              productSearch.trim().length >= 2 &&
-              searchResults.length === 0 &&
-              !isSearching && (
-                <div className="p-6 text-center text-gray-500">
-                  Nenhum produto encontrado para &quot;{productSearch}&quot;
-                </div>
-              )}
-          </div>
-        </div>
-      )}
-
-      {mobileClientPickerOpen && (
-        <div
-          className="fixed inset-0 z-[60] flex flex-col bg-white md:hidden"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Buscar cliente"
-        >
-          <div className="flex items-center gap-2 border-b border-gray-200 p-3 pt-[max(12px,env(safe-area-inset-top,0px))]">
-            <button
-              type="button"
-              onClick={() => setMobileClientPickerOpen(false)}
-              className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50"
-            >
-              Voltar
-            </button>
-            <div className="relative flex-1 min-w-0">
-              <input
-                type="search"
-                placeholder="Nome, fantasia ou CNPJ..."
-                value={clientSearchTerm}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setClientSearchTerm(value);
-                  const exact = clientOptions.find(
-                    ({ label }) =>
-                      label.toLowerCase().trim() ===
-                      value.toLowerCase().trim(),
-                  );
-                  if (exact) setClientId(exact.id);
-                  else setClientId("");
-                }}
-                className="w-full p-3 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="off"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto overscroll-contain">
-            {!clientSearchTerm.trim() && clientOptions.length > 0 && (
-              <p className="border-b border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                Mostrando os primeiros {MOBILE_CLIENT_BROWSE_COUNT} clientes em
-                ordem alfabética. Digite para filtrar.
-              </p>
-            )}
-            {clientSearchTerm.trim().length > 0 &&
-              mobileClientDisplayList.length === 0 &&
-              clientOptions.length > 0 && (
-                <div className="p-6 text-center text-sm text-gray-500">
-                  Nenhum cliente encontrado para &quot;{clientSearchTerm}&quot;
-                </div>
-              )}
-            {clientOptions.length === 0 && (
-              <p className="p-6 text-center text-sm text-amber-800">
-                Nenhum cliente cadastrado.
-              </p>
-            )}
-            {mobileClientDisplayList.map((opt) => renderClientOptionRow(opt))}
-          </div>
-
-          <Link
-            to="/clients"
-            className="flex shrink-0 items-center gap-2 border-t border-gray-200 px-4 py-3 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-            style={{
-              paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
-            }}
-            onClick={() => setMobileClientPickerOpen(false)}
-          >
-            <span className="text-lg leading-none" aria-hidden>
-              +
-            </span>
-            Cadastrar novo cliente
-          </Link>
-        </div>
-      )}
+      <OrderMobileClientPicker
+        open={mobileClientPickerOpen}
+        onClose={() => setMobileClientPickerOpen(false)}
+        clientSearchTerm={clientSearchTerm}
+        onClientSearchChange={(value) => {
+          setClientSearchTerm(value);
+          const exact = clientOptions.find(
+            ({ label }) =>
+              label.toLowerCase().trim() === value.toLowerCase().trim(),
+          );
+          if (exact) setClientId(exact.id);
+          else setClientId("");
+        }}
+        clientOptions={clientOptions}
+        mobileClientDisplayList={mobileClientDisplayList}
+        browseCount={MOBILE_CLIENT_BROWSE_COUNT}
+        onSelectClient={selectClientOption}
+      />
 
       {historyModalItem && (
         <ClientItemPriceHistoryModal
