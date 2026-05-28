@@ -451,7 +451,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
   if (showForm) {
     return (
-      <div className="w-full min-w-0 max-w-full px-0 sm:px-2 md:px-3 lg:px-4 overflow-x-hidden">
+      <div className="w-full min-w-0 max-w-none -mx-2 sm:-mx-4 md:-mx-6 px-2 sm:px-3 md:px-4 overflow-x-hidden">
         <OrdersForm
           userId={userId}
           userRole={userRole}

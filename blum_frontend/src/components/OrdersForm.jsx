@@ -357,8 +357,8 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full min-w-0 max-w-[1400px] xl:mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
-        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-4 sm:mb-6 lg:mb-8 pt-1">
+      <div className="w-full min-w-0 max-w-none">
+        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-3 sm:mb-5 pt-0.5">
           {editingOrder
             ? editingOrder.documentType === "orcamento"
               ? "Editar orçamento"
@@ -378,7 +378,7 @@ const OrdersForm = ({
           <form
             id="order-form-main"
             onSubmit={handleSubmit}
-            className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 md:p-5 lg:p-8 space-y-6 sm:space-y-8 w-full min-w-0 overflow-hidden pb-28 md:pb-10"
+            className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 md:p-5 lg:p-6 space-y-5 sm:space-y-7 w-full min-w-0 overflow-hidden pb-28 md:pb-8"
           >
           <OrderFormMetaSection
             brands={brands}
@@ -471,7 +471,7 @@ const OrdersForm = ({
           paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="max-w-4xl mx-auto flex flex-col-reverse gap-2">
+        <div className="w-full flex flex-col-reverse gap-2">
           <button
             type="button"
             onClick={onCancel}

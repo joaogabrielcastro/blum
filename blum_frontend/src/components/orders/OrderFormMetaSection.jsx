@@ -74,8 +74,8 @@ export default function OrderFormMetaSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-7">
-        <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Cliente *
           </label>
@@ -161,7 +161,7 @@ export default function OrderFormMetaSection({
           )}
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Representada *
           </label>
@@ -186,8 +186,8 @@ export default function OrderFormMetaSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-7">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
+        <div className="min-w-0 md:col-span-2 xl:col-span-1">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Condição / forma de pagamento
           </label>
@@ -208,7 +208,7 @@ export default function OrderFormMetaSection({
           </p>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Data do pedido
           </label>
@@ -223,7 +223,7 @@ export default function OrderFormMetaSection({
           </p>
         </div>
 
-        <div>
+        <div className="min-w-0 md:col-span-2 xl:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Descrição
           </label>
@@ -236,7 +236,7 @@ export default function OrderFormMetaSection({
           />
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Desconto geral no pedido (%)
           </label>
