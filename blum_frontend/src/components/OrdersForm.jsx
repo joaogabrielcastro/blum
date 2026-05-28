@@ -357,8 +357,8 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full max-w-none md:max-w-[1400px] md:mx-auto px-0 sm:px-0 md:px-8 lg:px-12">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-5 sm:mb-10 px-3 md:px-0 pt-1 md:pt-0">
+      <div className="w-full min-w-0 max-w-[1400px] xl:mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
+        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-4 sm:mb-6 lg:mb-8 pt-1">
           {editingOrder
             ? editingOrder.documentType === "orcamento"
               ? "Editar orçamento"
@@ -366,7 +366,7 @@ const OrdersForm = ({
             : "Novo orçamento"}
         </h2>
         {editingOrder?.status === "Entregue" ? (
-          <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          <div className="mb-4 sm:mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 sm:px-4 py-3 text-amber-900">
             <p className="text-sm font-semibold">Pedido entregue em edição</p>
             <p className="mt-1 text-sm">
               Ao salvar este pedido, o sistema ajusta o estoque automaticamente
@@ -378,7 +378,7 @@ const OrdersForm = ({
           <form
             id="order-form-main"
             onSubmit={handleSubmit}
-            className="bg-white rounded-none md:rounded-xl shadow-sm md:shadow-lg border-y border-gray-200 md:border border-gray-200 p-3 sm:p-5 md:p-10 lg:p-12 space-y-8 sm:space-y-10 w-full pb-28 md:pb-10"
+            className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 md:p-5 lg:p-8 space-y-6 sm:space-y-8 w-full min-w-0 overflow-hidden pb-28 md:pb-10"
           >
           <OrderFormMetaSection
             brands={brands}
@@ -407,7 +407,7 @@ const OrdersForm = ({
           />
 
           {/* --- Seção de Produtos (mobile: tela cheia; desktop: dropdown) --- */}
-          <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 md:p-6 space-y-5">
+          <section className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 md:p-5 space-y-4 sm:space-y-5 min-w-0">
             <div>
               <h3 className="text-base sm:text-lg font-semibold text-gray-800">
                 Produtos do pedido

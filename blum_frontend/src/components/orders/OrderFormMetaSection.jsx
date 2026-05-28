@@ -64,7 +64,7 @@ export default function OrderFormMetaSection({
   canApplyGeneralDiscount,
 }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 sm:p-5 md:p-6 space-y-6">
+    <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4 md:p-5 space-y-5 sm:space-y-6 min-w-0">
       <div>
         <h3 className="text-base sm:text-lg font-semibold text-gray-800">
           Dados do pedido
@@ -74,7 +74,7 @@ export default function OrderFormMetaSection({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-7">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Cliente *
@@ -186,7 +186,7 @@ export default function OrderFormMetaSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-7">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-7">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Condição / forma de pagamento
