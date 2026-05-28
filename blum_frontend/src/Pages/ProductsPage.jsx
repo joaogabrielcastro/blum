@@ -20,6 +20,7 @@ const ProductsPage = ({ userRole }) => {
   const [showProductForm, setShowProductForm] = useState(false);
   /** Nome da representada selecionada, ou null antes da escolha inicial */
   const [selectedBrand, setSelectedBrand] = useState(null);
+  const [selectedBrandId, setSelectedBrandId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [error, setError] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -89,6 +90,7 @@ const ProductsPage = ({ userRole }) => {
         currentPage,
         50,
         debouncedSearch,
+        selectedBrandId,
       );
 
       if (response.data && response.pagination) {
@@ -111,7 +113,7 @@ const ProductsPage = ({ userRole }) => {
     } finally {
       setProductsLoading(false);
     }
-  }, [selectedBrand, currentPage, debouncedSearch]);
+  }, [selectedBrand, selectedBrandId, currentPage, debouncedSearch]);
 
   useEffect(() => {
     fetchProducts();
@@ -213,8 +215,9 @@ const ProductsPage = ({ userRole }) => {
       const brandsData = await apiService.getBrands();
       setBrands(brandsData);
 
-      if (selectedBrand === brandId) {
+      if (String(selectedBrandId) === String(brandId)) {
         setSelectedBrand(null);
+        setSelectedBrandId(null);
         setSearchTerm("");
         setCurrentPage(1);
       } else {
@@ -245,8 +248,17 @@ const ProductsPage = ({ userRole }) => {
     setEditingProduct(null);
   };
 
-  const openCatalogForBrand = (brandName) => {
-    setSelectedBrand(brandName);
+  const openCatalogForBrand = (brand) => {
+    const name =
+      typeof brand === "string"
+        ? brand
+        : brand?.displayName || brand?.name || "";
+    const id =
+      typeof brand === "object" && brand?.id != null
+        ? String(brand.id)
+        : brands.find((b) => String(b.name) === String(name))?.id;
+    setSelectedBrand(name);
+    setSelectedBrandId(id != null ? String(id) : null);
     setSearchTerm("");
     setCurrentPage(1);
   };
@@ -270,6 +282,7 @@ const ProductsPage = ({ userRole }) => {
             type="button"
             onClick={() => {
               setSelectedBrand(null);
+              setSelectedBrandId(null);
               setSearchTerm("");
               setCurrentPage(1);
               setProducts([]);

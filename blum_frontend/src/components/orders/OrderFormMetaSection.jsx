@@ -51,7 +51,7 @@ export default function OrderFormMetaSection({
   onDesktopClientListOpen,
   filteredClientOptions,
   onSelectClient,
-  selectedBrand,
+  selectedBrandId,
   onBrandChange,
   paymentMethod,
   onPaymentMethodChange,
@@ -166,14 +166,14 @@ export default function OrderFormMetaSection({
             Representada *
           </label>
           <select
-            value={selectedBrand}
+            value={selectedBrandId}
             onChange={(e) => onBrandChange(e.target.value)}
             className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Selecione uma representada</option>
             {Array.isArray(brands) &&
               brands.map((brand) => (
-                <option key={brand.id ?? brand.name} value={brand.name}>
+                <option key={brand.id ?? brand.name} value={String(brand.id)}>
                   {brand.name}
                 </option>
               ))}

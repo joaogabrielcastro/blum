@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { searchCatalogProducts } from "../utils/catalogApi";
 
 /** Busca debounced de produtos para o formulário de pedidos. */
-export function useOrderCatalogSearch(api, { selectedBrand, productSearch }) {
+export function useOrderCatalogSearch(
+  api,
+  { selectedBrand, selectedBrandId, productSearch },
+) {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    if (!selectedBrand) {
+    if (!selectedBrand && !selectedBrandId) {
       setSearchResults([]);
       return;
     }
@@ -25,6 +28,7 @@ export function useOrderCatalogSearch(api, { selectedBrand, productSearch }) {
         const results = await searchCatalogProducts(api, {
           q: term,
           brand: selectedBrand,
+          brandId: selectedBrandId,
           limit: 30,
         });
         if (!cancelled) setSearchResults(results);
@@ -40,7 +44,7 @@ export function useOrderCatalogSearch(api, { selectedBrand, productSearch }) {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [api, productSearch, selectedBrand]);
+  }, [api, productSearch, selectedBrand, selectedBrandId]);
 
   const clearSearch = () => setSearchResults([]);
 

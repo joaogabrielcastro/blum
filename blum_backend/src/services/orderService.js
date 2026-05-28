@@ -94,6 +94,16 @@ class OrderService {
     return map;
   }
 
+  async loadBrandIdsByNames(brandNames, tenantId = 1) {
+    const unique = [...new Set((brandNames || []).filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const rows = await sql`
+      SELECT id, name FROM brands
+      WHERE name = ANY(${unique}) AND tenant_id = ${tenantId}
+    `;
+    return new Map(rows.map((r) => [r.name, r.id]));
+  }
+
   lineDiscountPct(item) {
     const raw =
       item.lineDiscount ??
@@ -163,6 +173,12 @@ class OrderService {
     if (!calculatedItems?.length) {
       return;
     }
+
+    const brandIdMap = await this.loadBrandIdsByNames(
+      calculatedItems.map((it) => it.brand),
+      tenantId,
+    );
+
     const values = [];
     const placeholders = [];
     let paramIndex = 1;
@@ -177,11 +193,19 @@ class OrderService {
       const lineFactor = 1 - Math.min(100, Math.max(0, lineDisc)) / 100;
       const lineTotal = qty * price * lineFactor;
 
+      const brandIdRaw =
+        it.brand_id ?? it.brandId ?? brandIdMap.get(it.brand) ?? null;
+      const brandIdNum =
+        brandIdRaw != null && brandIdRaw !== ""
+          ? parseInt(brandIdRaw, 10)
+          : null;
+
       values.push(
         orderId,
         it.productId != null ? it.productId : null,
         it.productName || "",
         it.brand || "",
+        Number.isInteger(brandIdNum) ? brandIdNum : null,
         qty,
         price,
         lineDisc,
@@ -192,14 +216,14 @@ class OrderService {
       );
 
       placeholders.push(
-        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10})`,
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11})`,
       );
-      paramIndex += 11;
+      paramIndex += 12;
     }
 
     const insertSql = `
       INSERT INTO order_items (
-        order_id, product_id, product_name, brand, quantity, unit_price,
+        order_id, product_id, product_name, brand, brand_id, quantity, unit_price,
         line_discount, commission_rate, commission_amount, line_total, tenant_id
       ) VALUES ${placeholders.join(", ")}
     `;

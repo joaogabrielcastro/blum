@@ -84,6 +84,7 @@ function mapOrderItemResponse(item, options = {}) {
     commissionRate: item.commissionRate ?? item.commission_rate ?? 0,
     commissionAmount: item.commissionAmount ?? item.commission_amount ?? 0,
     productCode: item.productCode ?? item.productcode ?? "",
+    brandId: item.brandId ?? item.brand_id ?? null,
   });
   return maybeStripLegacy(
     mapped,
@@ -91,6 +92,7 @@ function mapOrderItemResponse(item, options = {}) {
       "tenant_id",
       "product_id",
       "product_name",
+      "brand_id",
       "unit_price",
       "line_total",
       "line_discount",

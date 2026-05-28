@@ -8,18 +8,26 @@ function normalizeList(response) {
   return [];
 }
 
-/** Busca server-side (máx. 25 por padrão no backend). Filtra pela representada no cliente. */
-export async function searchCatalogProducts(api, { q, brand, limit = 25 }) {
+/** Busca server-side (filtro por representada no backend quando brandId/brand informados). */
+export async function searchCatalogProducts(
+  api,
+  { q, brand, brandId, limit = 25 },
+) {
   const term = String(q ?? "").trim();
   if (term.length < 2) return [];
 
-  const rows = await api.searchProducts(term);
-  const list = (Array.isArray(rows) ? rows : []).map(mergeProductCodeFields);
+  const brandIdStr =
+    brandId != null && brandId !== "" ? String(brandId) : "";
   const brandNorm = brand ? String(brand).trim() : "";
-  const filtered = brandNorm
-    ? list.filter((p) => String(p.brand || "").trim() === brandNorm)
-    : list;
-  return filtered.slice(0, limit);
+
+  const rows = await api.searchProducts(
+    term,
+    brandNorm || undefined,
+    brandIdStr || undefined,
+  );
+  return (Array.isArray(rows) ? rows : [])
+    .map(mergeProductCodeFields)
+    .slice(0, limit);
 }
 
 /** Uma página do catálogo (para selects de revisão de importação). */

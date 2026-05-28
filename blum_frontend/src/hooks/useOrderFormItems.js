@@ -5,7 +5,16 @@ import {
   parseQuantityByBrand,
 } from "../utils/orderFormUtils";
 
-export function useOrderFormItems(items, setItems, { setProductSearch, setSearchResults, setMobileProductPickerOpen }) {
+export function useOrderFormItems(
+  items,
+  setItems,
+  {
+    selectedBrandId,
+    setProductSearch,
+    setSearchResults,
+    setMobileProductPickerOpen,
+  },
+) {
   const toast = useToast();
 
   const handleItemChange = useCallback(
@@ -83,6 +92,11 @@ export function useOrderFormItems(items, setItems, { setProductSearch, setSearch
           {
             productName: product.name,
             brand: product.brand,
+            brandId:
+              product.brandId ??
+              product.brand_id ??
+              selectedBrandId ??
+              null,
             quantity: "",
             price: product.price,
             lineDiscount: 0,
@@ -99,7 +113,15 @@ export function useOrderFormItems(items, setItems, { setProductSearch, setSearch
       setSearchResults([]);
       setMobileProductPickerOpen(false);
     },
-    [items, setItems, setProductSearch, setSearchResults, setMobileProductPickerOpen, toast],
+    [
+      items,
+      setItems,
+      selectedBrandId,
+      setProductSearch,
+      setSearchResults,
+      setMobileProductPickerOpen,
+      toast,
+    ],
   );
 
   const removeItem = useCallback(

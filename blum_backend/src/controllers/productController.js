@@ -33,14 +33,10 @@ exports.getAll = async (req, res) => {
 
     let brandNameForAccess = brand && brand !== "all" ? String(brand).trim() : "";
     if (!brandNameForAccess && brandId) {
-      const { sql } = require("../config/database");
-      const rows = await sql`
-        SELECT name FROM brands
-        WHERE id = ${parseInt(brandId, 10)}
-          AND tenant_id = ${req.user.tenantId}
-        LIMIT 1
-      `;
-      brandNameForAccess = rows[0]?.name || "";
+      brandNameForAccess = await productService.resolveBrandName(
+        brandId,
+        req.user.tenantId,
+      );
     }
     if (
       allowedBrandNames &&
@@ -129,15 +125,36 @@ exports.lookupByCode = async (req, res) => {
 exports.search = async (req, res) => {
   try {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };
-    const { q } = req.query;
+    const { q, brandId, brand } = req.query;
     const allowedBrandNames =
       await brandAccessService.getRestrictedBrandNamesOrNull(
         req.user.userId,
         req.user.role,
         req.user.tenantId,
       );
+
+    let brandNameForAccess = brand && brand !== "all" ? String(brand).trim() : "";
+    if (!brandNameForAccess && brandId) {
+      brandNameForAccess = await productService.resolveBrandName(
+        brandId,
+        req.user.tenantId,
+      );
+    }
+    if (
+      allowedBrandNames &&
+      brandNameForAccess &&
+      !allowedBrandNames.includes(brandNameForAccess)
+    ) {
+      return res.status(403).json({
+        error: "Sem permissão para consultar produtos desta representada",
+      });
+    }
+
     const products = (
-      await productService.search(q, 20, allowedBrandNames, req.user.tenantId)
+      await productService.search(q, 20, allowedBrandNames, req.user.tenantId, {
+        brandId,
+        brand: brandNameForAccess || brand,
+      })
     ).map((item) => mapProductResponse(item, mapOptions));
     res.status(200).json(products);
   } catch (error) {

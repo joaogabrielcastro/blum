@@ -22,6 +22,7 @@ function mapOrderItemsWithProducts(lines) {
     productId: row.product_id,
     productName: row.product_name,
     brand: row.brand,
+    brandId: row.brand_id ?? row.brandId ?? null,
     quantity: row.quantity,
     price: parseFloat(row.unit_price),
     lineDiscount: parseFloat(row.line_discount) || 0,

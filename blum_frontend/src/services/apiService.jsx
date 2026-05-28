@@ -293,13 +293,16 @@ const apiService = {
     }
   },
 
-  searchProducts: async (searchTerm) => {
+  searchProducts: async (searchTerm, brand, brandId) => {
     if (!searchTerm || searchTerm.trim() === "") {
       return [];
     }
-    return apiRequest(
-      `${API_URL}/products/search?q=${encodeURIComponent(searchTerm.trim())}`,
-    );
+    const params = new URLSearchParams();
+    params.append("q", searchTerm.trim());
+    if (brand && brand !== "all") params.append("brand", brand);
+    if (brandId != null && brandId !== "")
+      params.append("brandId", String(brandId));
+    return apiRequest(`${API_URL}/products/search?${params.toString()}`);
   },
 
   // ==================== ORDERS ====================

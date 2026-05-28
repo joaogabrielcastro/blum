@@ -21,6 +21,8 @@ export const normalizeOrderLineItems = (items) => {
       line.productId ?? line.product_id ?? line.productid ?? null;
     const productName = line.productName ?? line.product_name ?? "";
     const brand = line.brand ?? "";
+    const brandId =
+      line.brandId ?? line.brand_id ?? line.brandid ?? null;
     const qty = parseFloat(
       String(line.quantity ?? "")
         .trim()
@@ -47,6 +49,7 @@ export const normalizeOrderLineItems = (items) => {
       productId: productId != null ? Number(productId) || productId : null,
       productName: String(productName),
       brand: String(brand),
+      brandId: brandId != null && brandId !== "" ? brandId : null,
       quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
       price: Number.isFinite(price) ? price : 0,
       lineDiscount,

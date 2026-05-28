@@ -9,6 +9,10 @@ import { useOrderFormClients } from "../hooks/useOrderFormClients";
 import { useOrderFormItems } from "../hooks/useOrderFormItems";
 import { computeOrderTotals } from "../utils/orderLineTotals";
 import {
+  findBrandById,
+  findBrandByName,
+} from "../utils/brandSelection";
+import {
   allowsDecimalQuantityBrand,
   parseQuantityByBrand,
   toDateTimeLocalValue,
@@ -54,6 +58,7 @@ const OrdersForm = ({
   const [items, setItems] = useState([]);
   const [discount, setDiscount] = useState(0);
   const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrandId, setSelectedBrandId] = useState("");
   const [totalPrice, setTotalPrice] = useState(0);
   const [productSearch, setProductSearch] = useState("");
   const {
@@ -61,7 +66,11 @@ const OrdersForm = ({
     setSearchResults,
     isSearching,
     clearSearch,
-  } = useOrderCatalogSearch(apiService, { selectedBrand, productSearch });
+  } = useOrderCatalogSearch(apiService, {
+    selectedBrand,
+    selectedBrandId,
+    productSearch,
+  });
   const [mobileProductPickerOpen, setMobileProductPickerOpen] =
     useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -77,6 +86,7 @@ const OrdersForm = ({
     items,
     setItems,
     {
+      selectedBrandId,
       setProductSearch,
       setSearchResults,
       setMobileProductPickerOpen,
@@ -96,8 +106,16 @@ const OrdersForm = ({
       setItems(lines);
       setDiscount(editingOrder.discount || 0);
       setTotalPrice(editingOrder.totalPrice ?? editingOrder.totalprice ?? 0);
-      const firstBrand = lines.find((i) => i.brand)?.brand;
-      if (firstBrand) setSelectedBrand(firstBrand);
+      const firstLine = lines.find((i) => i.brand || i.brandId);
+      if (firstLine?.brandId) {
+        setSelectedBrandId(String(firstLine.brandId));
+        const b = findBrandById(brands, firstLine.brandId);
+        setSelectedBrand(b?.name || firstLine.brand || "");
+      } else if (firstLine?.brand) {
+        setSelectedBrand(firstLine.brand);
+        const b = findBrandByName(brands, firstLine.brand);
+        setSelectedBrandId(b?.id != null ? String(b.id) : "");
+      }
       setPaymentMethod(editingOrder.paymentMethod || "");
       setOrderDateTime(toDateTimeLocalValue(editingOrder.createdAt));
     } else {
@@ -107,6 +125,7 @@ const OrdersForm = ({
       setItems([]);
       setDiscount(0);
       setSelectedBrand("");
+      setSelectedBrandId("");
       setTotalPrice(0);
       setProductSearch("");
       setSearchResults([]);
@@ -157,6 +176,14 @@ const OrdersForm = ({
     if (exact) setClientId(exact.id);
     else setClientId("");
     setDesktopClientListOpen(true);
+  };
+
+  const handleBrandChange = (brandId) => {
+    setSelectedBrandId(brandId);
+    const brand = findBrandById(brands, brandId);
+    setSelectedBrand(brand?.name || "");
+    setProductSearch("");
+    clearSearch();
   };
 
   const handlePaymentMethodChange = (nextMethod) => {
@@ -266,15 +293,21 @@ const OrdersForm = ({
             ? normalizedOriginalSellerId
             : userId,
         description: description,
-        items: items.map((item) => ({
-          ...item,
-          price: parseFloat(item.price) || 0,
-          quantity: parseQuantityByBrand(item.quantity, item.brand),
-          lineDiscount: Math.min(
-            100,
-            Math.max(0, parseFloat(item.lineDiscount) || 0),
-          ),
-        })),
+        items: items.map((item) => {
+          const resolvedBrandId =
+            item.brandId ??
+            (selectedBrandId || findBrandByName(brands, item.brand)?.id);
+          return {
+            ...item,
+            brandId: resolvedBrandId != null ? resolvedBrandId : null,
+            price: parseFloat(item.price) || 0,
+            quantity: parseQuantityByBrand(item.quantity, item.brand),
+            lineDiscount: Math.min(
+              100,
+              Math.max(0, parseFloat(item.lineDiscount) || 0),
+            ),
+          };
+        }),
         discount: parseFloat(discount) || 0,
         totalprice: parseFloat(netTotal) || 0,
         document_type: editingOrder
@@ -360,8 +393,8 @@ const OrdersForm = ({
             onDesktopClientListOpen={setDesktopClientListOpen}
             filteredClientOptions={filteredClientOptions}
             onSelectClient={selectClientOption}
-            selectedBrand={selectedBrand}
-            onBrandChange={setSelectedBrand}
+            selectedBrandId={selectedBrandId}
+            onBrandChange={handleBrandChange}
             paymentMethod={paymentMethod}
             onPaymentMethodChange={handlePaymentMethodChange}
             orderDateTime={orderDateTime}

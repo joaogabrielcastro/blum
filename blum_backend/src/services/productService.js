@@ -13,6 +13,15 @@ function brandSql(names) {
   };
 }
 
+async function resolveBrandName(brandId, tenantId = 1) {
+  const id = parseInt(brandId, 10);
+  if (!Number.isInteger(id) || id <= 0) return "";
+  const rows = await sql`
+    SELECT name FROM brands WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1
+  `;
+  return rows[0]?.name || "";
+}
+
 async function resolveBrandId(brandName, tenantId = 1) {
   const name = String(brandName || "").trim();
   if (!name) return null;
@@ -25,6 +34,10 @@ async function resolveBrandId(brandName, tenantId = 1) {
 }
 
 class ProductService {
+  async resolveBrandName(brandId, tenantId = 1) {
+    return resolveBrandName(brandId, tenantId);
+  }
+
   /**
    * Busca exata por código na representada (nome ou brand_id).
    */
@@ -296,7 +309,13 @@ class ProductService {
    * @param {number} limit - Limite de resultados
    * @returns {Promise<Array>} Lista de produtos
    */
-  async search(searchTerm, limit = 20, allowedBrandNames = null, tenantId = 1) {
+  async search(
+    searchTerm,
+    limit = 20,
+    allowedBrandNames = null,
+    tenantId = 1,
+    brandFilter = {},
+  ) {
     if (!searchTerm || searchTerm.trim() === "") {
       throw new Error("Termo de busca é obrigatório");
     }
@@ -310,6 +329,17 @@ class ProductService {
       throw new Error("Termo de busca é obrigatório");
     }
 
+    let brandIdNum =
+      brandFilter.brandId != null && brandFilter.brandId !== ""
+        ? parseInt(brandFilter.brandId, 10)
+        : null;
+    let brandName = brandFilter.brand
+      ? String(brandFilter.brand).trim()
+      : "";
+    if (Number.isInteger(brandIdNum) && brandIdNum > 0 && !brandName) {
+      brandName = await resolveBrandName(brandIdNum, tenantId);
+    }
+
     const trySearch = async (tokenFn) => {
       const t = tokenFn(tokens, 1);
       let w = `(tenant_id = ${tenantId}) AND (${t.sql})`;
@@ -318,6 +348,15 @@ class ProductService {
       if (allowedBrandNames && allowedBrandNames.length) {
         v.push(allowedBrandNames);
         w += ` AND brand = ANY($${np})`;
+        np++;
+      }
+      if (Number.isInteger(brandIdNum) && brandIdNum > 0) {
+        v.push(brandIdNum, brandName);
+        w += ` AND (brand_id = $${np} OR brand = $${np + 1})`;
+        np += 2;
+      } else if (brandName) {
+        v.push(brandName);
+        w += ` AND brand = $${np}`;
         np++;
       }
       const sqlText = `
