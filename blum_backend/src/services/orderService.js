@@ -78,6 +78,42 @@ function aggregateControlledStockQuantities(items = []) {
   return totals;
 }
 
+function stockShortfallValue(item) {
+  const raw = item?.stock_shortfall ?? item?.stockShortfall ?? 0;
+  const n = parseFloat(String(raw).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function computeHasStockWarning(items = []) {
+  return items.some((item) => stockShortfallValue(item) > 0);
+}
+
+function isStockWarningConfirmed(orderData) {
+  return (
+    orderData?.confirmStockWarning === true ||
+    orderData?.confirm_stock_warning === true
+  );
+}
+
+function buildStockWarningError(message, items = []) {
+  const err = new Error(message);
+  err.statusCode = 400;
+  err.code = "STOCK_WARNING_CONFIRM_REQUIRED";
+  err.stockWarnings = items
+    .filter((item) => stockShortfallValue(item) > 0)
+    .map((item) => ({
+      productId: item.productId,
+      productName: item.productName || item.product_name || "",
+      quantity: parseQuantityValue(item.quantity, {
+        brand: item.brand,
+        defaultValue: 0,
+      }),
+      availableStock: item.stock_at_save ?? item.stockAtSave ?? 0,
+      shortfall: stockShortfallValue(item),
+    }));
+  return err;
+}
+
 class OrderService {
   async loadCommissionRatesByBrandNames(brandNames) {
     const unique = [...new Set((brandNames || []).filter(Boolean))];
@@ -92,6 +128,77 @@ class OrderService {
       map.set(r.name, parseFloat(r.commission_rate) || 0);
     }
     return map;
+  }
+
+  async loadProductStockMap(productIds, tenantId = 1) {
+    const intIds = [
+      ...new Set(
+        (productIds || [])
+          .map((id) => parseInt(String(id), 10))
+          .filter((n) => Number.isFinite(n) && n > 0),
+      ),
+    ];
+    if (!intIds.length) return new Map();
+
+    const rows = await sql`
+      SELECT id, stock, name FROM products
+      WHERE id = ANY(${intIds}) AND tenant_id = ${tenantId}
+    `;
+    return new Map(
+      rows.map((r) => [
+        String(r.id),
+        { stock: parseInt(r.stock, 10) || 0, name: r.name },
+      ]),
+    );
+  }
+
+  enrichItemsWithStockWarnings(
+    items,
+    stockMap,
+    { previousControlledStock = new Map() } = {},
+  ) {
+    return (items || []).map((item) => {
+      if (!item?.productId || !controlsStockByBrand(item.brand)) {
+        return {
+          ...item,
+          stock_at_save: null,
+          stock_shortfall: 0,
+        };
+      }
+
+      const productInfo = stockMap.get(String(item.productId));
+      if (!productInfo) {
+        throw new Error(
+          `Produto "${item.productName || item.productId}" não encontrado`,
+        );
+      }
+
+      const availableStock = productInfo.stock;
+      const requestedQuantity = parseQuantityValue(item.quantity, {
+        brand: item.brand,
+        defaultValue: 0,
+      });
+      const previousQuantity =
+        previousControlledStock.get(String(item.productId)) || 0;
+      const effectiveAvailable = availableStock + previousQuantity;
+      const shortfall = Math.max(0, requestedQuantity - effectiveAvailable);
+
+      return {
+        ...item,
+        stock_at_save: availableStock,
+        stock_shortfall: shortfall,
+      };
+    });
+  }
+
+  enforceStockWarningConfirmation(docType, hasStockWarning, orderData) {
+    if (!hasStockWarning || docType !== "pedido") return;
+    if (!isStockWarningConfirmed(orderData)) {
+      throw buildStockWarningError(
+        "Confirme o aviso de estoque insuficiente para salvar este pedido.",
+        orderData?.items || [],
+      );
+    }
   }
 
   async loadBrandIdsByNames(brandNames, tenantId = 1) {
@@ -200,6 +307,14 @@ class OrderService {
           ? parseInt(brandIdRaw, 10)
           : null;
 
+      const stockAtSave =
+        it.stock_at_save != null
+          ? parseInt(String(it.stock_at_save), 10)
+          : it.stockAtSave != null
+            ? parseInt(String(it.stockAtSave), 10)
+            : null;
+      const stockShortfall = stockShortfallValue(it);
+
       values.push(
         orderId,
         it.productId != null ? it.productId : null,
@@ -213,18 +328,21 @@ class OrderService {
         it.commission_amount || 0,
         lineTotal,
         tenantId,
+        Number.isFinite(stockAtSave) ? stockAtSave : null,
+        stockShortfall,
       );
 
       placeholders.push(
-        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11})`,
+        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, $${paramIndex + 12}, $${paramIndex + 13})`,
       );
-      paramIndex += 12;
+      paramIndex += 14;
     }
 
     const insertSql = `
       INSERT INTO order_items (
         order_id, product_id, product_name, brand, brand_id, quantity, unit_price,
-        line_discount, commission_rate, commission_amount, line_total, tenant_id
+        line_discount, commission_rate, commission_amount, line_total, tenant_id,
+        stock_at_save, stock_shortfall
       ) VALUES ${placeholders.join(", ")}
     `;
 
@@ -443,34 +561,21 @@ class OrderService {
       );
     }
 
-    for (const item of items) {
-      if (item.productId) {
-        const product =
-          await sql`SELECT stock, name FROM products WHERE id = ${item.productId} AND tenant_id = ${tenantId}`;
+    const stockMap = await this.loadProductStockMap(
+      items.map((item) => item.productId),
+      tenantId,
+    );
+    const itemsWithStock = this.enrichItemsWithStockWarnings(items, stockMap);
+    const hasStockWarning = computeHasStockWarning(itemsWithStock);
+    this.enforceStockWarningConfirmation(docType, hasStockWarning, {
+      ...orderData,
+      items: itemsWithStock,
+    });
 
-        if (product.length === 0) {
-          throw new Error(
-            `Produto "${item.productName || item.productId}" não encontrado`,
-          );
-        }
-
-        const availableStock = product[0].stock;
-        const requestedQuantity = parseQuantityValue(item.quantity, {
-          brand: item.brand,
-          defaultValue: 0,
-        });
-        const shouldCheckStock = controlsStockByBrand(item.brand);
-
-        if (shouldCheckStock && requestedQuantity > availableStock) {
-          throw new Error(
-            `Estoque insuficiente para "${product[0].name}". ` +
-              `Disponível: ${availableStock}, Solicitado: ${requestedQuantity}`,
-          );
-        }
-      }
-    }
-
-    const calculated = await this.calculateItemsCommission(items, discount);
+    const calculated = await this.calculateItemsCommission(
+      itemsWithStock,
+      discount,
+    );
 
     const sellerRow =
       await sql`SELECT id FROM users WHERE id = ${sellerUserId} AND tenant_id = ${tenantId}`;
@@ -480,11 +585,11 @@ class OrderService {
 
     const result = await sql`
       INSERT INTO orders
-        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
+        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method, has_stock_warning)
       VALUES
         (${clientid}, ${sellerUserId}, ${tenantId}, ${description || ""},
          ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', COALESCE(${createdAt}, NOW()), ${docType}, ${payment})
+         'Em aberto', COALESCE(${createdAt}, NOW()), ${docType}, ${payment}, ${hasStockWarning})
       RETURNING *
     `;
 
@@ -526,38 +631,25 @@ class OrderService {
       );
     }
 
-    for (const item of items) {
-      if (item.productId) {
-        const product =
-          await sql`SELECT stock, name FROM products WHERE id = ${item.productId} AND tenant_id = ${tenantId}`;
+    const stockMap = await this.loadProductStockMap(
+      items.map((item) => item.productId),
+      tenantId,
+    );
+    const itemsWithStock = this.enrichItemsWithStockWarnings(items, stockMap, {
+      previousControlledStock: isDeliveredPedido
+        ? previousControlledStock
+        : new Map(),
+    });
+    const hasStockWarning = computeHasStockWarning(itemsWithStock);
+    this.enforceStockWarningConfirmation(docType, hasStockWarning, {
+      ...orderData,
+      items: itemsWithStock,
+    });
 
-        if (product.length === 0) {
-          throw new Error(
-            `Produto "${item.productName || item.productId}" não encontrado`,
-          );
-        }
-
-        const availableStock = product[0].stock;
-        const requestedQuantity = parseQuantityValue(item.quantity, {
-          brand: item.brand,
-          defaultValue: 0,
-        });
-        const shouldCheckStock = controlsStockByBrand(item.brand);
-        const previousQuantity = isDeliveredPedido
-          ? previousControlledStock.get(String(item.productId)) || 0
-          : 0;
-        const effectiveAvailable = availableStock + previousQuantity;
-
-        if (shouldCheckStock && requestedQuantity > effectiveAvailable) {
-          throw new Error(
-            `Estoque insuficiente para "${product[0].name}". ` +
-              `Disponível: ${effectiveAvailable}, Solicitado: ${requestedQuantity}`,
-          );
-        }
-      }
-    }
-
-    const calculated = await this.calculateItemsCommission(items, discount);
+    const calculated = await this.calculateItemsCommission(
+      itemsWithStock,
+      discount,
+    );
 
     const sellerRow =
       await sql`SELECT id FROM users WHERE id = ${sellerUserId} AND tenant_id = ${tenantId}`;
@@ -579,6 +671,7 @@ class OrderService {
         docType,
         payment,
         createdAt,
+        hasStockWarning,
         tenantId,
       });
 
@@ -678,17 +771,26 @@ class OrderService {
       throw new Error("Não é possível duplicar um pedido sem itens.");
     }
     const sourceDiscount = parseFloat(source.discount) || 0;
-    const calculated = await this.calculateItemsCommission(
+    const stockMap = await this.loadProductStockMap(
+      sourceItems.map((item) => item.productId),
+      tenantId,
+    );
+    const itemsWithStock = this.enrichItemsWithStockWarnings(
       sourceItems,
+      stockMap,
+    );
+    const hasStockWarning = computeHasStockWarning(itemsWithStock);
+    const calculated = await this.calculateItemsCommission(
+      itemsWithStock,
       sourceDiscount,
     );
     const inserted = await sql`
       INSERT INTO orders
-        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method)
+        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method, has_stock_warning)
       VALUES
         (${source.clientid}, ${source.user_ref}, ${tenantId}, ${source.description || ""},
          ${sourceDiscount}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', NOW(), 'orcamento', null)
+         'Em aberto', NOW(), 'orcamento', null, ${hasStockWarning})
       RETURNING id
     `;
     const newId = inserted[0].id;
@@ -752,7 +854,7 @@ class OrderService {
     `;
   }
 
-  async convertToPedido(id, tenantId = 1) {
+  async convertToPedido(id, tenantId = 1, options = {}) {
     const order = await this.findById(id, tenantId);
     const orderDoc = order.document_type ?? order.documentType ?? null;
     if (orderDoc !== "orcamento") {
@@ -767,9 +869,56 @@ class OrderService {
       err.statusCode = 400;
       throw err;
     }
-    await sql`
-      UPDATE orders SET document_type = 'pedido' WHERE id = ${id} AND tenant_id = ${tenantId}
-    `;
+
+    const sourceItems = Array.isArray(order.items) ? order.items : [];
+    const stockMap = await this.loadProductStockMap(
+      sourceItems.map((item) => item.productId),
+      tenantId,
+    );
+    const itemsWithStock = this.enrichItemsWithStockWarnings(
+      sourceItems,
+      stockMap,
+    );
+    const hasStockWarning = computeHasStockWarning(itemsWithStock);
+
+    if (hasStockWarning && !isStockWarningConfirmed(options)) {
+      throw buildStockWarningError(
+        "Este orçamento tem itens sem estoque suficiente. Confirme para converter em pedido.",
+        itemsWithStock,
+      );
+    }
+
+    const sourceDiscount = parseFloat(order.discount) || 0;
+    const calculated = await this.calculateItemsCommission(
+      itemsWithStock,
+      sourceDiscount,
+    );
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          UPDATE orders
+          SET document_type = 'pedido', has_stock_warning = $1
+          WHERE id = $2 AND tenant_id = $3
+        `,
+        [hasStockWarning, id, tenantId],
+      );
+      await this.persistOrderItemsWithClient(
+        client,
+        id,
+        calculated.items,
+        tenantId,
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+
     return this.findById(id, tenantId);
   }
 

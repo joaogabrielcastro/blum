@@ -39,14 +39,13 @@ export function useOrderFormItems(
           return;
         }
         if (
-          newItems[index].availableStock &&
+          newItems[index].availableStock != null &&
           !allowsDecimalQuantityBrand(itemBrand) &&
           parsedQty > newItems[index].availableStock
         ) {
           toast.warning(
-            `Quantidade solicitada (${parsedQty}) excede o estoque disponível (${newItems[index].availableStock}) para "${newItems[index].productName}"`,
+            `Quantidade (${parsedQty}) acima do estoque (${newItems[index].availableStock}) em "${newItems[index].productName}". O item ficará marcado com aviso de ruptura.`,
           );
-          return;
         }
         newItems[index][field] = parsedQty;
         setItems(newItems);
@@ -83,8 +82,9 @@ export function useOrderFormItems(
 
       if (!existingItem) {
         if (product.stock <= 0 && !allowsDecimalQuantityBrand(product.brand)) {
-          toast.warning(`Produto "${product.name}" sem estoque disponível!`);
-          return;
+          toast.warning(
+            `Produto "${product.name}" sem estoque. Você pode incluir; o orçamento/pedido será salvo com aviso de ruptura.`,
+          );
         }
 
         setItems((prev) => [

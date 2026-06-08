@@ -124,6 +124,8 @@ const apiRequest = async (url, options = {}) => {
         `Erro HTTP ${response.status}`
     );
     customError.status = response.status;
+    customError.code = error.code;
+    customError.stockWarnings = error.stockWarnings;
     throw customError;
   }
 
@@ -363,9 +365,12 @@ const apiService = {
     );
   },
 
-  convertOrderToPedido: async (orderId) => {
+  convertOrderToPedido: async (orderId, options = {}) => {
     return apiRequest(`${API_URL}/orders/${orderId}/convert-to-pedido`, {
       method: "PUT",
+      body: JSON.stringify({
+        confirmStockWarning: options.confirmStockWarning === true,
+      }),
     });
   },
 

@@ -3,6 +3,7 @@ import apiService from "../services/apiService";
 import ListPageSkeleton from "../components/ListPageSkeleton";
 import { useToast } from "../context/ToastContext";
 import OrdersForm from "../components/OrdersForm";
+import OrderStockWarningModal from "../components/orders/OrderStockWarningModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import formatCurrency, { formatOrderData } from "../utils/format";
@@ -99,6 +100,11 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   const [sellerFilterKey, setSellerFilterKey] = useState("");
   const [listFetchError, setListFetchError] = useState(null);
   const [visibleDayGroups, setVisibleDayGroups] = useState(10);
+  const [convertStockModal, setConvertStockModal] = useState({
+    open: false,
+    orderId: null,
+    lines: [],
+  });
 
   // Validar e transformar brands para garantir segurança
   const safeBrands = Array.isArray(brands)
@@ -204,19 +210,37 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     }
   };
 
-  const handleConvertToPedido = async (orderId) => {
-    if (
-      !window.confirm(
-        "Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega.",
-      )
-    ) {
-      return;
+  const handleConvertToPedido = async (orderId, { confirmStockWarning = false } = {}) => {
+    if (!confirmStockWarning) {
+      if (
+        !window.confirm(
+          "Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega.",
+        )
+      ) {
+        return;
+      }
     }
+
     try {
-      await apiService.convertOrderToPedido(orderId);
+      await apiService.convertOrderToPedido(orderId, { confirmStockWarning });
+      setConvertStockModal({ open: false, orderId: null, lines: [] });
       await fetchData();
-      toast.success("Orçamento convertido em pedido.");
+      toast.success(
+        confirmStockWarning
+          ? "Orçamento convertido em pedido com aviso de ruptura de estoque."
+          : "Orçamento convertido em pedido.",
+      );
     } catch (error) {
+      if (error?.code === "STOCK_WARNING_CONFIRM_REQUIRED") {
+        const lines = (error.stockWarnings || []).map((row) => ({
+          productName: row.productName,
+          quantity: row.quantity,
+          available: row.availableStock ?? 0,
+          shortfall: row.shortfall,
+        }));
+        setConvertStockModal({ open: true, orderId, lines });
+        return;
+      }
       toast.error(
         error?.message || "Não foi possível converter o orçamento.",
       );
@@ -495,6 +519,24 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           onClose={() => setPdfOrder(null)}
         />
       )}
+      <OrderStockWarningModal
+        open={convertStockModal.open}
+        title="Converter orçamento com itens sem estoque"
+        description="Ao virar pedido, o aviso ficará registrado. A entrega só será possível quando houver estoque."
+        lines={convertStockModal.lines}
+        requireExplicitConfirm
+        confirmLabel="Converter em pedido com aviso"
+        onConfirm={() =>
+          convertStockModal.orderId &&
+          handleConvertToPedido(convertStockModal.orderId, {
+            confirmStockWarning: true,
+          })
+        }
+        onCancel={() =>
+          setConvertStockModal({ open: false, orderId: null, lines: [] })
+        }
+      />
+
       {paymentDialogOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
@@ -613,12 +655,19 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                         className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
                       >
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-800">
-                            {order.documentType === "orcamento"
-                              ? "Orçamento"
-                              : "Pedido"}{" "}
-                            #{order.id}
-                          </h3>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-gray-800">
+                              {order.documentType === "orcamento"
+                                ? "Orçamento"
+                                : "Pedido"}{" "}
+                              #{order.id}
+                            </h3>
+                            {order.hasStockWarning ? (
+                              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                                Sem estoque
+                              </span>
+                            ) : null}
+                          </div>
                           <p className="text-xs font-medium text-indigo-700 mt-0.5">
                             {order.documentType === "orcamento"
                               ? "Status: orçamento (aguardando virar pedido)"

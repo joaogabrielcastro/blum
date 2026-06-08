@@ -85,6 +85,8 @@ function mapOrderItemResponse(item, options = {}) {
     commissionAmount: item.commissionAmount ?? item.commission_amount ?? 0,
     productCode: item.productCode ?? item.productcode ?? "",
     brandId: item.brandId ?? item.brand_id ?? null,
+    stockAtSave: item.stockAtSave ?? item.stock_at_save ?? null,
+    stockShortfall: parseFloat(item.stockShortfall ?? item.stock_shortfall) || 0,
   });
   return maybeStripLegacy(
     mapped,
@@ -99,6 +101,8 @@ function mapOrderItemResponse(item, options = {}) {
       "commission_rate",
       "commission_amount",
       "productcode",
+      "stock_at_save",
+      "stock_shortfall",
       "subcode",
     ],
     options,
@@ -123,6 +127,10 @@ function mapOrderResponse(order, options = {}) {
     sellerUsername: order.sellerUsername ?? order.seller_username ?? "",
     itemsCount: order.itemsCount ?? order.items_count ?? 0,
     representedBrands: order.representedBrands ?? order.representadas ?? "",
+    hasStockWarning:
+      order.hasStockWarning ??
+      order.has_stock_warning ??
+      false,
     items: Array.isArray(order.items)
       ? order.items.map((item) => mapOrderItemResponse(item, options))
       : order.items,
@@ -145,6 +153,7 @@ function mapOrderResponse(order, options = {}) {
       "seller_username",
       "items_count",
       "representadas",
+      "has_stock_warning",
     ],
     options,
   );

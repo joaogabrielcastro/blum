@@ -81,7 +81,11 @@ exports.create = async (req, res) => {
     res.status(201).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao criar pedido:", error);
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({
+      error: error.message,
+      code: error.code,
+      stockWarnings: error.stockWarnings,
+    });
   }
 };
 
@@ -92,7 +96,9 @@ exports.convertToPedido = async (req, res) => {
     const { id } = req.params;
     const existing = await orderService.findById(id, req.user.tenantId);
     assertOrderAccess(req, existing);
-    const order = await orderService.convertToPedido(id, req.user.tenantId);
+    const order = await orderService.convertToPedido(id, req.user.tenantId, {
+      confirmStockWarning: req.body?.confirmStockWarning === true,
+    });
     res.status(200).json(mapOrderResponse(order, mapOptions));
   } catch (error) {
     console.error("Erro ao converter orçamento:", error);
@@ -100,7 +106,11 @@ exports.convertToPedido = async (req, res) => {
       return res.status(403).json({ error: error.message });
     }
     if (error.statusCode === 400) {
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({
+        error: error.message,
+        code: error.code,
+        stockWarnings: error.stockWarnings,
+      });
     }
     if (error.message === "Pedido não encontrado") {
       return res.status(404).json({ error: error.message });
@@ -126,7 +136,11 @@ exports.update = async (req, res) => {
     if (error.message === "Pedido não encontrado") {
       return res.status(404).json({ error: error.message });
     }
-    res.status(400).json({ error: error.message });
+    res.status(error.statusCode || 400).json({
+      error: error.message,
+      code: error.code,
+      stockWarnings: error.stockWarnings,
+    });
   }
 };
 

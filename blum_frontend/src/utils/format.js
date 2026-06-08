@@ -58,6 +58,9 @@ export const normalizeOrderLineItems = (items) => {
         line.availableStock ??
         line.available_stock ??
         (line.stock != null ? line.stock : undefined),
+      stockAtSave: line.stockAtSave ?? line.stock_at_save ?? null,
+      stockShortfall:
+        parseFloat(line.stockShortfall ?? line.stock_shortfall) || 0,
     };
   });
 };
@@ -107,6 +110,8 @@ export const formatOrderData = (order) => {
     paymentMethod: order.payment_method ?? order.paymentMethod ?? null,
     representadas:
       order.representadas ?? order.representedBrands ?? "",
+    hasStockWarning:
+      order.hasStockWarning ?? order.has_stock_warning ?? false,
   };
 };
 

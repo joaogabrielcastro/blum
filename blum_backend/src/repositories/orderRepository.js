@@ -27,6 +27,7 @@ async function updateOrderCore(executor, payload) {
     docType,
     payment,
     createdAt,
+    hasStockWarning = false,
     tenantId = 1,
   } = payload;
 
@@ -41,8 +42,9 @@ async function updateOrderCore(executor, payload) {
           total_commission = $6,
           document_type = $7,
           payment_method = $8,
-          createdat = COALESCE($9, createdat)
-      WHERE id = $10 AND tenant_id = $11
+          createdat = COALESCE($9, createdat),
+          has_stock_warning = $10
+      WHERE id = $11 AND tenant_id = $12
       RETURNING *
     `,
     [
@@ -55,6 +57,7 @@ async function updateOrderCore(executor, payload) {
       docType,
       payment,
       createdAt,
+      hasStockWarning,
       id,
       tenantId,
     ],

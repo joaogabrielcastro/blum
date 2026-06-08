@@ -3,6 +3,22 @@ import {
   safeToFixed,
 } from "../../utils/orderFormUtils";
 import { computeLineNetTotal } from "../../utils/orderLineTotals";
+import { computeItemStockShortfall } from "../../utils/orderStockWarnings";
+
+function StockShortfallBadge({ item }) {
+  const shortfall = computeItemStockShortfall(item);
+  if (!shortfall) return null;
+  const available =
+    item.availableStock ??
+    item.stockAtSave ??
+    item.stock_at_save ??
+    0;
+  return (
+    <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
+      Sem estoque (disp.: {available}, falta: {shortfall})
+    </span>
+  );
+}
 
 function OrderItemCard({
   item,
@@ -13,8 +29,14 @@ function OrderItemCard({
   onRemoveItem,
   onOpenHistory,
 }) {
+  const hasShortfall = computeItemStockShortfall(item) > 0;
+
   return (
-    <div className="border border-gray-200 rounded-lg p-3 sm:p-4 space-y-3 bg-white">
+    <div
+      className={`rounded-lg p-3 sm:p-4 space-y-3 bg-white border ${
+        hasShortfall ? "border-amber-300 ring-1 ring-amber-100" : "border-gray-200"
+      }`}
+    >
       <div className="min-w-0">
         <p className="text-sm font-semibold text-gray-900 break-words">
           {item.productName}
@@ -23,6 +45,7 @@ function OrderItemCard({
           <span className="bg-gray-100 px-2 py-0.5 rounded text-xs break-all">
             Código: {item.productcode}
           </span>
+          <StockShortfallBadge item={item} />
         </div>
         {item.brand ? (
           <p className="text-xs text-gray-500 mt-1 break-words">{item.brand}</p>
@@ -35,11 +58,6 @@ function OrderItemCard({
           <input
             type="number"
             step={allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"}
-            max={
-              allowsDecimalQuantityBrand(item.brand)
-                ? undefined
-                : item.availableStock || undefined
-            }
             value={
               item.quantity === "" || item.quantity == null ? "" : item.quantity
             }
@@ -47,8 +65,12 @@ function OrderItemCard({
             onChange={(e) => onItemChange(index, "quantity", e.target.value)}
             className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
-          {item.availableStock ? (
-            <span className="text-xs text-gray-500 mt-1 block">
+          {item.availableStock != null && !allowsDecimalQuantityBrand(item.brand) ? (
+            <span
+              className={`text-xs mt-1 block ${
+                hasShortfall ? "text-amber-800 font-medium" : "text-gray-500"
+              }`}
+            >
               Disp.: {item.availableStock}
             </span>
           ) : null}
@@ -179,8 +201,13 @@ export default function OrderFormLineItems({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {items.map((item, index) => (
-              <tr key={item.productId || index} className="align-top">
+            {items.map((item, index) => {
+              const rowShortfall = computeItemStockShortfall(item) > 0;
+              return (
+              <tr
+                key={item.productId || index}
+                className={`align-top ${rowShortfall ? "bg-amber-50/40" : ""}`}
+              >
                 <td className="px-3 py-3">
                   <div className="min-w-0">
                     <div
@@ -193,6 +220,9 @@ export default function OrderFormLineItems({
                       <span className="inline-block bg-gray-100 px-1.5 py-0.5 rounded break-all">
                         {item.productcode}
                       </span>
+                      <div>
+                        <StockShortfallBadge item={item} />
+                      </div>
                       {item.brand ? (
                         <div className="break-words">{item.brand}</div>
                       ) : null}
@@ -204,11 +234,6 @@ export default function OrderFormLineItems({
                     type="number"
                     step={
                       allowsDecimalQuantityBrand(item.brand) ? "0.001" : "1"
-                    }
-                    max={
-                      allowsDecimalQuantityBrand(item.brand)
-                        ? undefined
-                        : item.availableStock || undefined
                     }
                     value={
                       item.quantity === "" || item.quantity == null
@@ -271,7 +296,8 @@ export default function OrderFormLineItems({
                   </div>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

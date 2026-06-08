@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
 import { normalizeOrderLineItems } from "../utils/format";
@@ -13,7 +13,6 @@ import {
   findBrandByName,
 } from "../utils/brandSelection";
 import {
-  allowsDecimalQuantityBrand,
   parseQuantityByBrand,
   toDateTimeLocalValue,
 } from "../utils/orderFormUtils";
@@ -21,6 +20,8 @@ import OrderFormLineItems from "./orders/OrderFormLineItems";
 import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
 import OrderFormTotals from "./orders/OrderFormTotals";
+import OrderStockWarningModal from "./orders/OrderStockWarningModal";
+import { getStockWarningLines } from "../utils/orderStockWarnings";
 import {
   OrderMobileClientPicker,
   OrderMobileProductPicker,
@@ -78,6 +79,18 @@ const OrdersForm = ({
   const [orderDateTime, setOrderDateTime] = useState(
     toDateTimeLocalValue(new Date()),
   );
+  const [stockWarningModalOpen, setStockWarningModalOpen] = useState(false);
+
+  const documentType = editingOrder
+    ? editingOrder.documentType === "pedido"
+      ? "pedido"
+      : "orcamento"
+    : "orcamento";
+  const stockWarningLines = useMemo(
+    () => getStockWarningLines(items),
+    [items],
+  );
+  const hasLiveStockWarnings = stockWarningLines.length > 0;
 
   const { subtotalAfterLineDiscounts, discountAmount, netTotal } =
     computeOrderTotals(items, discount);
@@ -204,6 +217,62 @@ const OrdersForm = ({
     }
   };
 
+  const saveOrder = async ({ confirmStockWarning = false } = {}) => {
+    const originalSellerId =
+      editingOrder?.userId ?? editingOrder?.userid ?? editingOrder?.user_ref;
+    const normalizedOriginalSellerId = parseInt(String(originalSellerId), 10);
+    const orderData = {
+      clientid: parseInt(clientId),
+      userid:
+        editingOrder && Number.isFinite(normalizedOriginalSellerId)
+          ? normalizedOriginalSellerId
+          : userId,
+      description: description,
+      items: items.map((item) => {
+        const resolvedBrandId =
+          item.brandId ??
+          (selectedBrandId || findBrandByName(brands, item.brand)?.id);
+        return {
+          ...item,
+          brandId: resolvedBrandId != null ? resolvedBrandId : null,
+          price: parseFloat(item.price) || 0,
+          quantity: parseQuantityByBrand(item.quantity, item.brand),
+          lineDiscount: Math.min(
+            100,
+            Math.max(0, parseFloat(item.lineDiscount) || 0),
+          ),
+        };
+      }),
+      discount: parseFloat(discount) || 0,
+      totalprice: parseFloat(netTotal) || 0,
+      document_type: documentType,
+      confirmStockWarning,
+    };
+
+    orderData.payment_method = paymentMethod || null;
+    if (orderDateTime) {
+      orderData.createdat = new Date(orderDateTime).toISOString();
+    }
+
+    if (editingOrder) {
+      await apiService.updateOrder(editingOrder.id, orderData);
+      toast.success(
+        hasLiveStockWarnings
+          ? "Pedido atualizado com aviso de ruptura de estoque."
+          : "Pedido atualizado com sucesso.",
+      );
+    } else {
+      await apiService.createOrder(orderData);
+      toast.success(
+        hasLiveStockWarnings
+          ? "Orçamento criado com aviso de ruptura de estoque."
+          : "Orçamento criado com sucesso.",
+      );
+    }
+
+    onOrderAdded();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!clientId) {
@@ -258,79 +327,13 @@ const OrdersForm = ({
       return;
     }
 
-    // Valida estoque antes de submeter
-    const stockErrors = [];
-    items.forEach((item) => {
-      const parsedQty = parseQuantityByBrand(item.quantity, item.brand);
-      if (
-        item.availableStock &&
-        !allowsDecimalQuantityBrand(item.brand) &&
-        parsedQty > item.availableStock
-      ) {
-        stockErrors.push(
-          `"${item.productName}": Solicitado ${parsedQty}, Disponível ${item.availableStock}`,
-        );
-      }
-    });
-
-    if (stockErrors.length > 0) {
-      toast.warning(
-        `Estoque insuficiente para os seguintes produtos:\n\n${stockErrors.join(
-          "\n",
-        )}\n\nPor favor, ajuste as quantidades antes de continuar.`,
-      );
+    if (hasLiveStockWarnings) {
+      setStockWarningModalOpen(true);
       return;
     }
 
     try {
-      const originalSellerId =
-        editingOrder?.userId ?? editingOrder?.userid ?? editingOrder?.user_ref;
-      const normalizedOriginalSellerId = parseInt(String(originalSellerId), 10);
-      const orderData = {
-        clientid: parseInt(clientId),
-        userid:
-          editingOrder && Number.isFinite(normalizedOriginalSellerId)
-            ? normalizedOriginalSellerId
-            : userId,
-        description: description,
-        items: items.map((item) => {
-          const resolvedBrandId =
-            item.brandId ??
-            (selectedBrandId || findBrandByName(brands, item.brand)?.id);
-          return {
-            ...item,
-            brandId: resolvedBrandId != null ? resolvedBrandId : null,
-            price: parseFloat(item.price) || 0,
-            quantity: parseQuantityByBrand(item.quantity, item.brand),
-            lineDiscount: Math.min(
-              100,
-              Math.max(0, parseFloat(item.lineDiscount) || 0),
-            ),
-          };
-        }),
-        discount: parseFloat(discount) || 0,
-        totalprice: parseFloat(netTotal) || 0,
-        document_type: editingOrder
-          ? editingOrder.documentType === "pedido"
-            ? "pedido"
-            : "orcamento"
-          : "orcamento",
-      };
-
-      orderData.payment_method = paymentMethod || null;
-      if (orderDateTime) {
-        orderData.createdat = new Date(orderDateTime).toISOString();
-      }
-
-      if (editingOrder) {
-        await apiService.updateOrder(editingOrder.id, orderData);
-        toast.success("Pedido atualizado com sucesso.");
-      } else {
-        await apiService.createOrder(orderData);
-        toast.success("Orçamento criado com sucesso.");
-      }
-
-      onOrderAdded();
+      await saveOrder();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
 
@@ -355,6 +358,18 @@ const OrdersForm = ({
     }
   };
 
+  const handleConfirmStockWarningSave = async () => {
+    try {
+      await saveOrder({
+        confirmStockWarning: documentType === "pedido",
+      });
+      setStockWarningModalOpen(false);
+    } catch (error) {
+      console.error("Erro ao salvar pedido:", error);
+      toast.error(error?.message || "Falha ao salvar o pedido.");
+    }
+  };
+
   return (
     <>
       <div className="w-full min-w-0 max-w-none">
@@ -371,6 +386,18 @@ const OrdersForm = ({
             <p className="mt-1 text-sm">
               Ao salvar este pedido, o sistema ajusta o estoque automaticamente
               conforme os itens adicionados, removidos ou alterados.
+            </p>
+          </div>
+        ) : null}
+        {hasLiveStockWarnings ? (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 sm:px-4 py-3 text-amber-950">
+            <p className="text-sm font-semibold">
+              Atenção: {stockWarningLines.length} item(ns) sem estoque suficiente
+            </p>
+            <p className="mt-1 text-sm text-amber-900/90">
+              {documentType === "pedido"
+                ? "Ao salvar o pedido será necessária confirmação explícita. A entrega continuará bloqueada até haver estoque."
+                : "Você pode salvar o orçamento; o aviso ficará registrado para o admin."}
             </p>
           </div>
         ) : null}
@@ -527,6 +554,29 @@ const OrdersForm = ({
           onClose={() => setHistoryModalItem(null)}
         />
       )}
+
+      <OrderStockWarningModal
+        open={stockWarningModalOpen}
+        title={
+          documentType === "pedido"
+            ? "Pedido com itens sem estoque"
+            : "Orçamento com itens sem estoque"
+        }
+        description={
+          documentType === "pedido"
+            ? "Confirme apenas se o cliente está ciente. A finalização da entrega continuará bloqueada enquanto faltar estoque."
+            : "O orçamento será salvo com aviso visível para o admin e para você."
+        }
+        lines={stockWarningLines}
+        requireExplicitConfirm={documentType === "pedido"}
+        confirmLabel={
+          documentType === "pedido"
+            ? "Salvar pedido com aviso"
+            : "Salvar orçamento com aviso"
+        }
+        onConfirm={handleConfirmStockWarningSave}
+        onCancel={() => setStockWarningModalOpen(false)}
+      />
     </>
   );
 };
