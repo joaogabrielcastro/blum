@@ -145,7 +145,9 @@ const OrdersForm = ({
       setPaymentMethod("");
       setOrderDateTime(toDateTimeLocalValue(new Date()));
     }
-  }, [editingOrder, brands, clients]);
+    // Apenas editingOrder deve resetar o formulário; mudanças de referência
+    // em brands/clients (re-render do pai) não podem apagar o que foi digitado.
+  }, [editingOrder]);
 
   useOrderEditHydration(apiService, editingOrder, items, setItems);
 

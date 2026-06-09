@@ -41,7 +41,7 @@ export function useOrderCatalogSearch(
     }, 300);
 
     return () => {
-      cancelled = true;
+      cancelled = true;   
       clearTimeout(timeoutId);
     };
   }, [api, productSearch, selectedBrand, selectedBrandId]);

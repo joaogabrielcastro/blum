@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useState,
 } from "react";
 
@@ -34,10 +35,14 @@ export function ToastProvider({ children }) {
   const info = useCallback((m) => push(m, "info"), [push]);
   const warning = useCallback((m) => push(m, "warning", 5500), [push]);
 
+  // Identidade estável: exibir um toast não deve re-renderizar consumidores.
+  const contextValue = useMemo(
+    () => ({ success, error, info, warning, dismiss: remove }),
+    [success, error, info, warning, remove],
+  );
+
   return (
-    <ToastContext.Provider
-      value={{ success, error, info, warning, dismiss: remove }}
-    >
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div
         className="fixed bottom-4 left-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none sm:left-auto sm:right-4 sm:max-w-md"

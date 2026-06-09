@@ -106,15 +106,20 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     lines: [],
   });
 
-  // Validar e transformar brands para garantir segurança
-  const safeBrands = Array.isArray(brands)
-    ? brands.map((brand) => ({
-        id: brand.id,
-        name: brand.name || "",
-        commission_rate:
-          brand.commission_rate ?? brand.commissionRate ?? 0,
-      }))
-    : [];
+  // Validar e transformar brands; memoizado para não trocar de referência
+  // a cada render (isso resetava o OrdersForm aberto).
+  const safeBrands = useMemo(
+    () =>
+      Array.isArray(brands)
+        ? brands.map((brand) => ({
+            id: brand.id,
+            name: brand.name || "",
+            commission_rate:
+              brand.commission_rate ?? brand.commissionRate ?? 0,
+          }))
+        : [],
+    [brands],
+  );
 
   useEffect(() => {
     if (userId && userRole) fetchData();
