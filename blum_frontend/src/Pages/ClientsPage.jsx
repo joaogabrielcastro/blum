@@ -29,15 +29,24 @@ const ClientsPage = () => {
   useEffect(() => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      const filtered = clients.filter(
-        (client) =>
-          getClientDisplayName(client).toLowerCase().includes(term) ||
-          client.contactPerson?.toLowerCase().includes(term) ||
-          client.phone?.includes(term) ||
-          client.region?.toLowerCase().includes(term) ||
-          client.cnpj?.includes(term) ||
-          client.email?.toLowerCase().includes(term),
-      );
+      const filtered = clients.filter((client) => {
+        const blob = [
+          getClientDisplayName(client),
+          client.companyName,
+          client.nomeFantasia,
+          client.nome_fantasia,
+          client.contactPerson,
+          client.phone,
+          client.region,
+          client.cnpj,
+          client.email,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const words = term.split(/\s+/).filter(Boolean);
+        return words.every((word) => blob.includes(word));
+      });
       setFilteredClients(filtered);
     } else {
       setFilteredClients(clients);

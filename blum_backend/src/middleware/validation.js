@@ -77,6 +77,7 @@ exports.validateProductUpdate = [
 
 // Validações para clientes
 exports.validateClient = [
+  body("nomeFantasia").optional().trim().isLength({ max: 255 }),
   body("companyName")
     .trim()
     .notEmpty()

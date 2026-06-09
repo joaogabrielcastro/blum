@@ -56,12 +56,13 @@ function mapClientResponse(client, options = {}) {
     ...client,
     tenantId: client.tenantId ?? client.tenant_id ?? null,
     companyName: client.companyName ?? client.companyname ?? "",
+    nomeFantasia: client.nomeFantasia ?? client.nome_fantasia ?? "",
     contactPerson: client.contactPerson ?? client.contactperson ?? "",
     createdAt: client.createdAt ?? client.createdat ?? null,
   };
   return maybeStripLegacy(
     mapped,
-    ["tenant_id", "companyname", "contactperson", "createdat"],
+    ["tenant_id", "companyname", "nome_fantasia", "contactperson", "createdat"],
     options,
   );
 }

@@ -21,6 +21,7 @@ import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
 import OrderFormTotals from "./orders/OrderFormTotals";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
+import { findClientOptionByTypedValue } from "../utils/clients";
 import { getStockWarningLines } from "../utils/orderStockWarnings";
 import {
   OrderMobileClientPicker,
@@ -184,10 +185,7 @@ const OrdersForm = ({
 
   const handleClientSearchTermChange = (value) => {
     setClientSearchTerm(value);
-    const exact = clientOptions.find(
-      ({ label }) =>
-        label.toLowerCase().trim() === value.toLowerCase().trim(),
-    );
+    const exact = findClientOptionByTypedValue(clientOptions, value);
     if (exact) setClientId(exact.id);
     else setClientId("");
     setDesktopClientListOpen(true);
@@ -536,10 +534,7 @@ const OrdersForm = ({
         clientSearchTerm={clientSearchTerm}
         onClientSearchChange={(value) => {
           setClientSearchTerm(value);
-          const exact = clientOptions.find(
-            ({ label }) =>
-              label.toLowerCase().trim() === value.toLowerCase().trim(),
-          );
+          const exact = findClientOptionByTypedValue(clientOptions, value);
           if (exact) setClientId(exact.id);
           else setClientId("");
         }}

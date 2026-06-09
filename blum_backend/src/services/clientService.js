@@ -35,6 +35,7 @@ class ClientService {
   async create(clientData, tenantId = 1) {
     const {
       companyName,
+      nomeFantasia,
       contactPerson,
       phone,
       region,
@@ -59,6 +60,7 @@ class ClientService {
 
     const result = await clientRepository.insertClient([
       companyName,
+      nomeFantasia || null,
       contactPerson,
       phone,
       region,
@@ -79,6 +81,7 @@ class ClientService {
   async update(id, clientData, tenantId = 1) {
     const {
       companyName,
+      nomeFantasia,
       contactPerson,
       phone,
       region,
@@ -100,6 +103,7 @@ class ClientService {
 
     const result = await clientRepository.updateClient([
       companyName,
+      nomeFantasia || null,
       contactPerson,
       phone,
       region,
@@ -147,6 +151,7 @@ class ClientService {
       WHERE
         tenant_id = ${tenantId} AND (
         companyname ILIKE ${term} OR
+        nome_fantasia ILIKE ${term} OR
         contactperson ILIKE ${term} OR
         cnpj ILIKE ${term}
         )

@@ -576,8 +576,13 @@ const apiService = {
 
     const data = await response.json();
 
+    const razaoSocial = data.razao_social || "";
+    const nomeFantasia = data.estabelecimento?.nome_fantasia || "";
+
     return {
-      nome: data.razao_social || data.estabelecimento?.nome_fantasia || "",
+      nome: razaoSocial || nomeFantasia || "",
+      razaoSocial,
+      nomeFantasia,
       telefone:
         data.estabelecimento?.telefone1 ||
         data.estabelecimento?.telefone2 ||

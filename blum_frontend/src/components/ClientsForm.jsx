@@ -4,6 +4,7 @@ import { useToast } from "../context/ToastContext";
 
 const KNOWN_FIELDS = new Set([
   "companyName",
+  "nomeFantasia",
   "contactPerson",
   "phone",
   "region",
@@ -31,6 +32,8 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
 
   const [formData, setFormData] = useState({
     companyName: client?.companyName || "",
+    nomeFantasia:
+      client?.nomeFantasia || client?.nome_fantasia || "",
     contactPerson: client?.contactPerson || "",
     phone: client?.phone || "",
     region: client?.region || "",
@@ -106,13 +109,14 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
     setIsSearching(true);
     try {
       const data = await apiService.queryCNPJ(cnpj);
-      if (data.nome) {
+      if (data.nome || data.razaoSocial || data.nomeFantasia) {
         setFormData((prev) => ({
           ...prev,
-          companyName: data.nome,
+          companyName: data.razaoSocial || data.nome || prev.companyName,
+          nomeFantasia: data.nomeFantasia || prev.nomeFantasia,
           phone: data.telefone || "",
           region: data.uf || "",
-          email: data.email || "", // Adiciona email se disponível
+          email: data.email || "",
         }));
       } else {
         setErrors((prev) => ({ ...prev, cnpj: "CNPJ não encontrado" }));
@@ -162,6 +166,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
     const email = String(formData.email || "").trim();
     return {
       companyName: String(formData.companyName || "").trim(),
+      nomeFantasia: String(formData.nomeFantasia || "").trim(),
       contactPerson: String(formData.contactPerson || "").trim(),
       phone,
       region: String(formData.region || "").trim(),
@@ -291,6 +296,23 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     {errors.companyName}
                   </p>
                 )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Nome fantasia
+                </label>
+                <input
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  type="text"
+                  name="nomeFantasia"
+                  value={formData.nomeFantasia}
+                  onChange={handleChange}
+                  placeholder="Como o cliente é conhecido no dia a dia (opcional)"
+                />
+                <p className="text-gray-500 text-xs mt-1">
+                  Usado na busca de clientes nos pedidos.
+                </p>
               </div>
 
               <div>

@@ -26,6 +26,13 @@ function pickCompanyName(row) {
   return undefined;
 }
 
+function firstNonEmpty(fieldList) {
+  for (const v of fieldList) {
+    if (v != null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+}
+
 function pickContactPerson(row) {
   if (!row) return undefined;
   return row.contactperson ?? row.contactPerson ?? row.contact_person;
@@ -37,6 +44,12 @@ function normalizeClientBody(raw) {
   }
 
   const companyName = pickCompanyName(raw);
+  const nomeFantasia = firstNonEmpty([
+    raw.nomeFantasia,
+    raw.nome_fantasia,
+    raw.trade_name,
+    raw.business_name,
+  ]);
   const contactPerson = pickContactPerson(raw);
   const phone = raw.phone ?? raw.telefone ?? "";
   const region = raw.region ?? raw.regiao ?? raw.estado ?? "";
@@ -53,6 +66,7 @@ function normalizeClientBody(raw) {
 
   return {
     companyName: companyName != null ? String(companyName).trim() : "",
+    nomeFantasia,
     contactPerson:
       contactPerson != null && String(contactPerson).trim() !== ""
         ? String(contactPerson).trim()
@@ -73,6 +87,12 @@ function normalizeClientBody(raw) {
 function mapClientRow(row) {
   if (!row) return row;
   const companyName = pickCompanyName(row);
+  const nomeFantasia = firstNonEmpty([
+    row.nome_fantasia,
+    row.nomeFantasia,
+    row.trade_name,
+    row.business_name,
+  ]);
   const contactPerson = pickContactPerson(row);
   const cnpj =
     row.cnpj != null && String(row.cnpj).trim() !== ""
@@ -88,6 +108,7 @@ function mapClientRow(row) {
   return {
     ...row,
     companyName,
+    nomeFantasia: nomeFantasia || undefined,
     contactPerson,
     street: row.street ?? row.logradouro,
     number: row.number ?? row.numero,

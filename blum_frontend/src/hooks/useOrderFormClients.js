@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   buildClientOrderSearchOption,
+  clientMatchesSearchTerm,
   normalizeClientsResponse,
 } from "../utils/clients";
 
@@ -49,13 +50,10 @@ export function useOrderFormClients(clients, clientsList) {
   );
 
   const filteredClientOptions = useMemo(() => {
-    const term = clientSearchTerm.trim().toLowerCase();
+    const term = clientSearchTerm.trim();
     if (!term) return [];
     return clientOptions
-      .filter(
-        (opt) =>
-          opt.filterBlob.includes(term) || String(opt.id).includes(term),
-      )
+      .filter((opt) => clientMatchesSearchTerm(opt, term))
       .slice(0, MAX_CLIENT_SEARCH_RESULTS);
   }, [clientOptions, clientSearchTerm]);
 

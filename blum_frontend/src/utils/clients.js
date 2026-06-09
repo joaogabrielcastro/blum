@@ -129,8 +129,45 @@ export function buildClientOrderSearchOption(client, id) {
     label,
     primary,
     secondary,
+    fantasyName: fantasy || "",
+    legalName: legal || "",
     filterBlob,
   };
+}
+
+/** Busca por razão social, fantasia, CNPJ, cidade (várias palavras). */
+export function clientMatchesSearchTerm(option, searchTerm) {
+  const term = String(searchTerm ?? "").trim().toLowerCase();
+  if (!term || !option) return false;
+
+  const digits = term.replace(/\D/g, "");
+  const blob = option.filterBlob || "";
+  if (String(option.id).includes(term)) return true;
+  if (digits.length >= 4 && blob.includes(digits)) return true;
+
+  const words = term.split(/\s+/).filter(Boolean);
+  if (!words.length) return false;
+  return words.every((word) => blob.includes(word));
+}
+
+/** Correspondência exata ao digitar (fantasia, razão ou rótulo exibido). */
+export function findClientOptionByTypedValue(options, value) {
+  const typed = String(value ?? "").trim().toLowerCase();
+  if (!typed) return null;
+
+  return (
+    options.find((opt) => {
+      const candidates = [
+        opt.label,
+        opt.primary,
+        opt.fantasyName,
+        opt.legalName,
+      ]
+        .filter(Boolean)
+        .map((s) => String(s).trim().toLowerCase());
+      return candidates.some((c) => c === typed);
+    }) || null
+  );
 }
 
 /** Linhas de endereço para PDF / impressão (cadastro PR). */
