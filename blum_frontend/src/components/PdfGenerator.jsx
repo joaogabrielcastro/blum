@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import formatCurrency from "../utils/format";
 import { formatClientAddressLines } from "../utils/clients";
+import {
+  buildPdfFile,
+  canSharePdfFile,
+  downloadPdfFile,
+  sharePdfFile,
+} from "../utils/pdfDownload";
 
 const PAYMENT_PDF_LABELS = {
   carteira: "Carteira (em aberto)",
@@ -45,6 +51,8 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [headerImage, setHeaderImage] = useState(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [shareSupported, setShareSupported] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (brands && brands.length > 0) {
@@ -92,6 +100,11 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     loadHeaderImage();
   }, [brands]);
 
+  useEffect(() => {
+    const probe = new File(["x"], "probe.pdf", { type: "application/pdf" });
+    setShareSupported(canSharePdfFile(probe));
+  }, []);
+
   const bankInfo = {
     Blumenau: {
       companyName: "BLUM CURITIBA LTDA.",
@@ -123,8 +136,8 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     }
   };
 
-  const handleGeneratePdf = async () => {
-    if (!order) return;
+  const buildPdfDocument = () => {
+    if (!order) return null;
 
     const pdfDocType =
       order.documentType === "orcamento" ? "Orçamento" : "Pedido";
@@ -430,8 +443,52 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     doc.text("Agradecemos pela preferência! • Este documento não tem valor fiscal", 
              pageWidth / 2, footerY, { align: "center" });
 
-    doc.save(`${filePrefix}-${order.id}.pdf`);
-    onClose();
+    return {
+      doc,
+      filename: `${filePrefix}-${order.id}.pdf`,
+      title: `${pdfDocType} Nº ${order.id}`,
+    };
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!order || busy) return;
+    setBusy(true);
+    try {
+      const built = buildPdfDocument();
+      if (!built) return;
+      const file = buildPdfFile(built.doc, built.filename);
+      await downloadPdfFile(file);
+      onClose();
+    } catch (err) {
+      console.error("Erro ao baixar PDF:", err);
+      window.alert("Não foi possível baixar o PDF. Tente novamente.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    if (!order || busy) return;
+    setBusy(true);
+    try {
+      const built = buildPdfDocument();
+      if (!built) return;
+      const file = buildPdfFile(built.doc, built.filename);
+      const shared = await sharePdfFile(file, built.title);
+      if (!shared) {
+        window.alert(
+          "Compartilhamento direto não disponível neste dispositivo. Use Baixar PDF e anexe o arquivo no WhatsApp.",
+        );
+        return;
+      }
+      onClose();
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      console.error("Erro ao compartilhar PDF:", err);
+      window.alert("Não foi possível compartilhar o PDF. Use Baixar PDF.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const createDefaultHeader = (doc, pageWidth, orderId, titleDoc = "Pedido") => {
@@ -482,30 +539,56 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
           </select>
         </div>
 
-        <div className="flex justify-between space-x-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleGeneratePdf}
-            disabled={!imageLoaded}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-          >
-            {imageLoaded ? (
-              <>
-                <span>📄</span>
-                <span>Gerar PDF</span>
-              </>
-            ) : (
-              <>
-                <div className="loader border-2 border-t-transparent border-white w-4 h-4 rounded-full animate-spin"></div>
-                <span>Carregando...</span>
-              </>
-            )}
-          </button>
+        <p className="mb-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+          No WhatsApp, envie <strong>só o arquivo PDF</strong> (pasta Downloads ou
+          anexo). Não arraste da barra de downloads do navegador — isso pode colar
+          um link interno do sistema.
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={!imageLoaded || busy}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {busy ? (
+                <>
+                  <div className="loader border-2 border-t-transparent border-white w-4 h-4 rounded-full animate-spin" />
+                  <span>Aguarde...</span>
+                </>
+              ) : imageLoaded ? (
+                <>
+                  <span>📄</span>
+                  <span>Baixar PDF</span>
+                </>
+              ) : (
+                <>
+                  <div className="loader border-2 border-t-transparent border-white w-4 h-4 rounded-full animate-spin" />
+                  <span>Carregando...</span>
+                </>
+              )}
+            </button>
+          </div>
+          {shareSupported ? (
+            <button
+              type="button"
+              onClick={handleSharePdf}
+              disabled={!imageLoaded || busy}
+              className="w-full px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              Enviar ao cliente (WhatsApp / e-mail)
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-4 text-xs text-gray-500 text-center">
