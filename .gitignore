@@ -1,17 +1,51 @@
-blum_frontend/node_modules
-blum_backend/node_modules
-cache
+# --- Dependências ---
+node_modules/
+blum_frontend/node_modules/
+blum_backend/node_modules/
+
+# --- Variáveis de ambiente (nunca commitar segredos) ---
+.env
+.env.*
+!.env.example
 blum_backend/.env
 blum_frontend/.env
+
+# --- Build / artefatos ---
 blum_frontend/build/
+dist/
+coverage/
+
+# --- Backend: temporários e cache de scripts ---
 blum_backend/src/temp/*
 !blum_backend/src/temp/.gitkeep
+blum_backend/scripts/.cache/
 
-# Playwright
-node_modules/
+# --- Testes E2E (Playwright) ---
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
-blum_backend/scripts/.cache/
+
+# --- Logs e debug ---
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Sistema operacional ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- IDEs / editores ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+
+# --- Legado (remover se não existir mais no projeto) ---
+cache/
