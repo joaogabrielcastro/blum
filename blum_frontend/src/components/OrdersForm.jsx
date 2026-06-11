@@ -19,6 +19,7 @@ import {
 import OrderFormLineItems from "./orders/OrderFormLineItems";
 import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
+import OrderFormProductStaging from "./orders/OrderFormProductStaging";
 import OrderFormTotals from "./orders/OrderFormTotals";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
 import { findClientOptionByTypedValue } from "../utils/clients";
@@ -96,16 +97,21 @@ const OrdersForm = ({
   const { subtotalAfterLineDiscounts, discountAmount, netTotal } =
     computeOrderTotals(items, discount);
 
-  const { handleItemChange, handleProductSelect, removeItem } = useOrderFormItems(
-    items,
-    setItems,
-    {
-      selectedBrandId,
-      setProductSearch,
-      setSearchResults,
-      setMobileProductPickerOpen,
-    },
-  );
+  const {
+    handleItemChange,
+    handleProductSelect,
+    removeItem,
+    stagingItem,
+    updateStagingField,
+    confirmStaging,
+    cancelStaging,
+    selectLineItemForStaging,
+  } = useOrderFormItems(items, setItems, {
+    selectedBrandId,
+    setProductSearch,
+    setSearchResults,
+    setMobileProductPickerOpen,
+  });
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
   const canEditUnitPrice = userRole === "admin";
@@ -149,6 +155,10 @@ const OrdersForm = ({
     // Apenas editingOrder deve resetar o formulário; mudanças de referência
     // em brands/clients (re-render do pai) não podem apagar o que foi digitado.
   }, [editingOrder]);
+
+  useEffect(() => {
+    cancelStaging();
+  }, [editingOrder, cancelStaging]);
 
   useOrderEditHydration(apiService, editingOrder, items, setItems);
 
@@ -440,7 +450,8 @@ const OrdersForm = ({
                 Produtos do pedido
               </h3>
               <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Busque e adicione itens, depois ajuste quantidade, desconto e preço.
+                Busque o produto, informe a quantidade no painel abaixo e adicione
+                ao pedido — sem precisar rolar a página a cada item.
               </p>
             </div>
           <OrderFormProductSearch
@@ -454,12 +465,34 @@ const OrdersForm = ({
             onProductSelect={handleProductSelect}
           />
 
+          <OrderFormProductStaging
+            stagingItem={stagingItem}
+            clientId={clientId}
+            canEditUnitPrice={canEditUnitPrice}
+            onFieldChange={updateStagingField}
+            onConfirm={confirmStaging}
+            onCancel={cancelStaging}
+            onOpenFullHistory={() => {
+              if (stagingItem) {
+                setHistoryModalItem({
+                  productId: stagingItem.productId,
+                  productName: stagingItem.productName,
+                  productcode: stagingItem.productcode,
+                });
+              }
+            }}
+          />
+
           <OrderFormLineItems
             items={items}
             clientId={clientId}
             canEditUnitPrice={canEditUnitPrice}
+            activeItemIndex={
+              stagingItem?.mode === "edit" ? stagingItem.editIndex : null
+            }
             onItemChange={handleItemChange}
             onRemoveItem={removeItem}
+            onSelectItem={selectLineItemForStaging}
             onOpenHistory={setHistoryModalItem}
           />
 

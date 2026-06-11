@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import apiService from "../services/apiService";
 import formatCurrency from "../utils/format";
-
-const PAYMENT_LABELS = {
-  carteira: "Carteira",
-  boleto: "Boleto",
-  pix: "PIX",
-  cheque: "Cheque",
-  dinheiro: "Dinheiro",
-};
+import {
+  PAYMENT_LABELS,
+  formatRowDate,
+  rowCreatedAt,
+  rowLineDiscount,
+  rowOrderId,
+  rowPaymentMethod,
+  rowSellerName,
+  rowUnitPrice,
+} from "../utils/clientItemPriceHistoryDisplay";
 
 const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
   const [loading, setLoading] = useState(true);
@@ -71,10 +73,14 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
               {latest && (
                 <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm">
                   Último preço praticado:{" "}
-                  <strong>{formatCurrency(latest.unit_price)}</strong> em{" "}
-                  <strong>
-                    {new Date(latest.created_at).toLocaleDateString("pt-BR")}
-                  </strong>
+                  <strong>{formatCurrency(rowUnitPrice(latest))}</strong> em{" "}
+                  <strong>{formatRowDate(rowCreatedAt(latest))}</strong>
+                  {rowOrderId(latest) ? (
+                    <>
+                      {" "}
+                      (Pedido #{rowOrderId(latest)})
+                    </>
+                  ) : null}
                 </div>
               )}
               <div className="overflow-x-auto">
@@ -84,14 +90,23 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
                       <th className="px-3 py-2 text-left font-semibold text-gray-600">
                         Data
                       </th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                        Pedido
+                      </th>
                       <th className="px-3 py-2 text-right font-semibold text-gray-600">
                         Preço
                       </th>
                       <th className="px-3 py-2 text-center font-semibold text-gray-600">
                         Qtd
                       </th>
+                      <th className="px-3 py-2 text-center font-semibold text-gray-600">
+                        Desc. %
+                      </th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-600">
                         Pagamento
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">
+                        Vendedor
                       </th>
                     </tr>
                   </thead>
@@ -99,21 +114,29 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
                     {rows.map((row) => (
                       <tr key={row.id}>
                         <td className="px-3 py-2 text-gray-700">
-                          {new Date(row.created_at).toLocaleString("pt-BR")}
+                          {formatRowDate(rowCreatedAt(row), true)}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {rowOrderId(row) ? `#${rowOrderId(row)}` : "—"}
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-gray-900">
-                          {formatCurrency(row.unit_price)}
+                          {formatCurrency(rowUnitPrice(row))}
                         </td>
                         <td className="px-3 py-2 text-center text-gray-700">
                           {row.quantity}
                         </td>
+                        <td className="px-3 py-2 text-center text-gray-700">
+                          {Number(rowLineDiscount(row)) > 0
+                            ? `${rowLineDiscount(row)}%`
+                            : "—"}
+                        </td>
                         <td className="px-3 py-2 text-gray-700">
-                          {PAYMENT_LABELS[
-                            row.payment_method ?? row.paymentMethod
-                          ] ||
-                            row.payment_method ||
-                            row.paymentMethod ||
+                          {PAYMENT_LABELS[rowPaymentMethod(row)] ||
+                            rowPaymentMethod(row) ||
                             "—"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {rowSellerName(row) || "—"}
                         </td>
                       </tr>
                     ))}

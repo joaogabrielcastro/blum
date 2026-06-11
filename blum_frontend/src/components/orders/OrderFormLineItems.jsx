@@ -25,16 +25,31 @@ function OrderItemCard({
   index,
   clientId,
   canEditUnitPrice,
+  isActive,
   onItemChange,
   onRemoveItem,
+  onSelectItem,
   onOpenHistory,
 }) {
   const hasShortfall = computeItemStockShortfall(item) > 0;
 
   return (
     <div
-      className={`rounded-lg p-3 sm:p-4 space-y-3 bg-white border ${
-        hasShortfall ? "border-amber-300 ring-1 ring-amber-100" : "border-gray-200"
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelectItem?.(index)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectItem?.(index);
+        }
+      }}
+      className={`rounded-lg p-3 sm:p-4 space-y-3 bg-white border cursor-pointer transition-shadow ${
+        isActive
+          ? "border-indigo-400 ring-2 ring-indigo-200 shadow-md"
+          : hasShortfall
+            ? "border-amber-300 ring-1 ring-amber-100 hover:shadow-sm"
+            : "border-gray-200 hover:border-blue-200 hover:shadow-sm"
       }`}
     >
       <div className="min-w-0">
@@ -62,6 +77,7 @@ function OrderItemCard({
               item.quantity === "" || item.quantity == null ? "" : item.quantity
             }
             placeholder="—"
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => onItemChange(index, "quantity", e.target.value)}
             className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -83,6 +99,7 @@ function OrderItemCard({
             max="100"
             step="0.01"
             value={item.lineDiscount ?? 0}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) =>
               onItemChange(index, "lineDiscount", e.target.value)
             }
@@ -98,6 +115,7 @@ function OrderItemCard({
             min="0.01"
             step="0.01"
             value={item.price}
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => onItemChange(index, "price", e.target.value)}
             disabled={!canEditUnitPrice}
             className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base disabled:bg-gray-100 disabled:text-gray-500"
@@ -117,14 +135,20 @@ function OrderItemCard({
       <div className="flex flex-col sm:flex-row gap-2">
         <button
           type="button"
-          onClick={() => onRemoveItem(index)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemoveItem(index);
+          }}
           className="flex-1 min-h-10 px-3 border border-red-200 text-red-600 rounded-md hover:bg-red-50 text-sm font-medium"
         >
           Remover item
         </button>
         <button
           type="button"
-          onClick={() => onOpenHistory(item)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenHistory(item);
+          }}
           disabled={!clientId || !item.productId}
           className="flex-1 min-h-10 rounded-md border border-blue-300 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -139,17 +163,24 @@ export default function OrderFormLineItems({
   items,
   clientId,
   canEditUnitPrice,
+  activeItemIndex = null,
   onItemChange,
   onRemoveItem,
+  onSelectItem,
   onOpenHistory,
 }) {
   if (!items.length) return null;
 
   return (
     <div className="mt-6 sm:mt-8 min-w-0">
-      <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3 sm:mb-4">
-        Itens do Pedido
-      </h3>
+      <div className="mb-3 sm:mb-4">
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
+          Itens do Pedido ({items.length})
+        </h3>
+        <p className="text-xs text-gray-500 mt-1">
+          Clique em um item para editá-lo no painel acima.
+        </p>
+      </div>
 
       {/* Cards: telas até xl (evita tabela larga com scroll em laptops/tablets) */}
       <div className="space-y-3 xl:hidden">
@@ -160,8 +191,10 @@ export default function OrderFormLineItems({
             index={index}
             clientId={clientId}
             canEditUnitPrice={canEditUnitPrice}
+            isActive={activeItemIndex === index}
             onItemChange={onItemChange}
             onRemoveItem={onRemoveItem}
+            onSelectItem={onSelectItem}
             onOpenHistory={onOpenHistory}
           />
         ))}
@@ -203,10 +236,26 @@ export default function OrderFormLineItems({
           <tbody className="bg-white divide-y divide-gray-200">
             {items.map((item, index) => {
               const rowShortfall = computeItemStockShortfall(item) > 0;
+              const isActive = activeItemIndex === index;
               return (
               <tr
                 key={item.productId || index}
-                className={`align-top ${rowShortfall ? "bg-amber-50/40" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onSelectItem?.(index)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectItem?.(index);
+                  }
+                }}
+                className={`align-top cursor-pointer transition-colors ${
+                  isActive
+                    ? "bg-indigo-50 ring-1 ring-inset ring-indigo-300"
+                    : rowShortfall
+                      ? "bg-amber-50/40 hover:bg-amber-50/70"
+                      : "hover:bg-blue-50/40"
+                }`}
               >
                 <td className="px-3 py-3">
                   <div className="min-w-0">
@@ -229,7 +278,7 @@ export default function OrderFormLineItems({
                     </div>
                   </div>
                 </td>
-                <td className="px-2 py-3">
+                <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="number"
                     step={
@@ -247,7 +296,7 @@ export default function OrderFormLineItems({
                     className="w-full p-2 border border-gray-300 rounded-md text-center text-sm"
                   />
                 </td>
-                <td className="px-2 py-3">
+                <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="number"
                     min="0"
@@ -260,7 +309,7 @@ export default function OrderFormLineItems({
                     className="w-full p-2 border border-gray-300 rounded-md text-center text-sm"
                   />
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="number"
                     min="0.01"
@@ -276,7 +325,7 @@ export default function OrderFormLineItems({
                 <td className="px-3 py-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap">
                   R$ {safeToFixed(computeLineNetTotal(item))}
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-1.5">
                     <button
                       type="button"
