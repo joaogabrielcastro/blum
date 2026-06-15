@@ -59,12 +59,32 @@ export function formatOrderDateLabel(raw) {
   return d.toLocaleDateString("pt-BR");
 }
 
+function pickBetterBrandLabel(current, next) {
+  if (current === next) return current;
+  if (current.toLowerCase() !== next.toLowerCase()) return current;
+  if (current === current.toLowerCase() && next !== next.toLowerCase()) return next;
+  if (next === next.toLowerCase() && current !== current.toLowerCase()) return current;
+  return current.length >= next.length ? current : next;
+}
+
+function upsertBrandSales(byKey, normKey, rawName, amount) {
+  if (!byKey[normKey]) {
+    byKey[normKey] = { displayName: rawName, vendas: 0 };
+  } else {
+    byKey[normKey].displayName = pickBetterBrandLabel(
+      byKey[normKey].displayName,
+      rawName,
+    );
+  }
+  byKey[normKey].vendas += amount;
+}
+
 /**
  * Pedidos com várias marcas no mesmo pedido: reparte o valor total
  * igualmente entre as representadas (lista sem Itens no GET em massa).
  */
 export function accumulateSalesByRepresentada(orders) {
-  const map = {};
+  const byKey = {};
   for (const order of orders) {
     const total = orderTotalPrice(order);
     const raw = orderRepresentadas(order);
@@ -73,16 +93,17 @@ export function accumulateSalesByRepresentada(orders) {
       .map((s) => s.trim())
       .filter(Boolean);
     if (brands.length === 0) {
-      const k = "Sem marca definida";
-      map[k] = (map[k] || 0) + total;
+      upsertBrandSales(byKey, "sem marca definida", "Sem marca definida", total);
       continue;
     }
     const share = total / brands.length;
     for (const b of brands) {
-      map[b] = (map[b] || 0) + share;
+      upsertBrandSales(byKey, b.toLowerCase(), b, share);
     }
   }
-  return map;
+  return Object.fromEntries(
+    Object.values(byKey).map((entry) => [entry.displayName, entry.vendas]),
+  );
 }
 
 /** [{ name, vendas }] ordenado; agrupa excedente em "Outras" */
@@ -98,6 +119,46 @@ export function brandBarsFromSalesMap(salesMap, maxBars = 12) {
     rows.push({ name: "Outras", vendas: restSum });
   }
   return rows;
+}
+
+/** Dados de participação % com fatias pequenas agrupadas em «Outros» */
+export function buildParticipationChartData(
+  brandBars,
+  totalPeriodo,
+  { minPercent = 2, maxSlices = 10 } = {},
+) {
+  if (!brandBars?.length || totalPeriodo <= 0) return [];
+
+  const rows = brandBars
+    .filter((b) => b.name !== "Outras")
+    .map((b) => ({
+      name: b.name,
+      vendas: b.vendas,
+      percent: (b.vendas / totalPeriodo) * 100,
+    }))
+    .sort((a, b) => b.vendas - a.vendas);
+
+  const outrasFromBars = brandBars.find((b) => b.name === "Outras");
+  let outrosVendas = outrasFromBars?.vendas || 0;
+
+  const main = [];
+  for (const row of rows) {
+    if (main.length < maxSlices - 1 && row.percent >= minPercent) {
+      main.push(row);
+    } else {
+      outrosVendas += row.vendas;
+    }
+  }
+
+  if (outrosVendas > 0) {
+    main.push({
+      name: "Outros",
+      vendas: outrosVendas,
+      percent: (outrosVendas / totalPeriodo) * 100,
+    });
+  }
+
+  return main.sort((a, b) => b.percent - a.percent);
 }
 
 /** Dados acumulados para SalesChart (pedidos já filtrados e entregues) */
