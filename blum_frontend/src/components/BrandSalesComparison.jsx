@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -9,10 +8,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Cell,
-  LabelList,
 } from "recharts";
 import formatCurrency from "../utils/format";
-import { buildParticipationChartData } from "../utils/orderApiFields";
 
 const COLORS = [
   "#2563eb",
@@ -27,18 +24,6 @@ const COLORS = [
   "#0d9488",
 ];
 
-function ParticipationTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-lg">
-      <p className="font-semibold text-gray-900">{row.name}</p>
-      <p className="text-gray-700">{formatCurrency(row.vendas)}</p>
-      <p className="text-blue-700 font-medium">{row.percent.toFixed(1)}% do total</p>
-    </div>
-  );
-}
-
 /**
  * Compara vendas por representada (marca) com o total do período e uma linha de média por marca.
  */
@@ -47,13 +32,6 @@ export default function BrandSalesComparison({
   totalPeriodo,
   mediaPorRepresentada,
 }) {
-  const participationData = useMemo(
-    () => buildParticipationChartData(brandBars, totalPeriodo),
-    [brandBars, totalPeriodo],
-  );
-
-  const participationHeight = Math.max(220, participationData.length * 44 + 48);
-
   if (!brandBars?.length) {
     return (
       <div className="flex flex-col items-center justify-center py-14 text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
@@ -131,61 +109,6 @@ export default function BrandSalesComparison({
         Quando um pedido inclui várias representadas, o valor é dividido igualmente
         entre elas neste gráfico (o total do período continua igual ao somatório real).
       </p>
-
-      {totalPeriodo > 0 && participationData.length > 0 && (
-        <div className="pt-6 border-t border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-800 mb-1">
-            Participação no total (representadas)
-          </h3>
-          <p className="text-xs text-gray-500 mb-4">
-            Representadas com menos de 2% do total aparecem agrupadas em «Outros».
-          </p>
-          <div className="w-full" style={{ height: participationHeight }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={participationData}
-                layout="vertical"
-                margin={{ top: 4, right: 56, left: 4, bottom: 4 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  tickFormatter={(v) => `${v}%`}
-                  tick={{ fontSize: 11 }}
-                  stroke="#6b7280"
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={140}
-                  tick={{ fontSize: 12 }}
-                  stroke="#374151"
-                />
-                <Tooltip content={<ParticipationTooltip />} />
-                <Bar dataKey="percent" name="Participação" radius={[0, 4, 4, 0]} barSize={22}>
-                  {participationData.map((entry, i) => (
-                    <Cell
-                      key={entry.name}
-                      fill={
-                        entry.name === "Outros"
-                          ? "#94a3b8"
-                          : COLORS[i % COLORS.length]
-                      }
-                    />
-                  ))}
-                  <LabelList
-                    dataKey="percent"
-                    position="right"
-                    formatter={(v) => `${Number(v).toFixed(1)}%`}
-                    className="fill-gray-700 text-xs font-medium"
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

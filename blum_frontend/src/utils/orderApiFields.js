@@ -121,46 +121,6 @@ export function brandBarsFromSalesMap(salesMap, maxBars = 12) {
   return rows;
 }
 
-/** Dados de participação % com fatias pequenas agrupadas em «Outros» */
-export function buildParticipationChartData(
-  brandBars,
-  totalPeriodo,
-  { minPercent = 2, maxSlices = 10 } = {},
-) {
-  if (!brandBars?.length || totalPeriodo <= 0) return [];
-
-  const rows = brandBars
-    .filter((b) => b.name !== "Outras")
-    .map((b) => ({
-      name: b.name,
-      vendas: b.vendas,
-      percent: (b.vendas / totalPeriodo) * 100,
-    }))
-    .sort((a, b) => b.vendas - a.vendas);
-
-  const outrasFromBars = brandBars.find((b) => b.name === "Outras");
-  let outrosVendas = outrasFromBars?.vendas || 0;
-
-  const main = [];
-  for (const row of rows) {
-    if (main.length < maxSlices - 1 && row.percent >= minPercent) {
-      main.push(row);
-    } else {
-      outrosVendas += row.vendas;
-    }
-  }
-
-  if (outrosVendas > 0) {
-    main.push({
-      name: "Outros",
-      vendas: outrosVendas,
-      percent: (outrosVendas / totalPeriodo) * 100,
-    });
-  }
-
-  return main.sort((a, b) => b.percent - a.percent);
-}
-
 /** Dados acumulados para SalesChart (pedidos já filtrados e entregues) */
 export function prepareCumulativeSalesChartData(orders) {
   const salesByDayKey = {};
