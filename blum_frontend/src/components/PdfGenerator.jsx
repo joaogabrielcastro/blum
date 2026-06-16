@@ -375,66 +375,91 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     );
     yPosition += 12;
 
-    checkPageOverflow(25);
+    // Rodapé em duas colunas: pagamento à esquerda, depósito ao centro/direita
+    const footerBlockHeight = 42;
+
+    checkPageOverflow(footerBlockHeight);
+    const footerStartY = yPosition;
+    const leftColX = margin;
+    const depositColX = pageWidth / 2 + 5;
 
     doc.setFontSize(9);
-    doc.setFont(undefined, "bold");
-    doc.text("Condição de Pagamento:", margin, yPosition);
-    yPosition += 4;
+    let leftY = footerStartY;
 
-    doc.setFont(undefined, "normal");
     const rawPay = order.paymentMethod ?? order.payment_method;
     const paymentMethod =
       (rawPay && PAYMENT_PDF_LABELS[rawPay]) || rawPay || "—";
-    doc.text(String(paymentMethod), margin, yPosition);
-    yPosition += 6; // ✅ Menos espaço
+
+    const paymentBoxWidth = pageWidth / 2 - margin - 8;
+    const paymentBoxHeight = 14;
+    doc.setFillColor(245, 247, 250);
+    doc.setDrawColor(180, 190, 200);
+    doc.roundedRect(
+      leftColX - 2,
+      leftY - 3,
+      paymentBoxWidth,
+      paymentBoxHeight,
+      2,
+      2,
+      "FD",
+    );
+
+    doc.setFont(undefined, "bold");
+    doc.text("Condição de Pagamento:", leftColX, leftY + 1);
+    leftY += 5;
+
+    doc.setFontSize(11);
+    doc.setFont(undefined, "bold");
+    doc.text(String(paymentMethod), leftColX, leftY + 2);
+    doc.setFontSize(9);
+    leftY += 8;
 
     if (order.sellerName || order.sellerUsername) {
       doc.setFont(undefined, "bold");
-      doc.text("Pedido lançado por:", margin, yPosition);
-      yPosition += 4;
+      doc.text("Pedido lançado por:", leftColX, leftY);
+      leftY += 4;
       doc.setFont(undefined, "normal");
       const seller = order.sellerName || order.sellerUsername;
       const withUser =
         order.sellerName && order.sellerUsername
           ? `${order.sellerName} (@${order.sellerUsername})`
           : seller;
-      doc.text(String(withUser), margin, yPosition);
-      yPosition += 6;
+      doc.text(String(withUser), leftColX, leftY);
+      leftY += 6;
     }
 
     doc.setFont(undefined, "bold");
-    doc.text("Data de Emissão:", margin, yPosition);
-    yPosition += 4;
-    
+    doc.text("Data de Emissão:", leftColX, leftY);
+    leftY += 4;
+
     doc.setFont(undefined, "normal");
     const created =
       order.createdAt ?? order.createdat ?? order.created_at ?? null;
     const emissionDate = created
       ? new Date(created).toLocaleDateString("pt-BR")
       : new Date().toLocaleDateString("pt-BR");
-    doc.text(emissionDate, margin, yPosition);
-    yPosition += 12; // ✅ Menos espaço
+    doc.text(emissionDate, leftColX, leftY);
+    leftY += 6;
 
-    checkPageOverflow(35);
-
-    // Dados bancários
     const bank = bankInfo[selectedPdfBrand] || bankInfo.default;
-    
+    let depositY = footerStartY;
+
     doc.setFont(undefined, "bold");
-    doc.text("DADOS PARA DEPOSITO:", margin, yPosition);
-    yPosition += 4; // ✅ Menos espaço
-    
+    doc.text("DADOS PARA DEPOSITO:", depositColX, depositY);
+    depositY += 4;
+
     doc.setFont(undefined, "normal");
-    doc.text(bank.companyName, margin, yPosition);
-    yPosition += 3; // ✅ Menos espaço
-    doc.text(bank.bank, margin, yPosition);
-    yPosition += 3; // ✅ Menos espaço
-    doc.text(`AG: ${bank.agency}`, margin, yPosition);
-    yPosition += 3; // ✅ Menos espaço
-    doc.text(`C/C: ${bank.account}`, margin, yPosition);
-    yPosition += 3; // ✅ Menos espaço
-    doc.text(`PIX CNPJ: ${bank.pix}`, margin, yPosition);
+    doc.text(bank.companyName, depositColX, depositY);
+    depositY += 3;
+    doc.text(bank.bank, depositColX, depositY);
+    depositY += 3;
+    doc.text(`AG: ${bank.agency}`, depositColX, depositY);
+    depositY += 3;
+    doc.text(`C/C: ${bank.account}`, depositColX, depositY);
+    depositY += 3;
+    doc.text(`PIX CNPJ: ${bank.pix}`, depositColX, depositY);
+
+    yPosition = Math.max(leftY, depositY) + 4;
 
     // Footer
     const footerY = pageHeight - 8; // ✅ Footer mais próximo da borda
