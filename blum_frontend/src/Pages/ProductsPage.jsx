@@ -9,6 +9,7 @@ import RepresentadaPicker from "../components/RepresentadaPicker";
 import ErrorMessage from "../components/ErrorMessage";
 import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
+import BulkPriceAdjustModal from "../components/products/BulkPriceAdjustModal";
 
 const ProductsPage = ({ userRole }) => {
   const toast = useToast();
@@ -35,6 +36,8 @@ const ProductsPage = ({ userRole }) => {
     totalPages: 0,
   });
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [showBulkAdjust, setShowBulkAdjust] = useState(false);
 
   const isAdmin = userRole === "admin";
 
@@ -118,6 +121,29 @@ const ProductsPage = ({ userRole }) => {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    setSelectedProductIds([]);
+  }, [selectedBrand, selectedBrandId, currentPage, debouncedSearch]);
+
+  const toggleProductSelection = (productId) => {
+    setSelectedProductIds((prev) => {
+      const id = String(productId);
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      return [...prev, id];
+    });
+  };
+
+  const toggleAllOnPage = () => {
+    const pageIds = products.map((p) => String(p.id));
+    const allSelected =
+      pageIds.length > 0 && pageIds.every((id) => selectedProductIds.includes(id));
+    if (allSelected) {
+      setSelectedProductIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedProductIds((prev) => [...new Set([...prev, ...pageIds])]);
+    }
+  };
 
   const handleAddBrand = async (brandData) => {
     if (brandData.name && brandData.name.trim()) {
@@ -303,6 +329,16 @@ const ProductsPage = ({ userRole }) => {
           </button>
         )}
 
+        {isAdmin && selectedBrand && (
+          <button
+            type="button"
+            onClick={() => setShowBulkAdjust(true)}
+            className="bg-amber-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-amber-700 transition-colors text-sm md:text-base"
+          >
+            Reajuste de preços
+          </button>
+        )}
+
         {isAdmin && (
           <button
             type="button"
@@ -413,6 +449,22 @@ const ProductsPage = ({ userRole }) => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    {isAdmin ? (
+                      <th className="py-3 px-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={
+                            products.length > 0 &&
+                            products.every((p) =>
+                              selectedProductIds.includes(String(p.id)),
+                            )
+                          }
+                          onChange={toggleAllOnPage}
+                          aria-label="Selecionar todos da página"
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                        />
+                      </th>
+                    ) : null}
                     <th className="py-3 px-4 text-left text-sm font-semibold text-gray-700">
                       Produto
                     </th>
@@ -447,6 +499,9 @@ const ProductsPage = ({ userRole }) => {
                         setDeleteId(null);
                       }}
                       userRole={userRole}
+                      selectable={isAdmin}
+                      selected={selectedProductIds.includes(String(product.id))}
+                      onToggleSelect={toggleProductSelection}
                     />
                   ))}
                 </tbody>
@@ -590,6 +645,22 @@ const ProductsPage = ({ userRole }) => {
             />
           </div>
         </div>
+      )}
+
+      {isAdmin && showBulkAdjust && selectedBrand && (
+        <BulkPriceAdjustModal
+          brandName={selectedBrand}
+          brandId={selectedBrandId}
+          selectedProductIds={selectedProductIds}
+          onClose={() => setShowBulkAdjust(false)}
+          onSuccess={async (result) => {
+            toast.success(
+              `Reajuste aplicado em ${result.updated} produto(s).`,
+            );
+            setSelectedProductIds([]);
+            await fetchProducts();
+          }}
+        />
       )}
     </div>
   );

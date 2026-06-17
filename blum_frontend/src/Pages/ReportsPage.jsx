@@ -15,31 +15,60 @@ import {
   formatOrderDateLabel,
   accumulateSalesByRepresentada,
   brandBarsFromSalesMap,
-  prepareCumulativeSalesChartData,
+  filterOrdersByCalendarMonth,
+  prepareMonthlyCumulativeChartData,
+  mergeMonthlyComparisonChart,
+  getPreviousCalendarMonth,
+  formatMonthYearLabel,
+  monthYearKey,
 } from "../utils/orderApiFields";
+
+const now = new Date();
+const defaultMonthKey = monthYearKey(now.getFullYear(), now.getMonth() + 1);
+
+function parseMonthKey(key) {
+  const [y, m] = String(key).split("-").map(Number);
+  return { year: y, month: m };
+}
 
 const ReportsPage = ({ userRole, userId }) => {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterPeriod, setFilterPeriod] = useState("all");
+  const [selectedMonthKey, setSelectedMonthKey] = useState(defaultMonthKey);
+  const [monthlySummaries, setMonthlySummaries] = useState([]);
+  const [salesTarget, setSalesTarget] = useState(null);
+  const [targetDraft, setTargetDraft] = useState("");
+  const [savingTarget, setSavingTarget] = useState(false);
   /** "" = todos os representantes do período; senão = id do vendedor (string) */
   const [sellerFilterKey, setSellerFilterKey] = useState("");
   const [clients, setClients] = useState({});
-  /** Fallback nome/login do vendedor quando o pedido não traz seller (edge cases) */
   const [usersById, setUsersById] = useState({});
-  const monthlyTarget = 80000;
   const mountedRef = useRef(false);
+
+  const { year: selectedYear, month: selectedMonth } =
+    parseMonthKey(selectedMonthKey);
+  const previousMonth = getPreviousCalendarMonth(selectedYear, selectedMonth);
+
+  const targetSellerKey =
+    userRole === "salesperson"
+      ? String(userId)
+      : sellerFilterKey || null;
 
   const fetchReports = useCallback(async (opts = { showSpinner: true }) => {
     try {
       if (opts.showSpinner) setLoading(true);
-      const [ordersData, clientsData, usersData] = await Promise.all([
-        apiService.getOrders({}),
-        apiService.getClients(),
-        userRole === "admin"
-          ? apiService.getUsers().catch(() => [])
-          : Promise.resolve([]),
-      ]);
+      const summarySellerArg =
+        userRole === "salesperson" ? userId : sellerFilterKey || undefined;
+
+      const [ordersData, clientsData, usersData, summariesData] =
+        await Promise.all([
+          apiService.getOrders({}),
+          apiService.getClients(),
+          userRole === "admin"
+            ? apiService.getUsers().catch(() => [])
+            : Promise.resolve([]),
+          apiService.getMonthlySalesSummaries(summarySellerArg).catch(() => []),
+        ]);
       const clientsMap = {};
       clientsData.forEach((client) => {
         const cid = client.id;
@@ -57,12 +86,30 @@ const ReportsPage = ({ userRole, userId }) => {
         (order) => order.status === "Entregue",
       );
       setAllOrders(finishedOrders);
+      setMonthlySummaries(Array.isArray(summariesData) ? summariesData : []);
     } catch (error) {
       console.error("Erro ao buscar relatórios:", error);
     } finally {
       if (opts.showSpinner) setLoading(false);
     }
-  }, [userRole]);
+  }, [userRole, sellerFilterKey, userId]);
+
+  const loadSalesTarget = useCallback(async () => {
+    try {
+      const data = await apiService.getSalesTarget({
+        year: selectedYear,
+        month: selectedMonth,
+        sellerUserId: targetSellerKey,
+      });
+      const amount = data?.targetAmount ?? null;
+      setSalesTarget(amount);
+      setTargetDraft(amount != null ? String(amount) : "");
+    } catch (error) {
+      console.error("Erro ao buscar meta:", error);
+      setSalesTarget(null);
+      setTargetDraft("");
+    }
+  }, [selectedYear, selectedMonth, targetSellerKey]);
 
   useEffect(() => {
     if (userId && userRole) {
@@ -70,6 +117,10 @@ const ReportsPage = ({ userRole, userId }) => {
       mountedRef.current = true;
     }
   }, [userRole, userId, fetchReports]);
+
+  useEffect(() => {
+    loadSalesTarget();
+  }, [loadSalesTarget]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -81,33 +132,67 @@ const ReportsPage = ({ userRole, userId }) => {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [fetchReports]);
 
-  useEffect(() => {
-    setSellerFilterKey("");
-  }, [filterPeriod]);
-
-  const getFilteredOrders = (days) => {
-    const today = new Date();
-    const filterDate = new Date();
-    filterDate.setDate(today.getDate() - days);
-    return allOrders.filter((order) => {
-      const fin = orderFinishedAt(order);
-      return fin && new Date(fin) >= filterDate;
+  const monthOptions = useMemo(() => {
+    const keys = new Set([defaultMonthKey, selectedMonthKey]);
+    monthlySummaries.forEach((row) => {
+      keys.add(monthYearKey(row.year, row.month));
     });
-  };
+    allOrders.forEach((order) => {
+      const fin = orderFinishedAt(order);
+      if (!fin) return;
+      const d = new Date(fin);
+      if (Number.isNaN(d.getTime())) return;
+      keys.add(monthYearKey(d.getFullYear(), d.getMonth() + 1));
+    });
+    return [...keys]
+      .map((key) => {
+        const { year, month } = parseMonthKey(key);
+        return { key, label: formatMonthYearLabel(year, month), year, month };
+      })
+      .sort((a, b) => b.year - a.year || b.month - a.month);
+  }, [allOrders, monthlySummaries, selectedMonthKey]);
 
-  const weeklyOrders = getFilteredOrders(7);
-  const monthlyOrders = getFilteredOrders(30);
+  const sellerScopedOrders = useMemo(() => {
+    if (userRole === "salesperson") {
+      return allOrders.filter((o) => orderSellerUserKey(o) === String(userId));
+    }
+    if (!sellerFilterKey) return allOrders;
+    return allOrders.filter((o) => orderSellerUserKey(o) === sellerFilterKey);
+  }, [allOrders, sellerFilterKey, userRole, userId]);
 
-  const periodFilteredOrders =
-    filterPeriod === "weekly"
-      ? weeklyOrders
-      : filterPeriod === "monthly"
-        ? monthlyOrders
-        : allOrders;
+  const periodFilteredOrders = useMemo(
+    () => filterOrdersByCalendarMonth(sellerScopedOrders, selectedYear, selectedMonth),
+    [sellerScopedOrders, selectedYear, selectedMonth],
+  );
+
+  const previousMonthOrders = useMemo(
+    () =>
+      filterOrdersByCalendarMonth(
+        sellerScopedOrders,
+        previousMonth.year,
+        previousMonth.month,
+      ),
+    [sellerScopedOrders, previousMonth.year, previousMonth.month],
+  );
+
+  const previousMonthTotal = useMemo(
+    () => previousMonthOrders.reduce((acc, o) => acc + orderTotalPrice(o), 0),
+    [previousMonthOrders],
+  );
+
+  const suggestedTarget = useMemo(() => {
+    if (previousMonthTotal <= 0) return null;
+    return Math.round(previousMonthTotal * 1.1 * 100) / 100;
+  }, [previousMonthTotal]);
 
   const sellerOptions = useMemo(() => {
+    const monthOrders = filterOrdersByCalendarMonth(
+      allOrders,
+      selectedYear,
+      selectedMonth,
+    );
     const byKey = new Map();
-    for (const order of periodFilteredOrders) {
+    for (const order of monthOrders) {
       const key = orderSellerUserKey(order);
       if (byKey.has(key)) continue;
       const team = usersById[key];
@@ -126,21 +211,31 @@ const ReportsPage = ({ userRole, userId }) => {
     return [...byKey.values()].sort((a, b) =>
       a.label.localeCompare(b.label, "pt-BR"),
     );
-  }, [periodFilteredOrders, usersById]);
+  }, [allOrders, selectedYear, selectedMonth, usersById]);
 
-  const ordersToDisplay = useMemo(() => {
-    if (!sellerFilterKey) return periodFilteredOrders;
-    return periodFilteredOrders.filter(
-      (o) => orderSellerUserKey(o) === sellerFilterKey,
-    );
-  }, [periodFilteredOrders, sellerFilterKey]);
+  const ordersToDisplay = periodFilteredOrders;
 
   const selectedSellerLabel =
     sellerOptions.find((o) => o.key === sellerFilterKey)?.label ?? "";
 
+  const currentMonthChart = useMemo(
+    () => prepareMonthlyCumulativeChartData(periodFilteredOrders, selectedYear, selectedMonth),
+    [periodFilteredOrders, selectedYear, selectedMonth],
+  );
+
+  const previousMonthChart = useMemo(
+    () =>
+      prepareMonthlyCumulativeChartData(
+        previousMonthOrders,
+        previousMonth.year,
+        previousMonth.month,
+      ),
+    [previousMonthOrders, previousMonth.year, previousMonth.month],
+  );
+
   const chartData = useMemo(
-    () => prepareCumulativeSalesChartData(ordersToDisplay),
-    [ordersToDisplay],
+    () => mergeMonthlyComparisonChart(currentMonthChart, previousMonthChart),
+    [currentMonthChart, previousMonthChart],
   );
 
   const totalSales = ordersToDisplay.reduce(
@@ -228,6 +323,40 @@ const ReportsPage = ({ userRole, userId }) => {
     return sale.displayName || sale.userId || "N/A";
   };
 
+  const goToPreviousMonth = () => {
+    setSelectedMonthKey(
+      monthYearKey(previousMonth.year, previousMonth.month),
+    );
+  };
+
+  const goToCurrentMonth = () => {
+    setSelectedMonthKey(defaultMonthKey);
+  };
+
+  const handleSaveTarget = async () => {
+    const amount = parseFloat(String(targetDraft).replace(",", "."));
+    if (!Number.isFinite(amount) || amount < 0) return;
+    try {
+      setSavingTarget(true);
+      await apiService.saveSalesTarget({
+        year: selectedYear,
+        month: selectedMonth,
+        targetAmount: amount,
+        sellerUserId: targetSellerKey,
+      });
+      setSalesTarget(amount);
+    } catch (error) {
+      console.error("Erro ao salvar meta:", error);
+    } finally {
+      setSavingTarget(false);
+    }
+  };
+
+  const applySuggestedTarget = () => {
+    if (suggestedTarget == null) return;
+    setTargetDraft(String(suggestedTarget));
+  };
+
   if (loading)
     return (
       <div className="p-8 text-center text-gray-500">
@@ -241,69 +370,73 @@ const ReportsPage = ({ userRole, userId }) => {
         Relatórios de Vendas e Comissões
       </h1>
 
-      <div className="flex items-center gap-2 flex-wrap mb-8">
-        <span className="font-semibold text-gray-700">
-          Filtrar por Período:
-        </span>
-        <button
-          onClick={() => setFilterPeriod("all")}
-          className={`min-w-fit px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-            filterPeriod === "all"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          Todos
-        </button>
-        <button
-          onClick={() => setFilterPeriod("weekly")}
-          className={`min-w-fit px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-            filterPeriod === "weekly"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          Última Semana
-        </button>
-        <button
-          onClick={() => setFilterPeriod("monthly")}
-          className={`min-w-fit px-5 py-2 rounded-full text-sm font-semibold transition-colors duration-200 ${
-            filterPeriod === "monthly"
-              ? "bg-blue-600 text-white"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          Último Mês
-        </button>
+      <div className="flex flex-col lg:flex-row lg:items-end gap-3 mb-8">
+        <div className="flex flex-col gap-2">
+          <span className="font-semibold text-gray-700">Mês calendário:</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={goToCurrentMonth}
+              className={`min-w-fit px-4 py-2 rounded-full text-sm font-semibold ${
+                selectedMonthKey === defaultMonthKey
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Mês atual
+            </button>
+            <button
+              type="button"
+              onClick={goToPreviousMonth}
+              className="min-w-fit px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >
+              Mês anterior
+            </button>
+            <select
+              value={selectedMonthKey}
+              onChange={(e) => setSelectedMonthKey(e.target.value)}
+              className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800"
+              aria-label="Selecionar mês"
+            >
+              {monthOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-8 flex-wrap">
-        <span className="font-semibold text-gray-700 shrink-0">
-          Representante:
-        </span>
-        <select
-          value={sellerFilterKey}
-          onChange={(e) => setSellerFilterKey(e.target.value)}
-          aria-label="Filtrar pedidos por representante"
-          className="w-full sm:w-auto min-w-[200px] max-w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
-          <option value="">Todos os representantes</option>
-          {sellerOptions.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {sellerFilterKey ? (
-          <span className="text-sm text-gray-600">
-            Exibindo apenas pedidos de{" "}
-            <span className="font-semibold text-gray-800">
-              {selectedSellerLabel}
-            </span>
-            .
+      {userRole === "admin" ? (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-8 flex-wrap">
+          <span className="font-semibold text-gray-700 shrink-0">
+            Representante:
           </span>
-        ) : null}
-      </div>
+          <select
+            value={sellerFilterKey}
+            onChange={(e) => setSellerFilterKey(e.target.value)}
+            aria-label="Filtrar pedidos por representante"
+            className="w-full sm:w-auto min-w-[200px] max-w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          >
+            <option value="">Todos os representantes</option>
+            {sellerOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {sellerFilterKey ? (
+            <span className="text-sm text-gray-600">
+              Exibindo apenas pedidos de{" "}
+              <span className="font-semibold text-gray-800">
+                {selectedSellerLabel}
+              </span>
+              .
+            </span>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 hover:shadow-lg transition-transform duration-300 transform hover:-translate-y-1">
@@ -339,22 +472,117 @@ const ReportsPage = ({ userRole, userId }) => {
       </div>
 
       <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Evolução das Vendas
-          {filterPeriod === "weekly" && " (Última Semana)"}
-          {filterPeriod === "monthly" && " (Último Mês)"}
-          {filterPeriod === "all" && " (Todos os Períodos)"}
-          {sellerFilterKey && selectedSellerLabel
-            ? ` — ${selectedSellerLabel}`
-            : ""}
-        </h2>
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-1">
+              Evolução das Vendas — {formatMonthYearLabel(selectedYear, selectedMonth)}
+              {sellerFilterKey && selectedSellerLabel
+                ? ` — ${selectedSellerLabel}`
+                : ""}
+            </h2>
+            <p className="text-sm text-gray-600">
+              Linha cinza: acumulado de{" "}
+              {formatMonthYearLabel(previousMonth.year, previousMonth.month)}.
+            </p>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 min-w-[260px]">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">
+              Meta do mês
+              {userRole === "admin" && !sellerFilterKey ? " (empresa)" : ""}
+            </h3>
+            <p className="text-xs text-gray-600 mb-1">
+              Mês anterior: {formatCurrency(previousMonthTotal)}
+            </p>
+            {suggestedTarget != null ? (
+              <p className="text-xs text-gray-600 mb-3">
+                Sugestão (+10%): {formatCurrency(suggestedTarget)}
+              </p>
+            ) : null}
+            <div className="flex gap-2 mb-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={targetDraft}
+                onChange={(e) => setTargetDraft(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Valor da meta"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {suggestedTarget != null ? (
+                <button
+                  type="button"
+                  onClick={applySuggestedTarget}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-800 font-semibold hover:bg-indigo-200"
+                >
+                  Usar sugestão
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleSaveTarget}
+                disabled={savingTarget}
+                className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {savingTarget ? "Salvando..." : "Salvar meta"}
+              </button>
+            </div>
+            {salesTarget != null && salesTarget > 0 ? (
+              <p className="text-xs text-green-700 mt-2 font-medium">
+                Meta salva: {formatCurrency(salesTarget)}
+              </p>
+            ) : null}
+          </div>
+        </div>
         <SalesChart
           data={chartData}
-          monthlyTarget={monthlyTarget}
-          filterPeriod={filterPeriod}
+          monthlyTarget={salesTarget}
+          filterPeriod="monthly"
           totalSales={totalSales}
+          showComparison
         />
       </div>
+
+      {monthlySummaries.length > 0 ? (
+        <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Histórico mensal de vendas
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600">
+                    Mês
+                  </th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">
+                    Pedidos
+                  </th>
+                  <th className="px-4 py-2 text-right font-semibold text-gray-600">
+                    Total vendido
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlySummaries.map((row) => (
+                  <tr key={`${row.year}-${row.month}`} className="border-t">
+                    <td className="px-4 py-2 capitalize">
+                      {formatMonthYearLabel(row.year, row.month)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {row.orderCount}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums font-medium">
+                      {formatCurrency(row.totalSales)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-2">

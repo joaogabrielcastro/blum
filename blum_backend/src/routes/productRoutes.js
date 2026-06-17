@@ -13,6 +13,13 @@ router.get("/", authenticate, productsController.getAll);
 router.get("/search", authenticate, productsController.search);
 router.get("/by-code", authenticate, productsController.lookupByCode);
 
+router.post(
+  "/bulk-price-adjust",
+  authenticate,
+  authorize("admin"),
+  productsController.bulkAdjustPrices,
+);
+
 // Rotas que requerem autenticação (qualquer usuário autenticado)
 router.get("/:id", authenticate, validateId, productsController.getById);
 

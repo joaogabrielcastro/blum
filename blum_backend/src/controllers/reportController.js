@@ -83,4 +83,102 @@ exports.getCommissionByBrand = async (req, res) => {
   }
 };
 
+exports.getMonthlySalesSummaries = async (req, res) => {
+  try {
+    await reportService.syncMonthlySalesSummaries(req.user.tenantId);
+
+    let sellerUserId = req.query.sellerUserId;
+    if (req.user.role === "salesperson") {
+      sellerUserId = req.user.userId;
+    }
+
+    const rows = await reportService.listMonthlySalesSummaries(
+      req.user.tenantId,
+      sellerUserId || null,
+    );
+
+    res.status(200).json(
+      rows.map((row) => ({
+        year: Number(row.year),
+        month: Number(row.month),
+        totalSales: parseFloat(row.total_sales) || 0,
+        orderCount: Number(row.order_count) || 0,
+        updatedAt: row.updated_at,
+      })),
+    );
+  } catch (error) {
+    console.error("Erro ao listar resumos mensais:", error);
+    res.status(500).json({ error: "Erro ao listar resumos mensais de vendas." });
+  }
+};
+
+exports.getSalesTarget = async (req, res) => {
+  try {
+    const year = parseInt(req.query.year, 10);
+    const month = parseInt(req.query.month, 10);
+    if (!Number.isInteger(year) || !Number.isInteger(month)) {
+      return res.status(400).json({ error: "year e month são obrigatórios" });
+    }
+
+    let sellerUserId = req.query.sellerUserId;
+    if (req.user.role === "salesperson") {
+      sellerUserId = req.user.userId;
+    } else if (sellerUserId === "" || sellerUserId === "company") {
+      sellerUserId = null;
+    }
+
+    const targetAmount = await reportService.getSalesTarget({
+      tenantId: req.user.tenantId,
+      year,
+      month,
+      sellerUserId: sellerUserId ?? null,
+    });
+
+    res.status(200).json({ year, month, targetAmount, sellerUserId: sellerUserId ?? null });
+  } catch (error) {
+    console.error("Erro ao buscar meta de vendas:", error);
+    res.status(500).json({ error: "Erro ao buscar meta de vendas." });
+  }
+};
+
+exports.upsertSalesTarget = async (req, res) => {
+  try {
+    const year = parseInt(req.body.year, 10);
+    const month = parseInt(req.body.month, 10);
+    const targetAmount = req.body.targetAmount;
+
+    if (!Number.isInteger(year) || !Number.isInteger(month)) {
+      return res.status(400).json({ error: "year e month são obrigatórios" });
+    }
+
+    let sellerUserId = req.body.sellerUserId;
+    if (req.user.role === "salesperson") {
+      if (String(sellerUserId ?? req.user.userId) !== String(req.user.userId)) {
+        return res.status(403).json({ error: "Sem permissão para alterar meta de outro vendedor" });
+      }
+      sellerUserId = req.user.userId;
+    } else if (sellerUserId === "" || sellerUserId === "company" || sellerUserId == null) {
+      sellerUserId = null;
+    }
+
+    const row = await reportService.upsertSalesTarget({
+      tenantId: req.user.tenantId,
+      year,
+      month,
+      sellerUserId,
+      targetAmount,
+    });
+
+    res.status(200).json({
+      year: Number(row.year),
+      month: Number(row.month),
+      targetAmount: parseFloat(row.target_amount) || 0,
+      sellerUserId: row.seller_user_id,
+    });
+  } catch (error) {
+    console.error("Erro ao salvar meta de vendas:", error);
+    res.status(400).json({ error: error.message || "Erro ao salvar meta de vendas." });
+  }
+};
+
 module.exports = exports;

@@ -10,13 +10,27 @@ const ProductRow = ({
   deleteId, 
   onConfirmDelete, 
   onCancelDelete,
-  userRole 
+  userRole,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }) => {
   const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   return (
     <>
       <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150">
+        {selectable ? (
+          <td className="py-4 px-3 w-10">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={() => onToggleSelect?.(product.id)}
+              aria-label={`Selecionar ${product.name}`}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            />
+          </td>
+        ) : null}
         {/* Nome do Produto */}
         <td className="py-4 px-4">
           <div className="flex flex-col">
