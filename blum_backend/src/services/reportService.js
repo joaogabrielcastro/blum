@@ -152,6 +152,140 @@ class ReportService {
 
     return await reportRepository.query(query, params);
   }
+
+  /** Sincroniza resumos mensais a partir de pedidos entregues (finishedat). */
+  async syncMonthlySalesSummaries(tenantId = 1) {
+    await sql`
+      INSERT INTO monthly_sales_summary (tenant_id, year, month, seller_user_id, total_sales, order_count, updated_at)
+      SELECT
+        o.tenant_id,
+        EXTRACT(YEAR FROM o.finishedat)::int AS year,
+        EXTRACT(MONTH FROM o.finishedat)::int AS month,
+        o.user_ref AS seller_user_id,
+        COALESCE(SUM(o.totalprice), 0) AS total_sales,
+        COUNT(o.id)::int AS order_count,
+        NOW()
+      FROM orders o
+      WHERE o.status = 'Entregue'
+        AND o.tenant_id = ${tenantId}
+        AND o.finishedat IS NOT NULL
+      GROUP BY o.tenant_id, year, month, o.user_ref
+      ON CONFLICT (tenant_id, year, month, seller_user_id) WHERE seller_user_id IS NOT NULL
+      DO UPDATE SET
+        total_sales = EXCLUDED.total_sales,
+        order_count = EXCLUDED.order_count,
+        updated_at = NOW()
+    `;
+
+    await sql`
+      INSERT INTO monthly_sales_summary (tenant_id, year, month, seller_user_id, total_sales, order_count, updated_at)
+      SELECT
+        o.tenant_id,
+        EXTRACT(YEAR FROM o.finishedat)::int AS year,
+        EXTRACT(MONTH FROM o.finishedat)::int AS month,
+        NULL AS seller_user_id,
+        COALESCE(SUM(o.totalprice), 0) AS total_sales,
+        COUNT(o.id)::int AS order_count,
+        NOW()
+      FROM orders o
+      WHERE o.status = 'Entregue'
+        AND o.tenant_id = ${tenantId}
+        AND o.finishedat IS NOT NULL
+      GROUP BY o.tenant_id, year, month
+      ON CONFLICT (tenant_id, year, month) WHERE seller_user_id IS NULL
+      DO UPDATE SET
+        total_sales = EXCLUDED.total_sales,
+        order_count = EXCLUDED.order_count,
+        updated_at = NOW()
+    `;
+  }
+
+  async listMonthlySalesSummaries(tenantId = 1, sellerUserId = null) {
+    if (sellerUserId != null && sellerUserId !== "") {
+      return sql`
+        SELECT year, month, total_sales, order_count, updated_at
+        FROM monthly_sales_summary
+        WHERE tenant_id = ${tenantId}
+          AND seller_user_id = ${Number(sellerUserId)}
+        ORDER BY year DESC, month DESC
+      `;
+    }
+    return sql`
+      SELECT year, month, total_sales, order_count, updated_at
+      FROM monthly_sales_summary
+      WHERE tenant_id = ${tenantId}
+        AND seller_user_id IS NULL
+      ORDER BY year DESC, month DESC
+    `;
+  }
+
+  async getSalesTarget({ tenantId = 1, year, month, sellerUserId = null }) {
+    const sellerId =
+      sellerUserId != null && sellerUserId !== ""
+        ? Number(sellerUserId)
+        : null;
+
+    const rows =
+      sellerId == null
+        ? await sql`
+            SELECT target_amount
+            FROM sales_targets
+            WHERE tenant_id = ${tenantId}
+              AND year = ${year}
+              AND month = ${month}
+              AND seller_user_id IS NULL
+            LIMIT 1
+          `
+        : await sql`
+            SELECT target_amount
+            FROM sales_targets
+            WHERE tenant_id = ${tenantId}
+              AND year = ${year}
+              AND month = ${month}
+              AND seller_user_id = ${sellerId}
+            LIMIT 1
+          `;
+    return rows[0] ? parseFloat(rows[0].target_amount) : null;
+  }
+
+  async upsertSalesTarget({
+    tenantId = 1,
+    year,
+    month,
+    sellerUserId = null,
+    targetAmount,
+  }) {
+    const amount = parseFloat(targetAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error("Valor da meta deve ser zero ou positivo");
+    }
+
+    const sellerId =
+      sellerUserId != null && sellerUserId !== ""
+        ? Number(sellerUserId)
+        : null;
+
+    const rows = sellerId == null
+      ? await sql`
+          INSERT INTO sales_targets (tenant_id, year, month, seller_user_id, target_amount, updated_at)
+          VALUES (${tenantId}, ${year}, ${month}, NULL, ${amount}, NOW())
+          ON CONFLICT (tenant_id, year, month) WHERE seller_user_id IS NULL
+          DO UPDATE SET
+            target_amount = EXCLUDED.target_amount,
+            updated_at = NOW()
+          RETURNING *
+        `
+      : await sql`
+          INSERT INTO sales_targets (tenant_id, year, month, seller_user_id, target_amount, updated_at)
+          VALUES (${tenantId}, ${year}, ${month}, ${sellerId}, ${amount}, NOW())
+          ON CONFLICT (tenant_id, year, month, seller_user_id) WHERE seller_user_id IS NOT NULL
+          DO UPDATE SET
+            target_amount = EXCLUDED.target_amount,
+            updated_at = NOW()
+          RETURNING *
+        `;
+    return rows[0];
+  }
 }
 
 module.exports = new ReportService();

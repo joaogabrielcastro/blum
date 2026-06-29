@@ -275,6 +275,13 @@ const apiService = {
     });
   },
 
+  bulkAdjustPrices: async (payload) => {
+    return apiRequest(`${API_URL}/products/bulk-price-adjust`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   getProductById: async (productId) => {
     return apiRequest(`${API_URL}/products/${productId}`);
   },
@@ -558,6 +565,33 @@ const apiService = {
   getReportStats: async (filters) => {
     const queryString = new URLSearchParams(filters).toString();
     return apiRequest(`${API_URL}/reports/stats?${queryString}`);
+  },
+
+  getMonthlySalesSummaries: async (sellerUserId) => {
+    const params = new URLSearchParams();
+    if (sellerUserId) params.append("sellerUserId", String(sellerUserId));
+    const qs = params.toString();
+    return apiRequest(
+      `${API_URL}/reports/monthly-sales${qs ? `?${qs}` : ""}`,
+    );
+  },
+
+  getSalesTarget: async ({ year, month, sellerUserId }) => {
+    const params = new URLSearchParams({
+      year: String(year),
+      month: String(month),
+    });
+    if (sellerUserId != null && sellerUserId !== "") {
+      params.append("sellerUserId", String(sellerUserId));
+    }
+    return apiRequest(`${API_URL}/reports/sales-target?${params.toString()}`);
+  },
+
+  saveSalesTarget: async ({ year, month, targetAmount, sellerUserId }) => {
+    return apiRequest(`${API_URL}/reports/sales-target`, {
+      method: "PUT",
+      body: JSON.stringify({ year, month, targetAmount, sellerUserId }),
+    });
   },
 
   // ==================== EXTERNAL APIS ====================

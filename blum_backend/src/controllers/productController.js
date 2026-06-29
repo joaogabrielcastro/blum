@@ -247,3 +247,34 @@ exports.updateStock = async (productId, quantity) => {
     throw error;
   }
 };
+
+exports.bulkAdjustPrices = async (req, res) => {
+  try {
+    const {
+      brandId,
+      brand,
+      productIds,
+      percentage,
+      dryRun = false,
+    } = req.body;
+
+    const result = await productService.bulkAdjustPrices({
+      tenantId: req.user.tenantId,
+      brandId,
+      brandName: brand,
+      productIds,
+      percentage,
+      dryRun: dryRun === true || dryRun === "true",
+      changedBy: req.user.username || String(req.user.userId),
+    });
+
+    if (!result.dryRun) {
+      await invalidateProductsCache();
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Erro no reajuste de preços:", error);
+    res.status(400).json({ error: error.message || "Erro no reajuste de preços" });
+  }
+};

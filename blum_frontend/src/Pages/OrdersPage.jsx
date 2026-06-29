@@ -16,22 +16,7 @@ import {
   orderSellerName,
   orderSellerUsername,
 } from "../utils/orderApiFields";
-
-const PAYMENT_LABELS = {
-  carteira: "Carteira (em aberto)",
-  boleto: "Boleto",
-  pix: "PIX",
-  cheque: "Cheque",
-  dinheiro: "Dinheiro",
-};
-
-const PAYMENT_BADGE_CLASS = {
-  carteira: "bg-amber-100 text-amber-900 border-amber-300",
-  boleto: "bg-blue-100 text-blue-900 border-blue-300",
-  pix: "bg-emerald-100 text-emerald-900 border-emerald-300",
-  cheque: "bg-purple-100 text-purple-900 border-purple-300",
-  dinheiro: "bg-lime-100 text-lime-900 border-lime-300",
-};
+import PaymentMethodBadge from "../components/orders/PaymentMethodBadge";
 
 function formatOpenDays(createdAt, status) {
   if (!createdAt || status === "Entregue") return null;
@@ -660,13 +645,19 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                         className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
                       >
                         <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                             <h3 className="text-lg font-semibold text-gray-800">
                               {order.documentType === "orcamento"
                                 ? "Orçamento"
                                 : "Pedido"}{" "}
                               #{order.id}
                             </h3>
+                            {order.documentType === "pedido" ? (
+                              <PaymentMethodBadge
+                                method={order.paymentMethod}
+                                prominent
+                              />
+                            ) : null}
                             {order.hasStockWarning ? (
                               <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
                                 Sem estoque
@@ -678,21 +669,6 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                               ? "Status: orçamento (aguardando virar pedido)"
                               : "Pedido"}
                           </p>
-                          {order.documentType === "pedido" && (
-                            <p className="mt-2">
-                              <span
-                                className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${
-                                  PAYMENT_BADGE_CLASS[order.paymentMethod] ||
-                                  "bg-gray-100 text-gray-800 border-gray-300"
-                                }`}
-                              >
-                                {order.paymentMethod
-                                  ? PAYMENT_LABELS[order.paymentMethod] ||
-                                    order.paymentMethod
-                                  : "Pagamento não informado"}
-                              </span>
-                            </p>
-                          )}
                           <p className="text-sm text-gray-500 mt-1">
                             Cliente: {clients[order.clientId] || "N/A"}
                           </p>

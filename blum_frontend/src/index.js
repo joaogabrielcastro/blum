@@ -3,17 +3,37 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ToastProvider } from './context/ToastContext';
 
-// Verifica se o Service Worker é suportado pelo navegador
-// e o registra antes da aplicação React ser renderizada.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(registration => {
-        console.log('Service Worker registrado com sucesso:', registration.scope);
-      })
-      .catch(error => {
-        console.log('Falha no registro do Service Worker:', error);
+if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+  let refreshing = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/service-worker.js');
+      console.log('Service Worker registrado:', registration.scope);
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (
+            newWorker.state === 'activated' &&
+            navigator.serviceWorker.controller
+          ) {
+            window.location.reload();
+          }
+        });
       });
+
+      setInterval(() => registration.update(), 60 * 60 * 1000);
+    } catch (error) {
+      console.log('Falha no registro do Service Worker:', error);
+    }
   });
 }
 

@@ -553,6 +553,131 @@ class ProductService {
       ORDER BY stock ASC
     `;
   }
+
+  /**
+   * Reajuste percentual em massa (representada inteira ou produtos selecionados).
+   * @param {Object} opts
+   * @returns {Promise<{ dryRun: boolean, updated: number, items: Array }>}
+   */
+  async bulkAdjustPrices({
+    tenantId = 1,
+    brandId,
+    brandName,
+    productIds = null,
+    percentage,
+    dryRun = false,
+    changedBy = null,
+  }) {
+    const pct = Number(percentage);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      throw new Error("Percentual deve ser entre 0,01 e 100");
+    }
+
+    let resolvedBrandName = brandName ? String(brandName).trim() : "";
+    const brandIdNum =
+      brandId != null && brandId !== "" ? parseInt(brandId, 10) : null;
+
+    if (!resolvedBrandName && Number.isInteger(brandIdNum) && brandIdNum > 0) {
+      resolvedBrandName = await resolveBrandName(brandIdNum, tenantId);
+    }
+    if (!resolvedBrandName && (!productIds || productIds.length === 0)) {
+      throw new Error("Representada é obrigatória para reajuste em massa");
+    }
+
+    let products;
+    const ids =
+      Array.isArray(productIds) && productIds.length > 0
+        ? productIds.map((id) => parseInt(id, 10)).filter((id) => id > 0)
+        : null;
+
+    if (ids && ids.length > 0) {
+      products = await sql`
+        SELECT * FROM products
+        WHERE tenant_id = ${tenantId}
+          AND id = ANY(${ids})
+      `;
+      if (products.length === 0) {
+        throw new Error("Nenhum produto encontrado para reajuste");
+      }
+      if (resolvedBrandName) {
+        const invalid = products.filter(
+          (p) =>
+            p.brand !== resolvedBrandName &&
+            !(Number.isInteger(brandIdNum) && p.brand_id === brandIdNum),
+        );
+        if (invalid.length > 0) {
+          throw new Error(
+            "Todos os produtos selecionados devem pertencer à mesma representada",
+          );
+        }
+      }
+    } else if (Number.isInteger(brandIdNum) && brandIdNum > 0) {
+      products = await sql`
+        SELECT * FROM products
+        WHERE tenant_id = ${tenantId}
+          AND (brand_id = ${brandIdNum} OR brand = ${resolvedBrandName})
+        ORDER BY name
+      `;
+    } else {
+      products = await sql`
+        SELECT * FROM products
+        WHERE tenant_id = ${tenantId} AND brand = ${resolvedBrandName}
+        ORDER BY name
+      `;
+    }
+
+    if (products.length === 0) {
+      throw new Error("Nenhum produto encontrado para reajuste");
+    }
+
+    const roundPrice = (value) =>
+      Math.round(Number(value) * (1 + pct / 100) * 100) / 100;
+
+    const items = products.map((p) => {
+      const oldPrice = parseFloat(p.price) || 0;
+      const newPrice = roundPrice(oldPrice);
+      return {
+        id: p.id,
+        name: p.name,
+        productCode: p.productcode,
+        brand: p.brand,
+        oldPrice,
+        newPrice,
+        difference: Math.round((newPrice - oldPrice) * 100) / 100,
+      };
+    });
+
+    if (dryRun) {
+      return { dryRun: true, updated: items.length, items };
+    }
+
+    for (const item of items) {
+      await sql`
+        UPDATE products
+        SET price = ${item.newPrice}
+        WHERE id = ${item.id} AND tenant_id = ${tenantId}
+      `;
+      await sql`
+        INSERT INTO price_history (
+          product_id,
+          tenant_id,
+          old_price,
+          new_price,
+          changed_by,
+          changedat
+        ) VALUES (
+          ${item.id},
+          ${tenantId},
+          ${item.oldPrice},
+          ${item.newPrice},
+          ${changedBy},
+          NOW()
+        )
+      `;
+    }
+
+    return { dryRun: false, updated: items.length, items };
+  }
 }
 
 module.exports = new ProductService();

@@ -146,3 +146,77 @@ export function prepareCumulativeSalesChartData(orders) {
     };
   });
 }
+
+export function getPreviousCalendarMonth(year, month) {
+  if (month <= 1) return { year: year - 1, month: 12 };
+  return { year, month: month - 1 };
+}
+
+export function formatMonthYearLabel(year, month) {
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+
+export function monthYearKey(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function orderInCalendarMonth(order, year, month) {
+  const fin = orderFinishedAt(order);
+  if (!fin) return false;
+  const d = new Date(fin);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getFullYear() === year && d.getMonth() + 1 === month;
+}
+
+export function filterOrdersByCalendarMonth(orders, year, month) {
+  return orders.filter((order) => orderInCalendarMonth(order, year, month));
+}
+
+/** Gráfico acumulado dia a dia de um mês calendário (todos os dias do mês). */
+export function prepareMonthlyCumulativeChartData(orders, year, month) {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const salesByDay = {};
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    salesByDay[day] = 0;
+  }
+
+  for (const order of orders) {
+    if (!orderInCalendarMonth(order, year, month)) continue;
+    const fin = orderFinishedAt(order);
+    const day = new Date(fin).getDate();
+    salesByDay[day] = (salesByDay[day] || 0) + orderTotalPrice(order);
+  }
+
+  let cumulative = 0;
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    cumulative += salesByDay[day] || 0;
+    const labelDate = new Date(year, month - 1, day);
+    return {
+      date: labelDate.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
+      day,
+      "Vendas Acumuladas": cumulative,
+      "Vendas do Dia": salesByDay[day] || 0,
+    };
+  });
+}
+
+export function mergeMonthlyComparisonChart(currentData, previousData) {
+  const maxLen = Math.max(currentData.length, previousData.length);
+  return Array.from({ length: maxLen }, (_, index) => {
+    const current = currentData[index];
+    const previous = previousData[index];
+    const day = current?.day ?? previous?.day ?? index + 1;
+    return {
+      date: current?.date ?? previous?.date ?? `Dia ${day}`,
+      day,
+      "Vendas Acumuladas": current?.["Vendas Acumuladas"] ?? 0,
+      "Vendas do Dia": current?.["Vendas do Dia"] ?? 0,
+      "Mês anterior (acum.)": previous?.["Vendas Acumuladas"] ?? 0,
+    };
+  });
+}

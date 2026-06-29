@@ -17,19 +17,27 @@ const SalesChart = ({
   filterPeriod,
   totalSales,
   simplified = false,
+  showComparison = false,
 }) => {
-  // CORREÇÃO: Calcular o domínio do eixo Y corretamente
+  const cumulativeKey = "Vendas Acumuladas";
+  const compareKey = "Mês anterior (acum.)";
+
   const calculateYDomain = () => {
     if (data.length === 0) return [0, 1000];
 
-    const maxValue = Math.max(...data.map((item) => item["Vendas Acumuladas"]));
-    // Adicionar 10% de margem no topo para melhor visualização
-    const paddedMax = maxValue * 1.1;
+    const values = data.flatMap((item) => {
+      const row = [item[cumulativeKey] || 0];
+      if (showComparison && item[compareKey] != null) {
+        row.push(item[compareKey]);
+      }
+      return row;
+    });
+    const maxValue = Math.max(...values, monthlyTarget || 0, totalSales || 0);
+    const paddedMax = maxValue * 1.1 || 1000;
 
     return [0, paddedMax];
   };
 
-  // Tooltip simplificado
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload;
@@ -37,10 +45,15 @@ const SalesChart = ({
         <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
           <p className="font-semibold text-gray-800">{`Data: ${label}`}</p>
           <p className="text-blue-600 font-semibold">
-            {`Vendas Acumuladas: ${formatCurrency(payload[0].value)}`}
+            {`Vendas Acumuladas: ${formatCurrency(dataPoint[cumulativeKey] || 0)}`}
           </p>
+          {showComparison ? (
+            <p className="text-gray-600">
+              {`Mês anterior: ${formatCurrency(dataPoint[compareKey] || 0)}`}
+            </p>
+          ) : null}
           <p className="text-green-600">
-            {`Vendas do Dia: ${formatCurrency(dataPoint["Vendas do Dia"])}`}
+            {`Vendas do Dia: ${formatCurrency(dataPoint["Vendas do Dia"] || 0)}`}
           </p>
         </div>
       );
@@ -180,15 +193,25 @@ const SalesChart = ({
           <Legend />
           <Line
             type="monotone"
-            dataKey="Vendas Acumuladas"
+            dataKey={cumulativeKey}
             stroke="#3b82f6"
             strokeWidth={3}
             dot={{ r: 4, fill: "#3b82f6" }}
             activeDot={{ r: 6, stroke: "#3b82f6", strokeWidth: 2 }}
             connectNulls={true}
           />
-          {/* Linha da meta apenas se houver meta definida e for período mensal */}
-          {monthlyTarget && filterPeriod === "monthly" && (
+          {showComparison ? (
+            <Line
+              type="monotone"
+              dataKey={compareKey}
+              stroke="#9ca3af"
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              dot={false}
+              connectNulls={true}
+            />
+          ) : null}
+          {monthlyTarget != null && monthlyTarget > 0 && filterPeriod === "monthly" && (
             <ReferenceLine
               y={monthlyTarget}
               stroke="#ef4444"
