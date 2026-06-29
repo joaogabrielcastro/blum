@@ -29,17 +29,83 @@ function createApp() {
     }
   }
 
+  const corsExtra = (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const allowedOrigins = [
+    ...new Set(
+      [
+        "https://blum.jwsoftware.com.br",
+        "https://www.blum.jwsoftware.com.br",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:8080",
+        process.env.FRONTEND_URL,
+        ...corsExtra,
+      ].filter(Boolean),
+    ),
+  ];
+
+  const isAllowedOrigin = (origin) => {
+    if (!origin) return true;
+    if (allowedOrigins.includes(origin)) return true;
+    try {
+      const host = new URL(origin).hostname;
+      if (
+        host === "blum.jwsoftware.com.br" ||
+        host === "www.blum.jwsoftware.com.br"
+      ) {
+        return true;
+      }
+    } catch {
+      /* ignore invalid origin */
+    }
+    return false;
+  };
+
+  const corsOptions = {
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("CORS bloqueado para origem:", origin);
+      }
+      callback(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "X-Requested-With",
+      "x-request-id",
+    ],
+    optionsSuccessStatus: 204,
+  };
+
+  // CORS antes de rate limit / body parser para o preflight OPTIONS receber os headers.
+  app.use(cors(corsOptions));
+  app.options(/.*/, cors(corsOptions));
+
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" },
     }),
   );
 
+  const skipPreflight = (req) => req.method === "OPTIONS";
+
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 400,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipPreflight,
   });
 
   const loginLimiter = rateLimit({
@@ -48,6 +114,7 @@ function createApp() {
     message: { error: "Muitas tentativas. Tente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipPreflight,
   });
 
   app.use("/api/", apiLimiter);
@@ -84,45 +151,6 @@ function createApp() {
 
     next();
   });
-
-  const corsExtra = (process.env.CORS_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  const allowedOrigins = [
-    ...new Set(
-      [
-        "https://blum.jwsoftware.com.br",
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:8080",
-        process.env.FRONTEND_URL,
-        ...corsExtra,
-      ].filter(Boolean),
-    ),
-  ];
-
-  app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin) return callback(null, true);
-
-        if (allowedOrigins.includes(origin)) {
-          return callback(null, true);
-        }
-
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("CORS bloqueado para origem:", origin);
-        }
-        callback(null, false);
-      },
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-    }),
-  );
 
   app.get("/health", (req, res) => {
     res.status(200).json({ status: "ok" });
