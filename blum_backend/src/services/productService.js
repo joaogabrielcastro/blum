@@ -101,6 +101,65 @@ class ProductService {
   }
 
   /**
+   * Busca vários códigos de uma vez na representada (importação CSV/NF).
+   */
+  async findManyByProductCodesInBrand({
+    productcodes,
+    brand,
+    brandId,
+    tenantId = 1,
+    allowedBrandNames = null,
+  }) {
+    const codes = [
+      ...new Set(
+        (productcodes || [])
+          .map((c) => String(c ?? "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (codes.length === 0) return [];
+
+    let brandName = brand ? String(brand).trim() : "";
+    let brandIdNum =
+      brandId != null && brandId !== "" ? parseInt(brandId, 10) : null;
+
+    if (Number.isInteger(brandIdNum) && brandIdNum > 0 && !brandName) {
+      brandName = await resolveBrandName(brandIdNum, tenantId);
+    }
+    if (!Number.isInteger(brandIdNum) && brandName) {
+      brandIdNum = await resolveBrandId(brandName, tenantId);
+    }
+
+    if (!brandName && !Number.isInteger(brandIdNum)) return [];
+
+    if (
+      allowedBrandNames &&
+      brandName &&
+      !allowedBrandNames.includes(brandName)
+    ) {
+      return [];
+    }
+
+    const bc = brandSql(allowedBrandNames);
+    if (Number.isInteger(brandIdNum) && brandIdNum > 0) {
+      return sql`
+        SELECT * FROM products
+        WHERE productcode = ANY(${codes})
+          AND tenant_id = ${tenantId}
+          AND (brand_id = ${brandIdNum} OR brand = ${brandName})
+          ${bc}
+      `;
+    }
+    return sql`
+      SELECT * FROM products
+      WHERE productcode = ANY(${codes})
+        AND brand = ${brandName}
+        AND tenant_id = ${tenantId}
+        ${bc}
+    `;
+  }
+
+  /**
    * Busca produtos com filtros opcionais e paginação
    * @param {Object} filters - Filtros de busca (brand, productcode, name, page, limit, allowedBrandNames)
    * @returns {Promise<Object>} Objeto com data, total, page, totalPages

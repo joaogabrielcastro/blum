@@ -12,6 +12,7 @@ const {
 router.get("/", authenticate, productsController.getAll);
 router.get("/search", authenticate, productsController.search);
 router.get("/by-code", authenticate, productsController.lookupByCode);
+router.post("/lookup-by-codes", authenticate, productsController.lookupByCodes);
 
 router.post(
   "/bulk-price-adjust",

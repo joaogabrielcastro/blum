@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const jwt = require("jsonwebtoken");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -100,12 +101,32 @@ function createApp() {
 
   const skipPreflight = (req) => req.method === "OPTIONS";
 
+  const rateLimitKey = (req) => {
+    const auth = req.headers.authorization;
+    if (auth && auth.startsWith("Bearer ")) {
+      try {
+        const decoded = jwt.decode(auth.slice(7));
+        const uid = decoded?.userId ?? decoded?.id ?? decoded?.sub;
+        if (uid != null) return `user:${uid}`;
+      } catch {
+        /* ignore invalid token for rate-limit key */
+      }
+    }
+    const xff = req.headers["x-forwarded-for"];
+    if (typeof xff === "string" && xff.trim()) {
+      return xff.split(",")[0].trim();
+    }
+    return req.ip || "unknown";
+  };
+
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 400,
+    max: 1200,
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipPreflight,
+    keyGenerator: rateLimitKey,
+    message: { error: "Muitas requisições. Aguarde alguns minutos e tente novamente." },
   });
 
   const loginLimiter = rateLimit({
@@ -115,6 +136,7 @@ function createApp() {
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipPreflight,
+    keyGenerator: rateLimitKey,
   });
 
   app.use("/api/", apiLimiter);

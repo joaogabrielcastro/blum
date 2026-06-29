@@ -122,6 +122,49 @@ exports.lookupByCode = async (req, res) => {
   }
 };
 
+exports.lookupByCodes = async (req, res) => {
+  try {
+    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const { brand, brandId } = req.body || {};
+    const rawCodes = req.body?.codes ?? req.body?.productCodes ?? [];
+
+    if (!Array.isArray(rawCodes) || rawCodes.length === 0) {
+      return res.status(400).json({ error: "Informe ao menos um código em codes." });
+    }
+    if (rawCodes.length > 500) {
+      return res.status(400).json({ error: "Máximo de 500 códigos por requisição." });
+    }
+
+    const allowedBrandNames =
+      await brandAccessService.getRestrictedBrandNamesOrNull(
+        req.user.userId,
+        req.user.role,
+        req.user.tenantId,
+      );
+
+    const products = await productService.findManyByProductCodesInBrand({
+      productcodes: rawCodes,
+      brand,
+      brandId,
+      tenantId: req.user.tenantId,
+      allowedBrandNames,
+    });
+
+    const byCode = {};
+    for (const product of products) {
+      const code = String(product.productcode ?? "").trim();
+      if (code) byCode[code] = mapProductResponse(product, mapOptions);
+    }
+
+    res.status(200).json({ products: byCode });
+  } catch (error) {
+    console.error("Erro ao buscar produtos por códigos:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Erro ao buscar produtos por códigos." });
+  }
+};
+
 exports.search = async (req, res) => {
   try {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };

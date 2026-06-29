@@ -118,6 +118,9 @@ const apiRequest = async (url, options = {}) => {
 
     const customError = new Error(
       messageWithDetails ||
+        (response.status === 429
+          ? "Muitas requisições. Aguarde alguns minutos e tente novamente."
+          : null) ||
         (rawText && !serverText && rawText.length < 400
           ? rawText.trim()
           : null) ||
@@ -300,6 +303,28 @@ const apiService = {
       if (err?.status === 404) return null;
       throw err;
     }
+  },
+
+  /** Vários códigos de uma vez (importação CSV/NF). */
+  lookupProductsByCodes: async (productCodes, brand, brandId) => {
+    const codes = [
+      ...new Set(
+        (productCodes || [])
+          .map((c) => String(c ?? "").trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (codes.length === 0) return {};
+    const body = { codes };
+    if (brand && brand !== "all") body.brand = brand;
+    if (brandId != null && brandId !== "") body.brandId = String(brandId);
+    const result = await apiRequest(`${API_URL}/products/lookup-by-codes`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return result?.products && typeof result.products === "object"
+      ? result.products
+      : {};
   },
 
   searchProducts: async (searchTerm, brand, brandId) => {
