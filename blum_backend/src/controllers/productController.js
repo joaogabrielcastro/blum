@@ -131,8 +131,12 @@ exports.lookupByCodes = async (req, res) => {
     if (!Array.isArray(rawCodes) || rawCodes.length === 0) {
       return res.status(400).json({ error: "Informe ao menos um código em codes." });
     }
-    if (rawCodes.length > 500) {
-      return res.status(400).json({ error: "Máximo de 500 códigos por requisição." });
+    const maxCodes =
+      parseInt(process.env.PRODUCT_LOOKUP_MAX_CODES, 10) || 2500;
+    if (rawCodes.length > maxCodes) {
+      return res.status(400).json({
+        error: `Máximo de ${maxCodes} códigos por requisição.`,
+      });
     }
 
     const allowedBrandNames =

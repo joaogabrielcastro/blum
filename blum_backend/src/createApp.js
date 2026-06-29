@@ -119,9 +119,12 @@ function createApp() {
     return req.ip || "unknown";
   };
 
+  const apiRateLimitMax =
+    parseInt(process.env.API_RATE_LIMIT_MAX, 10) || 5000;
+
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 1200,
+    max: apiRateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipPreflight,

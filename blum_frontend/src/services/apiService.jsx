@@ -305,7 +305,7 @@ const apiService = {
     }
   },
 
-  /** Vários códigos de uma vez (importação CSV/NF). */
+  /** Vários códigos de uma vez (importação CSV/NF). Particiona acima de 2500 códigos. */
   lookupProductsByCodes: async (productCodes, brand, brandId) => {
     const codes = [
       ...new Set(
@@ -315,16 +315,25 @@ const apiService = {
       ),
     ];
     if (codes.length === 0) return {};
-    const body = { codes };
-    if (brand && brand !== "all") body.brand = brand;
-    if (brandId != null && brandId !== "") body.brandId = String(brandId);
-    const result = await apiRequest(`${API_URL}/products/lookup-by-codes`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
-    return result?.products && typeof result.products === "object"
-      ? result.products
-      : {};
+
+    const chunkSize = 2500;
+    const merged = {};
+
+    for (let i = 0; i < codes.length; i += chunkSize) {
+      const chunk = codes.slice(i, i + chunkSize);
+      const body = { codes: chunk };
+      if (brand && brand !== "all") body.brand = brand;
+      if (brandId != null && brandId !== "") body.brandId = String(brandId);
+      const result = await apiRequest(`${API_URL}/products/lookup-by-codes`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (result?.products && typeof result.products === "object") {
+        Object.assign(merged, result.products);
+      }
+    }
+
+    return merged;
   },
 
   searchProducts: async (searchTerm, brand, brandId) => {
