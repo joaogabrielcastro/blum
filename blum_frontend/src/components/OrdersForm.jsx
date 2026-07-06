@@ -16,6 +16,7 @@ import {
   parseQuantityByBrand,
   toDateTimeLocalValue,
 } from "../utils/orderFormUtils";
+import { isBrowserOnline, enqueuePendingOrder } from "../offline";
 import OrderFormLineItems from "./orders/OrderFormLineItems";
 import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
@@ -262,6 +263,29 @@ const OrdersForm = ({
     orderData.payment_method = paymentMethod || null;
     if (orderDateTime) {
       orderData.createdat = new Date(orderDateTime).toISOString();
+    }
+
+    if (!isBrowserOnline()) {
+      if (editingOrder) {
+        toast.warning(
+          "Sem internet — não é possível editar pedidos offline. Tente novamente quando estiver online.",
+        );
+        return;
+      }
+      const clientLabel =
+        clientOptions.find((opt) => opt.id === String(clientId))?.label ||
+        clients[String(clientId)] ||
+        "Cliente";
+      await enqueuePendingOrder({
+        payload: orderData,
+        clientLabel,
+        totalPrice: netTotal,
+      });
+      toast.success(
+        "Orçamento guardado neste aparelho. Será enviado automaticamente quando houver internet.",
+      );
+      onOrderAdded();
+      return;
     }
 
     if (editingOrder) {

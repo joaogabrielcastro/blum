@@ -17,6 +17,14 @@ import {
   orderSellerUsername,
 } from "../utils/orderApiFields";
 import PaymentMethodBadge from "../components/orders/PaymentMethodBadge";
+import OfflineSyncBar from "../components/offline/OfflineSyncBar";
+import { useOfflineSync } from "../hooks/useOfflineSync";
+import {
+  getCachedClients,
+  listPendingOrders,
+  pendingOrderToListItem,
+  isBrowserOnline,
+} from "../offline";
 
 function formatOpenDays(createdAt, status) {
   if (!createdAt || status === "Entregue") return null;
@@ -65,7 +73,7 @@ function groupOrdersByDay(orders) {
   }));
 }
 
-const OrdersPage = ({ userId, userRole, brands }) => {
+const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   const toast = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +98,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     orderId: null,
     lines: [],
   });
+  const [offlinePendingOrders, setOfflinePendingOrders] = useState([]);
 
   // Validar e transformar brands; memoizado para não trocar de referência
   // a cada render (isso resetava o OrdersForm aberto).
@@ -106,9 +115,62 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     [brands],
   );
 
+  const {
+    meta: offlineMeta,
+    pendingCount,
+    syncing: offlineSyncing,
+    downloadCatalogForOffline,
+    syncAll,
+    refreshStatus: refreshOfflineStatus,
+  } = useOfflineSync({
+    api: apiService,
+    brands: safeBrands,
+    isOnline,
+    isLoggedIn: Boolean(userId),
+    toast,
+  });
+
   useEffect(() => {
     if (userId && userRole) fetchData();
   }, [userId, userRole]);
+
+  const applyClientsList = (list) => {
+    setClientsList(list);
+    const clientsMap = {};
+    list.forEach((client) => {
+      const id = client.id ?? client.Id;
+      if (id == null) return;
+      clientsMap[id] =
+        getClientDisplayName(client) ||
+        (client.cnpj != null && String(client.cnpj).trim()
+          ? `CNPJ ${String(client.cnpj).trim()}`
+          : "");
+    });
+    setClients(clientsMap);
+    return clientsMap;
+  };
+
+  const loadOfflinePendingOrders = async (clientsMap = clients) => {
+    try {
+      const pending = await listPendingOrders();
+      setOfflinePendingOrders(
+        pending.map((entry) => pendingOrderToListItem(entry, clientsMap)),
+      );
+      await refreshOfflineStatus();
+    } catch (error) {
+      console.error("Erro ao carregar orçamentos offline:", error);
+    }
+  };
+
+  const loadCachedClientsIfNeeded = async () => {
+    const cached = await getCachedClients();
+    if (!cached.length) return false;
+    applyClientsList(cached);
+    toast.info(
+      "Sem internet — usando clientes guardados neste aparelho para o orçamento.",
+    );
+    return true;
+  };
 
   useEffect(() => {
     setVisibleDayGroups(10);
@@ -127,25 +189,26 @@ const OrdersPage = ({ userId, userRole, brands }) => {
       setOrders(formattedOrders);
 
       const list = normalizeClientsResponse(clientsData);
-      setClientsList(list);
-
-      const clientsMap = {};
-      list.forEach((client) => {
-        const id = client.id ?? client.Id;
-        if (id == null) return;
-        clientsMap[id] =
-          getClientDisplayName(client) ||
-          (client.cnpj != null && String(client.cnpj).trim()
-            ? `CNPJ ${String(client.cnpj).trim()}`
-            : "");
-      });
-      setClients(clientsMap);
+      const clientsMap = applyClientsList(list);
+      await loadOfflinePendingOrders(clientsMap);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
-      const msg =
-        error?.message || "Não foi possível carregar pedidos e clientes.";
-      setListFetchError(msg);
-      toast.error(msg);
+      const usedCache = await loadCachedClientsIfNeeded();
+      await loadOfflinePendingOrders();
+      if (!usedCache && !isBrowserOnline()) {
+        const msg =
+          error?.message ||
+          "Sem internet e sem dados locais. Baixe os dados offline antes de ir para o campo.";
+        setListFetchError(msg);
+        toast.error(msg);
+      } else if (!usedCache) {
+        const msg =
+          error?.message || "Não foi possível carregar pedidos e clientes.";
+        setListFetchError(msg);
+        toast.error(msg);
+      } else {
+        setListFetchError(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -318,6 +381,14 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   };
 
   const renderOrderActions = (order) => {
+    if (order.isOfflinePending) {
+      return (
+        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-900">
+          Aguardando envio ao servidor
+        </span>
+      );
+    }
+
     const isDelivered = order.status === "Entregue";
     const isQuote = order.documentType === "orcamento";
 
@@ -408,11 +479,12 @@ const OrdersPage = ({ userId, userRole, brands }) => {
   }, [orders]);
 
   const ordersForList = useMemo(() => {
-    if (!sellerFilterKey) return orders;
-    return orders.filter(
-      (o) => orderSellerUserKey(o) === sellerFilterKey,
+    const merged = [...offlinePendingOrders, ...orders];
+    if (!sellerFilterKey) return merged;
+    return merged.filter(
+      (o) => o.isOfflinePending || orderSellerUserKey(o) === sellerFilterKey,
     );
-  }, [orders, sellerFilterKey]);
+  }, [orders, offlinePendingOrders, sellerFilterKey]);
 
   const ordersByDay = useMemo(
     () => groupOrdersByDay(ordersForList),
@@ -463,9 +535,53 @@ const OrdersPage = ({ userId, userRole, brands }) => {
     );
   }
 
+  const handleDownloadOffline = async () => {
+    try {
+      const summary = await downloadCatalogForOffline();
+      toast.success(
+        `Dados baixados: ${summary.clientCount} clientes e ${summary.productCount} produtos.`,
+      );
+    } catch (error) {
+      toast.error(
+        error?.message || "Não foi possível baixar os dados para uso offline.",
+      );
+    }
+  };
+
+  const handleSyncAll = async () => {
+    try {
+      const result = await syncAll();
+      if (result.orders?.synced > 0) {
+        toast.success(
+          `${result.orders.synced} orçamento(s) enviado(s) ao servidor.`,
+        );
+      }
+      if (result.catalog && !result.catalog.error) {
+        toast.success("Catálogo offline atualizado.");
+      }
+      await fetchData();
+    } catch (error) {
+      toast.error(error?.message || "Falha ao sincronizar.");
+    }
+  };
+
+  const offlineSyncBar = (
+    <div className="mb-4">
+      <OfflineSyncBar
+        isOnline={isOnline}
+        meta={offlineMeta}
+        pendingCount={pendingCount}
+        syncing={offlineSyncing}
+        onDownload={handleDownloadOffline}
+        onSyncAll={handleSyncAll}
+      />
+    </div>
+  );
+
   if (showForm) {
     return (
       <div className="w-full min-w-0 max-w-none -mx-2 sm:-mx-4 md:-mx-6 px-2 sm:px-3 md:px-4 overflow-x-hidden">
+        {offlineSyncBar}
         <OrdersForm
           userId={userId}
           userRole={userRole}
@@ -476,7 +592,8 @@ const OrdersPage = ({ userId, userRole, brands }) => {
           onOrderAdded={() => {
             setShowForm(false);
             setEditingOrder(null);
-            fetchData();
+            if (isBrowserOnline()) fetchData();
+            else loadOfflinePendingOrders();
           }}
           onCancel={() => {
             setShowForm(false);
@@ -489,6 +606,7 @@ const OrdersPage = ({ userId, userRole, brands }) => {
 
   return (
     <div className="p-3 sm:p-6 md:p-8">
+      {offlineSyncBar}
       <ConfirmationModal
         show={!!modalAction.orderId}
         onConfirm={handleAction}
@@ -657,6 +775,11 @@ const OrdersPage = ({ userId, userRole, brands }) => {
                                 method={order.paymentMethod}
                                 prominent
                               />
+                            ) : null}
+                            {order.isOfflinePending ? (
+                              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+                                Offline — aguardando envio
+                              </span>
                             ) : null}
                             {order.hasStockWarning ? (
                               <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">

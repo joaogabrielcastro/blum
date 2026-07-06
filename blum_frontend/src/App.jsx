@@ -117,12 +117,16 @@ function AppShell() {
       const savedUser = localStorage.getItem("user");
 
       if (token && savedUser) {
-        try {
-          await verifyToken();
+        if (navigator.onLine) {
+          try {
+            await verifyToken();
+            setUser(JSON.parse(savedUser));
+          } catch (error) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+          }
+        } else {
           setUser(JSON.parse(savedUser));
-        } catch (error) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
         }
       }
       setIsLoading(false);
@@ -211,9 +215,8 @@ function AppShell() {
 
           {!isOnline && (
             <div className="bg-yellow-500 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base leading-snug">
-              ⚠️ Sem ligação à internet. Só pode usar o que já foi carregado
-              neste dispositivo; guardar alterações ou pedidos pode falhar até
-              voltar a ficar online.
+              Sem internet — modo campo ativo. Use Orçamentos para criar vendas
+              offline; os dados serão enviados ao voltar online.
             </div>
           )}
 
@@ -241,6 +244,7 @@ function AppShell() {
                     userId={userId}
                     userRole={userRole}
                     brands={brands}
+                    isOnline={isOnline}
                   />
                 }
               />

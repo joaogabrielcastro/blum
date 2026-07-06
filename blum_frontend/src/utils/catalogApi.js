@@ -1,4 +1,5 @@
 import { mergeProductCodeFields } from "./productSearch";
+import { isBrowserOnline, searchOfflineProducts } from "../offline";
 
 /** Busca server-side (filtro por representada no backend quando brandId/brand informados). */
 export async function searchCatalogProducts(
@@ -7,6 +8,10 @@ export async function searchCatalogProducts(
 ) {
   const term = String(q ?? "").trim();
   if (term.length < 2) return [];
+
+  if (!isBrowserOnline()) {
+    return searchOfflineProducts({ q: term, brand, brandId, limit });
+  }
 
   const brandIdStr =
     brandId != null && brandId !== "" ? String(brandId) : "";
@@ -21,7 +26,6 @@ export async function searchCatalogProducts(
     .map(mergeProductCodeFields)
     .slice(0, limit);
 }
-
 /** Uma página do catálogo (para selects de revisão de importação). */
 export async function fetchCatalogPage(
   api,
