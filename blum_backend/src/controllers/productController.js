@@ -59,7 +59,7 @@ exports.getAll = async (req, res) => {
       limit,
       allowedBrandNames,
     };
-    const cacheKey = cacheKeyProducts({
+    const cacheKey = cacheKeyProducts(req.user.tenantId, {
       ...filters,
       _access: req.user.userId,
     });
@@ -244,7 +244,7 @@ exports.create = async (req, res) => {
       tenant_id: req.user.tenantId,
     });
 
-    await invalidateProductsCache();
+    await invalidateProductsCache(req.user.tenantId);
 
     res.status(201).json(mapProductResponse(product, mapOptions));
   } catch (error) {
@@ -258,7 +258,7 @@ exports.delete = async (req, res) => {
     const { id } = req.params;
     await productService.delete(id, req.user.tenantId);
 
-    await invalidateProductsCache();
+    await invalidateProductsCache(req.user.tenantId);
     res.status(204).end();
   } catch (error) {
     console.error("Erro ao excluir produto:", error);
@@ -276,7 +276,7 @@ exports.update = async (req, res) => {
       tenant_id: req.user.tenantId,
     });
 
-    await invalidateProductsCache();
+    await invalidateProductsCache(req.user.tenantId);
 
     res.status(200).json(mapProductResponse(product, mapOptions));
   } catch (error) {
@@ -316,7 +316,7 @@ exports.bulkAdjustPrices = async (req, res) => {
     });
 
     if (!result.dryRun) {
-      await invalidateProductsCache();
+      await invalidateProductsCache(req.user.tenantId);
     }
 
     res.status(200).json(result);

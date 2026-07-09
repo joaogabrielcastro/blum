@@ -1,4 +1,5 @@
 const { sql, pool } = require("../config/database");
+const { requireTenantId } = require("../utils/tenantContext");
 
 async function findById(id) {
   return sql`SELECT * FROM products WHERE id = ${id}`;
@@ -28,6 +29,7 @@ async function insertProduct({
   minstock,
   tenant_id,
 }) {
+  const tenantId = requireTenantId(tenant_id);
   const rows = await sql(
     `INSERT INTO products (name, productcode, price, stock, brand, brand_id, minstock, tenant_id, createdat)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
@@ -40,7 +42,7 @@ async function insertProduct({
       brand,
       brand_id ?? null,
       minstock || 0,
-      tenant_id || 1,
+      tenantId,
     ],
   );
   return rows[0];

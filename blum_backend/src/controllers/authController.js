@@ -9,6 +9,39 @@ const {
   mapAuthUserResponse,
   mapAuthUsersPayload,
 } = require("../mappers/apiResponseMapper");
+const billingService = require("../services/billingService");
+const { resolvePlatformAdminFlag } = require("../utils/platformAdmin");
+const { assertCanAddUser } = require("../services/planLimitsService");
+
+function buildTokenPayload(user) {
+  const isPlatformAdmin = resolvePlatformAdminFlag(user);
+  return {
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    name: user.name,
+    tenantId: user.tenant_id,
+    tenantSlug: user.tenant_slug,
+    tenantName: user.tenant_name,
+    isPlatformAdmin,
+  };
+}
+
+function buildUserResponse(user, mapOptions) {
+  return mapAuthUserResponse(
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      name: user.name,
+      tenantId: user.tenant_id,
+      tenantSlug: user.tenant_slug,
+      tenantName: user.tenant_name,
+      isPlatformAdmin: resolvePlatformAdminFlag(user),
+    },
+    mapOptions,
+  );
+}
 
 exports.login = async (req, res) => {
   let { username, password } = req.body; // use let para permitir alteração
@@ -40,6 +73,12 @@ exports.login = async (req, res) => {
 
     const user = users[0];
 
+    if (user.tenant_status && user.tenant_status !== "active") {
+      return res.status(403).json({
+        error: "Esta empresa está suspensa. Contacte o suporte.",
+      });
+    }
+
     const validPassword = await bcrypt.compare(password, user.password_hash);
 
     if (!validPassword) {
@@ -47,17 +86,9 @@ exports.login = async (req, res) => {
     }
 
     // Gerar token JWT
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        tenantId: user.tenant_id,
-      },
-      getJwtSecret(),
-      { expiresIn: "8h" },
-    );
+    const token = jwt.sign(buildTokenPayload(user), getJwtSecret(), {
+      expiresIn: "8h",
+    });
     const refreshToken = await refreshTokenService.issueRefreshToken({
       tenantId: user.tenant_id,
       userId: user.id,
@@ -78,13 +109,7 @@ exports.login = async (req, res) => {
     res.json({
       token,
       refreshToken,
-      user: mapAuthUserResponse({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        tenantId: user.tenant_id,
-      }, mapOptions),
+      user: buildUserResponse(user, mapOptions),
     });
   } catch (error) {
     console.error("❌ ERRO FATAL no processo de login:", error);
@@ -96,16 +121,24 @@ exports.login = async (req, res) => {
 exports.verifyToken = async (req, res) => {
   try {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };
-    // O middleware authenticate já validou o token
-    // req.user já contém os dados do token
+    const subscription = await billingService.getSubscriptionSummary(
+      req.user.tenantId,
+    );
     res.json({
-      user: mapAuthUserResponse({
-        id: req.user.userId,
-        username: req.user.username,
-        role: req.user.role,
-        name: req.user.name,
-        tenantId: req.user.tenantId,
-      }, mapOptions),
+      user: buildUserResponse(
+        {
+          id: req.user.userId,
+          username: req.user.username,
+          role: req.user.role,
+          name: req.user.name,
+          tenant_id: req.user.tenantId,
+          tenant_slug: req.user.tenantSlug,
+          tenant_name: req.user.tenantName,
+          is_platform_admin: req.user.isPlatformAdmin,
+        },
+        mapOptions,
+      ),
+      subscription,
     });
   } catch (error) {
     console.error("Erro ao verificar token:", error);
@@ -131,6 +164,8 @@ exports.createUser = async (req, res) => {
     if (!["admin", "salesperson"].includes(role)) {
       return res.status(400).json({ error: "Role inválida" });
     }
+
+    await assertCanAddUser(req.user.tenantId);
 
     // Mesmo login independente de maiúsculas (evita duplicata antonio/Antonio)
     const existingUsers = await sql`
@@ -171,7 +206,10 @@ exports.createUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao criar usuário:", error);
-    res.status(500).json({ error: "Erro ao criar usuário" });
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      error: error.message || "Erro ao criar usuário",
+    });
   }
 };
 
@@ -383,17 +421,9 @@ exports.refresh = async (req, res) => {
       return res.status(401).json({ error: "Usuário não encontrado" });
     }
     const user = userRows[0];
-    const accessToken = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        tenantId: user.tenant_id,
-      },
-      getJwtSecret(),
-      { expiresIn: "8h" },
-    );
+    const accessToken = jwt.sign(buildTokenPayload(user), getJwtSecret(), {
+      expiresIn: "8h",
+    });
     await logAuditEvent({
       tenantId: user.tenant_id,
       actorUserId: user.id,
@@ -406,13 +436,7 @@ exports.refresh = async (req, res) => {
     return res.status(200).json({
       token: accessToken,
       refreshToken: rotated.refreshToken,
-      user: mapAuthUserResponse({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        name: user.name,
-        tenantId: user.tenant_id,
-      }, mapOptions),
+      user: buildUserResponse(user, mapOptions),
     });
   } catch (error) {
     return res.status(error.statusCode || 401).json({
@@ -428,7 +452,7 @@ exports.logout = async (req, res) => {
       await refreshTokenService.revokeRefreshToken(refreshToken);
     }
     await logAuditEvent({
-      tenantId: req.user?.tenantId || 1,
+      tenantId: req.user?.tenantId ?? null,
       actorUserId: req.user?.userId || null,
       action: "auth.logout",
       resourceType: "user",

@@ -13,6 +13,12 @@ const productRoutes = require("./routes/productRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const brandRoutes = require("./routes/brandRoutes");
+const billingRoutes = require("./routes/billingRoutes");
+const tenantRoutes = require("./routes/tenantRoutes");
+const platformAdminRoutes = require("./routes/platformAdminRoutes");
+const stripeWebhookController = require("./controllers/stripeWebhookController");
+const { requireActiveSubscription } = require("./middleware/subscriptionMiddleware");
+const { tenantDbContextMiddleware } = require("./middleware/tenantDbContextMiddleware");
 
 /**
  * Cria a aplicação Express (sem abrir porta). Usado em testes de integração.
@@ -61,6 +67,9 @@ function createApp() {
       ) {
         return true;
       }
+      if (host.endsWith(".blum.jwsoftware.com.br")) {
+        return true;
+      }
     } catch {
       /* ignore invalid origin */
     }
@@ -85,6 +94,7 @@ function createApp() {
       "Accept",
       "X-Requested-With",
       "x-request-id",
+      "x-tenant-slug",
     ],
     optionsSuccessStatus: 204,
   };
@@ -145,8 +155,28 @@ function createApp() {
   app.use("/api/", apiLimiter);
   app.use("/api/v2/auth/login", loginLimiter);
 
+  const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    message: { error: "Muitas tentativas de cadastro. Tente mais tarde." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: skipPreflight,
+    keyGenerator: rateLimitKey,
+  });
+  app.use("/api/v2/tenants/signup", signupLimiter);
+
+  // Webhook Stripe precisa do body bruto para validação de assinatura.
+  app.post(
+    "/api/v2/billing/webhook",
+    express.raw({ type: "application/json" }),
+    stripeWebhookController.handleWebhook,
+  );
+
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+  app.use("/api/v2", tenantDbContextMiddleware);
 
   app.use((req, res, next) => {
     const requestId = req.headers["x-request-id"] || randomUUID();
@@ -251,12 +281,49 @@ function createApp() {
 
   const mountApiRoutes = (versionPrefix) => {
     app.use(`${versionPrefix}/auth`, setApiVersion, authRoutes);
-    app.use(`${versionPrefix}/clients`, setApiVersion, clientRoutes);
-    app.use(`${versionPrefix}/products`, setApiVersion, productRoutes);
-    app.use(`${versionPrefix}/orders`, setApiVersion, orderRoutes);
-    app.use(`${versionPrefix}/reports`, setApiVersion, reportRoutes);
-    app.use(`${versionPrefix}/brands`, setApiVersion, brandRoutes);
-    app.use(`${versionPrefix}/purchases`, setApiVersion, purchaseRoutes);
+    app.use(`${versionPrefix}/tenants`, setApiVersion, tenantRoutes);
+    app.use(`${versionPrefix}/platform`, setApiVersion, platformAdminRoutes);
+    app.use(
+      `${versionPrefix}/billing`,
+      setApiVersion,
+      billingRoutes,
+    );
+    app.use(
+      `${versionPrefix}/clients`,
+      setApiVersion,
+      requireActiveSubscription,
+      clientRoutes,
+    );
+    app.use(
+      `${versionPrefix}/products`,
+      setApiVersion,
+      requireActiveSubscription,
+      productRoutes,
+    );
+    app.use(
+      `${versionPrefix}/orders`,
+      setApiVersion,
+      requireActiveSubscription,
+      orderRoutes,
+    );
+    app.use(
+      `${versionPrefix}/reports`,
+      setApiVersion,
+      requireActiveSubscription,
+      reportRoutes,
+    );
+    app.use(
+      `${versionPrefix}/brands`,
+      setApiVersion,
+      requireActiveSubscription,
+      brandRoutes,
+    );
+    app.use(
+      `${versionPrefix}/purchases`,
+      setApiVersion,
+      requireActiveSubscription,
+      purchaseRoutes,
+    );
   };
 
   mountApiRoutes("/api/v2");

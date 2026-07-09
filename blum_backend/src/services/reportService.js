@@ -1,8 +1,10 @@
 const { sql } = require("../config/database");
 const reportRepository = require("../repositories/reportRepository");
+const { requireTenantId, tenantIdFromAuth } = require("../utils/tenantContext");
 
 class ReportService {
-  async getSalesByRep(tenantId = 1) {
+  async getSalesByRep(tenantId) {
+    tenantId = requireTenantId(tenantId);
     return await sql`
       SELECT
         u.id AS "userId",
@@ -21,7 +23,7 @@ class ReportService {
     const { period, authUser } = filters;
     const userRole = authUser?.role;
     const userId = authUser?.userId;
-    const tenantId = authUser?.tenantId || 1;
+    const tenantId = tenantIdFromAuth(authUser);
 
     let baseQuery = `
       SELECT
@@ -52,7 +54,8 @@ class ReportService {
   }
 
   async getCommissionReport(filters = {}) {
-    const { startDate, endDate, userId, tenantId = 1 } = filters;
+    let { startDate, endDate, userId, tenantId } = filters;
+    tenantId = requireTenantId(tenantId);
 
     let query = sql`
       SELECT
@@ -87,11 +90,12 @@ class ReportService {
   }
 
   async getCommissionByBrand(filters = {}) {
-    const { startDate, endDate, sellerId, tenantId = 1 } = filters;
+    let { startDate, endDate, sellerId, tenantId } = filters;
+    tenantId = requireTenantId(tenantId);
 
     let conditions = [
       "o.status = 'Entregue'",
-      `o.tenant_id = ${Number(tenantId) || 1}`,
+      `o.tenant_id = ${tenantId}`,
     ];
     const params = [];
 
@@ -154,7 +158,8 @@ class ReportService {
   }
 
   /** Sincroniza resumos mensais a partir de pedidos entregues (finishedat). */
-  async syncMonthlySalesSummaries(tenantId = 1) {
+  async syncMonthlySalesSummaries(tenantId) {
+    tenantId = requireTenantId(tenantId);
     await sql`
       INSERT INTO monthly_sales_summary (tenant_id, year, month, seller_user_id, total_sales, order_count, updated_at)
       SELECT
@@ -200,7 +205,8 @@ class ReportService {
     `;
   }
 
-  async listMonthlySalesSummaries(tenantId = 1, sellerUserId = null) {
+  async listMonthlySalesSummaries(tenantId, sellerUserId = null) {
+    tenantId = requireTenantId(tenantId);
     if (sellerUserId != null && sellerUserId !== "") {
       return sql`
         SELECT year, month, total_sales, order_count, updated_at
@@ -219,7 +225,8 @@ class ReportService {
     `;
   }
 
-  async getSalesTarget({ tenantId = 1, year, month, sellerUserId = null }) {
+  async getSalesTarget({ tenantId, year, month, sellerUserId = null }) {
+    tenantId = requireTenantId(tenantId);
     const sellerId =
       sellerUserId != null && sellerUserId !== ""
         ? Number(sellerUserId)
@@ -249,12 +256,13 @@ class ReportService {
   }
 
   async upsertSalesTarget({
-    tenantId = 1,
+    tenantId,
     year,
     month,
     sellerUserId = null,
     targetAmount,
   }) {
+    tenantId = requireTenantId(tenantId);
     const amount = parseFloat(targetAmount);
     if (!Number.isFinite(amount) || amount < 0) {
       throw new Error("Valor da meta deve ser zero ou positivo");

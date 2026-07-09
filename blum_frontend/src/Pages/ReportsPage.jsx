@@ -22,6 +22,12 @@ import {
   formatMonthYearLabel,
   monthYearKey,
 } from "../utils/orderApiFields";
+import {
+  buildAllRepresentativesCommissionPdf,
+  buildRepresentativeCommissionPdf,
+} from "../utils/commissionReportPdf";
+import { buildPdfFile, downloadPdfFile } from "../utils/pdfDownload";
+import { useToast } from "../context/ToastContext";
 
 const now = new Date();
 const defaultMonthKey = monthYearKey(now.getFullYear(), now.getMonth() + 1);
@@ -32,6 +38,7 @@ function parseMonthKey(key) {
 }
 
 const ReportsPage = ({ userRole, userId }) => {
+  const toast = useToast();
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonthKey, setSelectedMonthKey] = useState(defaultMonthKey);
@@ -43,6 +50,8 @@ const ReportsPage = ({ userRole, userId }) => {
   const [sellerFilterKey, setSellerFilterKey] = useState("");
   const [clients, setClients] = useState({});
   const [usersById, setUsersById] = useState({});
+  const [exportingPdf, setExportingPdf] = useState(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const mountedRef = useRef(false);
 
   const { year: selectedYear, month: selectedMonth } =
@@ -321,6 +330,99 @@ const ReportsPage = ({ userRole, userId }) => {
     const u = sale.username?.trim();
     if (sale.displayName && u) return `${sale.displayName} (@${u})`;
     return sale.displayName || sale.userId || "N/A";
+  };
+
+  const periodLabel = formatMonthYearLabel(selectedYear, selectedMonth);
+
+  const downloadBuiltPdf = async (built) => {
+    const file = buildPdfFile(built.doc, built.filename);
+    await downloadPdfFile(file);
+  };
+
+  const handleExportSalesExcel = async () => {
+    if (userRole !== "admin") return;
+    try {
+      setExportingExcel(true);
+      const blob = await apiService.downloadSalesByRepExcel();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "blum-vendas-por-representante.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Excel exportado.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível exportar Excel.");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  const handleExportAllCommissionsPdf = async () => {
+    if (!commissionsByRep.length) {
+      toast.warning("Não há comissões para exportar neste período.");
+      return;
+    }
+    try {
+      setExportingPdf("all");
+      const built = buildAllRepresentativesCommissionPdf({
+        periodLabel,
+        rows: commissionsByRep,
+        totals: {
+          orderCount: ordersToDisplay.length,
+          totalSales,
+          totalCommissions,
+          avgTicket:
+            ordersToDisplay.length > 0
+              ? totalSales / ordersToDisplay.length
+              : 0,
+          effectiveRate:
+            totalSales > 0
+              ? `${((totalCommissions / totalSales) * 100).toFixed(2)}%`
+              : "0.00%",
+        },
+      });
+      await downloadBuiltPdf(built);
+      toast.success("PDF de comissões gerado.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível gerar o PDF.");
+    } finally {
+      setExportingPdf(null);
+    }
+  };
+
+  const handleExportRepCommissionPdf = async (sale) => {
+    const repOrders = ordersToDisplay.filter(
+      (order) => orderSellerUserKey(order) === sale.userId,
+    );
+    if (!repOrders.length) {
+      toast.warning("Este representante não tem pedidos no período.");
+      return;
+    }
+    try {
+      setExportingPdf(sale.userId);
+      const built = buildRepresentativeCommissionPdf({
+        rep: sale,
+        orders: repOrders,
+        clients,
+        periodLabel,
+        formatRepLabel,
+        formatOrderDateLabel,
+        orderFinishedAt,
+        orderTotalPrice,
+        orderTotalCommission,
+        orderClientId,
+      });
+      await downloadBuiltPdf(built);
+      toast.success(`PDF de ${sale.displayName} gerado.`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Não foi possível gerar o PDF.");
+    } finally {
+      setExportingPdf(null);
+    }
   };
 
   const goToPreviousMonth = () => {
@@ -699,20 +801,52 @@ const ReportsPage = ({ userRole, userId }) => {
         className="mb-8"
         aria-labelledby="reports-resumo-representantes-heading"
       >
-        <h2
-          id="reports-resumo-representantes-heading"
-          className="text-2xl font-bold text-gray-800 mb-4"
-        >
-          Resumo por representante (vendedor)
-        </h2>
-        <p className="text-gray-600 mb-4 max-w-3xl">
-          Cada linha é um <strong>vendedor</strong> que lançou o pedido (
-          <code className="text-sm bg-gray-100 px-1 rounded">user_ref</code>
-          ). Os valores somam apenas pedidos <strong>Entregue</strong> no período e
-          filtros acima. A comissão é a soma do campo{" "}
-          <strong>total_commission</strong> de cada pedido. A coluna &quot;% efetivo&quot; é{" "}
-          <em>comissão ÷ vendas</em> daquele representante.
-        </p>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2
+              id="reports-resumo-representantes-heading"
+              className="text-2xl font-bold text-gray-800"
+            >
+              Resumo por representante (vendedor)
+            </h2>
+            <p className="text-gray-600 mt-2 max-w-3xl">
+              Cada linha é um <strong>vendedor</strong> que lançou o pedido{" "}
+              (<code className="text-sm bg-gray-100 px-1 rounded">user_ref</code>
+              ). Os valores somam apenas pedidos <strong>Entregue</strong> em{" "}
+              <strong>{periodLabel}</strong>. A comissão é a soma do campo{" "}
+              <strong>total_commission</strong> de cada pedido.
+            </p>
+          </div>
+          {showRepresentantesSummaryTable && userRole === "admin" ? (
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportSalesExcel}
+                disabled={exportingExcel || exportingPdf != null}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-60"
+              >
+                {exportingExcel ? "Gerando Excel…" : "Exportar Excel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportAllCommissionsPdf}
+                disabled={exportingPdf != null || exportingExcel}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+              >
+                {exportingPdf === "all" ? "Gerando PDF…" : "Exportar PDF (todos)"}
+              </button>
+            </div>
+          ) : showRepresentantesSummaryTable ? (
+            <button
+              type="button"
+              onClick={handleExportAllCommissionsPdf}
+              disabled={exportingPdf != null}
+              className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+            >
+              {exportingPdf === "all" ? "Gerando PDF…" : "Exportar PDF (todos)"}
+            </button>
+          ) : null}
+        </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
           {showRepresentantesSummaryTable ? (
@@ -736,7 +870,10 @@ const ReportsPage = ({ userRole, userId }) => {
                       Comissão total
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {"% efetivo"}
+                      % efetivo
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      PDF
                     </th>
                   </tr>
                 </thead>
@@ -768,6 +905,17 @@ const ReportsPage = ({ userRole, userId }) => {
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 text-right tabular-nums">
                         {`${sale.commissionRate}%`}
                       </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleExportRepCommissionPdf(sale)}
+                          disabled={exportingPdf != null}
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                          title={`PDF de comissões — ${formatRepLabel(sale)}`}
+                        >
+                          {exportingPdf === sale.userId ? "…" : "PDF"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -795,6 +943,7 @@ const ReportsPage = ({ userRole, userId }) => {
                         ? `${((totalCommissions / totalSales) * 100).toFixed(2)}%`
                         : "0.00%"}
                     </td>
+                    <td className="px-4 py-3" />
                   </tr>
                 </tfoot>
               </table>

@@ -2,7 +2,17 @@ const { sql } = require("../config/database");
 
 async function findUserByUsernameAndTenantSlug(username, tenantSlug = "default") {
   return sql`
-    SELECT u.id, u.username, u.password_hash, u.role, u.name, u.tenant_id, t.slug AS tenant_slug
+    SELECT
+      u.id,
+      u.username,
+      u.password_hash,
+      u.role,
+      u.name,
+      u.tenant_id,
+      t.slug AS tenant_slug,
+      t.name AS tenant_name,
+      t.status AS tenant_status,
+      u.is_platform_admin
     FROM users u
     INNER JOIN tenants t ON t.id = u.tenant_id
     WHERE LOWER(TRIM(username)) = LOWER(${username})
@@ -12,9 +22,19 @@ async function findUserByUsernameAndTenantSlug(username, tenantSlug = "default")
 
 async function findUserByIdAndTenant(userId, tenantId) {
   return sql`
-    SELECT id, username, role, name, tenant_id, password_hash
-    FROM users
-    WHERE id = ${userId} AND tenant_id = ${tenantId}
+    SELECT
+      u.id,
+      u.username,
+      u.role,
+      u.name,
+      u.tenant_id,
+      u.password_hash,
+      t.slug AS tenant_slug,
+      t.name AS tenant_name,
+      u.is_platform_admin
+    FROM users u
+    INNER JOIN tenants t ON t.id = u.tenant_id
+    WHERE u.id = ${userId} AND u.tenant_id = ${tenantId}
     LIMIT 1
   `;
 }

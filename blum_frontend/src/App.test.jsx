@@ -18,6 +18,8 @@ describe("App", () => {
         <App />
       </ToastProvider>,
     );
-    expect(await screen.findByText("Entrar")).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", { name: "Entrar" }),
+    ).toBeTruthy();
   });
 });

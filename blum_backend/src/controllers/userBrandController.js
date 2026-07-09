@@ -70,7 +70,7 @@ exports.putUserAllowedBrands = async (req, res) => {
       uniqueIds,
       req.user.tenantId,
     );
-    await invalidateProductsCache();
+    await invalidateProductsCache(req.user.tenantId);
 
     res.json(mapUserAllowedBrandsPayload({
       message:

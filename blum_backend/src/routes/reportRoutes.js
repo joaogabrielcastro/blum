@@ -18,6 +18,12 @@ router.get(
   authorize("admin"),
   reportController.getSalesByRep
 );
+router.get(
+  "/sales-by-rep/export.xlsx",
+  authenticate,
+  authorize("admin"),
+  reportController.exportSalesByRepExcel
+);
 router.get("/commissions", authenticate, reportController.getCommissionReport);
 router.get(
   "/commissions/by-brand",

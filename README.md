@@ -147,7 +147,9 @@ Com sessão iniciada, exemplos: `/dashboard`, `/orders`, `/clients`, `/clients/:
 
 ### Produto / roadmap comercial
 
-Itens ainda não implementados no código (evolução do produto): **billing/planos**, **API pública versionada**, **exportação Excel** dos relatórios, **webhooks**. Podem ser priorizados conforme o go-to-market.
+Implementado: **billing/planos Stripe** (Starter/Profissional/Enterprise), **signup multi-tenant**, **platform admin** (`/platform`), **exportação Excel** de vendas por representante. Ver também [memory.md](memory.md) e [docs/DEPLOY.md](docs/DEPLOY.md).
+
+Itens em evolução: **API pública versionada**, **webhooks para clientes**.
 
 2. **PostgreSQL:** preencha `DATABASE_URL` com a *connection string* completa (`postgresql://usuario:senha@host:porta/nome_da_base`). O projeto só usa o driver `pg` com essa URL — não está amarrado a um fornecedor específico.
    - **Docker Compose na raiz** (`docker compose up`): a partir do seu PC, o Postgres do compose expõe a porta **5433** no host — exemplo: `postgresql://blum:blum_docker_dev@127.0.0.1:5433/blum` (credenciais em `docker-compose.yml`).
@@ -170,6 +172,50 @@ Em **produção**, no painel de deploy ou no build Docker, defina por exemplo:
 2. Faça build do frontend com **`REACT_APP_API_URL=https://…/api/v2`** (URL **público** da API). O browser fala direto com a API e o proxy `/api/` do Nginx deixa de ser usado para esses pedidos.
 
 Importante: no Create React App esta variável é **injeta na hora do build** — alterar só o `.env` em runtime **não** muda o bundle; é preciso **novo build** após corrigir um valor antigo com `/api/v1`.
+
+### Multi-tenant: subdomínios e Coolify
+
+Cada empresa pode aceder pelo slug no login ou pelo subdomínio:
+
+| Empresa | URL de acesso |
+|---------|----------------|
+| `default` (legado) | `https://blum.jwsoftware.com.br` |
+| `acme` | `https://acme.blum.jwsoftware.com.br` |
+
+**1. DNS (no provedor do domínio)**
+
+```
+blum.jwsoftware.com.br      A    → IP do servidor
+*.blum.jwsoftware.com.br    A    → mesmo IP
+```
+
+**2. Coolify — serviço do frontend**
+
+- Domínios: `blum.jwsoftware.com.br` **e** `*.blum.jwsoftware.com.br` (wildcard)
+- SSL: Let's Encrypt (wildcard exige validação DNS no Coolify/Traefik)
+- `REACT_APP_API_URL=/api/v2` (proxy no mesmo host) **ou** URL pública da API
+- Build args / env do frontend:
+  - `REACT_APP_TENANT_BASE_DOMAIN=blum.jwsoftware.com.br`
+  - `REACT_APP_ONBOARDING_PLAN_SLUG=starter`
+
+**3. Coolify — serviço do backend**
+
+```env
+FRONTEND_URL=https://blum.jwsoftware.com.br
+TENANT_BASE_DOMAIN=blum.jwsoftware.com.br
+TENANT_SUBDOMAIN_ENABLED=true
+CORS_ORIGINS=
+```
+
+O backend gera redirects Stripe por tenant (`https://acme.blum.../subscription?checkout=success`).
+
+**4. Onboarding (signup → Stripe)**
+
+Após criar empresa, o admin é redirecionado para `/subscription?onboarding=1` e o checkout do plano **Starter** abre automaticamente no Stripe.
+
+**5. Nginx do container frontend**
+
+O template `blum_frontend/nginx.conf.template` já aceita `*.blum.jwsoftware.com.br` e encaminha `/api/` para o backend (`BACKEND_PROXY_HOST`).
 
 ## 🐳 Docker (teste local)
 
@@ -320,12 +366,18 @@ DELETE /api/v2/clients/:id      # Deletar cliente
 
 ### Produtos
 ```
-GET    /api/v2/products         # Listar produtos
-GET    /api/v2/products/search  # Buscar produtos
-POST   /api/v2/products         # Criar produto
-PUT    /api/v2/products/:id     # Atualizar produto
-DELETE /api/v2/products/:id     # Deletar produto
+GET    /api/v2/products                  # Listar produtos
+GET    /api/v2/products/search           # Buscar produtos
+POST   /api/v2/products/import/preview   # Preview importação CSV/Excel (admin)
+POST   /api/v2/products/import/finalize  # Finalizar importação (admin)
+GET    /api/v2/products/export.csv       # Exportar catálogo CSV (admin)
+GET    /api/v2/products/export.xlsx      # Exportar catálogo Excel (admin)
+POST   /api/v2/products                  # Criar produto
+PUT    /api/v2/products/:id              # Atualizar produto
+DELETE /api/v2/products/:id             # Deletar produto
 ```
+
+**Importação na UI (Produtos):** envie `.csv` ou `.xlsx` exportado do ERP — sem conversão manual. Modos: *Sincronizar catálogo* (substitui estoque) ou *Somar estoque* (entrada). CLI: `npm run import:products -- "./planilha.xlsx" --brand-id=1 [--dry-run]`.
 
 ### Pedidos
 ```

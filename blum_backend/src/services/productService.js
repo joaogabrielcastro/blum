@@ -1,5 +1,6 @@
 const { sql } = require("../config/database");
 const productRepository = require("../repositories/productRepository");
+const { requireTenantId } = require("../utils/tenantContext");
 
 /** Restrição opcional por representada (vendedor). Fragmento vazio = sem filtro extra. */
 function brandSql(names) {
@@ -13,7 +14,8 @@ function brandSql(names) {
   };
 }
 
-async function resolveBrandName(brandId, tenantId = 1) {
+async function resolveBrandName(brandId, tenantId) {
+  tenantId = requireTenantId(tenantId);
   const id = parseInt(brandId, 10);
   if (!Number.isInteger(id) || id <= 0) return "";
   const rows = await sql`
@@ -22,7 +24,8 @@ async function resolveBrandName(brandId, tenantId = 1) {
   return rows[0]?.name || "";
 }
 
-async function resolveBrandId(brandName, tenantId = 1) {
+async function resolveBrandId(brandName, tenantId) {
+  tenantId = requireTenantId(tenantId);
   const name = String(brandName || "").trim();
   if (!name) return null;
   const rows = await sql`
@@ -34,7 +37,8 @@ async function resolveBrandId(brandName, tenantId = 1) {
 }
 
 class ProductService {
-  async resolveBrandName(brandId, tenantId = 1) {
+  async resolveBrandName(brandId, tenantId) {
+    tenantId = requireTenantId(tenantId);
     return resolveBrandName(brandId, tenantId);
   }
 
@@ -45,9 +49,10 @@ class ProductService {
     productcode,
     brand,
     brandId,
-    tenantId = 1,
+    tenantId,
     allowedBrandNames = null,
   }) {
+    tenantId = requireTenantId(tenantId);
     const code = String(productcode ?? "").trim();
     if (!code) return null;
 
@@ -107,9 +112,10 @@ class ProductService {
     productcodes,
     brand,
     brandId,
-    tenantId = 1,
+    tenantId,
     allowedBrandNames = null,
   }) {
+    tenantId = requireTenantId(tenantId);
     const codes = [
       ...new Set(
         (productcodes || [])
@@ -174,8 +180,9 @@ class ProductService {
       page = 1,
       limit = 50,
       allowedBrandNames,
-      tenantId = 1,
+      tenantId: tenantIdInput,
     } = filters;
+    const tenantId = requireTenantId(tenantIdInput);
     const brandIdNum =
       brandId != null && brandId !== "" ? parseInt(brandId, 10) : null;
     const offset = (page - 1) * limit;
@@ -321,8 +328,9 @@ class ProductService {
     limit,
     offset,
     allowedBrandNames,
-    tenantId = 1,
+    tenantId,
   }) {
+    tenantId = requireTenantId(tenantId);
     const run = async (tokenSqlFn) => {
       const tw = tokenSqlFn(tokens, 2);
       const vals = [brand, ...tokens];
@@ -372,9 +380,10 @@ class ProductService {
     searchTerm,
     limit = 20,
     allowedBrandNames = null,
-    tenantId = 1,
+    tenantId,
     brandFilter = {},
   ) {
+    tenantId = requireTenantId(tenantId);
     if (!searchTerm || searchTerm.trim() === "") {
       throw new Error("Termo de busca é obrigatório");
     }
@@ -448,7 +457,8 @@ class ProductService {
    * @param {number} id - ID do produto
    * @returns {Promise<Object>} Produto encontrado
    */
-  async findById(id, tenantId = 1) {
+  async findById(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const products = await sql`
       SELECT * FROM products WHERE id = ${id} AND tenant_id = ${tenantId}
     `;
@@ -468,7 +478,7 @@ class ProductService {
   async create(productData) {
     const { name, productcode, price, stock, brand, minstock, tenant_id } =
       productData;
-    const tenantId = tenant_id || 1;
+    const tenantId = requireTenantId(tenant_id);
 
     if (!name || price === undefined || stock === undefined) {
       throw new Error("Nome, preço e estoque são obrigatórios");
@@ -510,7 +520,7 @@ class ProductService {
   async update(id, productData) {
     const { name, productcode, price, stock, brand, minstock, tenant_id } =
       productData;
-    const tenantId = tenant_id || 1;
+    const tenantId = requireTenantId(tenant_id);
 
     if (!name || price === undefined || stock === undefined) {
       throw new Error("Nome, preço e estoque são obrigatórios");
@@ -561,7 +571,8 @@ class ProductService {
    * @param {number} id - ID do produto
    * @returns {Promise<void>}
    */
-  async delete(id, tenantId = 1) {
+  async delete(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const result =
       await sql`DELETE FROM products WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING *`;
 
@@ -576,7 +587,8 @@ class ProductService {
    * @param {number} quantity - Quantidade a subtrair
    * @returns {Promise<number>} Novo estoque
    */
-  async updateStock(productId, quantity, tenantId = 1) {
+  async updateStock(productId, quantity, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const product = await this.findById(productId, tenantId);
 
     const newStock = product.stock - quantity;
@@ -596,7 +608,8 @@ class ProductService {
    * @param {number} quantity - Quantidade desejada
    * @returns {Promise<boolean>}
    */
-  async hasStock(productId, quantity, tenantId = 1) {
+  async hasStock(productId, quantity, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const product = await this.findById(productId, tenantId);
     return product.stock >= quantity;
   }
@@ -605,7 +618,8 @@ class ProductService {
    * Lista produtos com estoque baixo
    * @returns {Promise<Array>} Produtos com estoque baixo
    */
-  async findLowStock(tenantId = 1) {
+  async findLowStock(tenantId) {
+    tenantId = requireTenantId(tenantId);
     return sql`
       SELECT * FROM products
       WHERE stock <= minstock AND tenant_id = ${tenantId}
@@ -619,7 +633,7 @@ class ProductService {
    * @returns {Promise<{ dryRun: boolean, updated: number, items: Array }>}
    */
   async bulkAdjustPrices({
-    tenantId = 1,
+    tenantId,
     brandId,
     brandName,
     productIds = null,
@@ -627,6 +641,7 @@ class ProductService {
     dryRun = false,
     changedBy = null,
   }) {
+    tenantId = requireTenantId(tenantId);
     const pct = Number(percentage);
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
       throw new Error("Percentual deve ser entre 0,01 e 100");

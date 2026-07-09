@@ -30,21 +30,39 @@ services:
       timeout: 5s
       retries: 8
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./blum_backend
       dockerfile: Dockerfile
     ports:
       - "3011:3011"
+    env_file:
+      - ./blum_backend/.env
     environment:
       NODE_ENV: development
       PORT: "3011"
       DATABASE_URL: postgresql://blum:blum_docker_dev@postgres:5432/blum
       JWT_SECRET: ${JWT_SECRET:-blum_docker_jwt_change_before_production}
       FRONTEND_URL: http://localhost:8080
+      TENANT_BASE_DOMAIN: blum.jwsoftware.com.br
+      TENANT_SUBDOMAIN_ENABLED: "false"
+      REDIS_URL: redis://redis:6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -54,6 +72,8 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: /api/v2
+        REACT_APP_TENANT_BASE_DOMAIN: blum.jwsoftware.com.br
+        REACT_APP_ONBOARDING_PLAN_SLUG: starter
     environment:
       BACKEND_PROXY_HOST: backend
     ports:

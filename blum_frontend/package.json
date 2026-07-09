@@ -7,7 +7,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "test:ci": "react-scripts test --watchAll=false",
+    "test:ci": "react-scripts test --watchAll=false --coverage",
     "test:e2e": "cross-env RUN_E2E=1 playwright test",
     "test:e2e:install": "playwright install chromium",
     "eject": "react-scripts eject"
@@ -27,7 +27,6 @@
     "@tootallnate/once": "3.0.1",
     "serialize-javascript": "7.0.5",
     "postcss": "8.4.49",
-    "webpack-dev-server": "5.2.2",
     "rollup-plugin-terser": {
       "serialize-javascript": "7.0.5"
     },
@@ -53,5 +52,25 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/utils/authSession.js",
+      "src/utils/billing.js",
+      "src/utils/brandSelection.js",
+      "src/utils/brandUtils.js",
+      "src/utils/format.js",
+      "src/utils/orderFormUtils.js",
+      "src/utils/orderLineTotals.js",
+      "src/utils/tenantHost.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 65,
+        "functions": 75,
+        "lines": 80
+      }
+    }
   }
 }

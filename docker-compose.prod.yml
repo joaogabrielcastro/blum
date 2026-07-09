@@ -22,6 +22,15 @@ services:
       retries: 8
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./blum_backend
@@ -34,13 +43,28 @@ services:
       DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
       FRONTEND_URL: ${FRONTEND_URL:?defina FRONTEND_URL}
+      TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-blum.jwsoftware.com.br}
+      TENANT_SUBDOMAIN_ENABLED: ${TENANT_SUBDOMAIN_ENABLED:-true}
+      PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       API_RATE_LIMIT_MAX: ${API_RATE_LIMIT_MAX:-5000}
       PRODUCT_LOOKUP_MAX_CODES: ${PRODUCT_LOOKUP_MAX_CODES:-2500}
       TRUST_PROXY: ${TRUST_PROXY:-1}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PROFESSIONAL: ${STRIPE_PRICE_PROFESSIONAL:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
+      BILLING_ENFORCE: ${BILLING_ENFORCE:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      TENANT_SIGNUP_ENABLED: ${TENANT_SIGNUP_ENABLED:-true}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -50,6 +74,8 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL:?defina REACT_APP_API_URL}
+        REACT_APP_TENANT_BASE_DOMAIN: ${TENANT_BASE_DOMAIN:-blum.jwsoftware.com.br}
+        REACT_APP_ONBOARDING_PLAN_SLUG: ${REACT_APP_ONBOARDING_PLAN_SLUG:-starter}
     environment:
       # Nome DNS do serviço da API na rede Docker (Coolify: ver hostname interno do container da API).
       BACKEND_PROXY_HOST: ${BACKEND_PROXY_HOST:-backend}

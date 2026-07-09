@@ -25,12 +25,19 @@ exports.authenticate = (req, res, next) => {
     const decoded = jwt.verify(token, getJwtSecret());
 
     // Adiciona informações do usuário ao request
+    if (!decoded.tenantId) {
+      return res.status(401).json({ error: "Token inválido: tenant ausente" });
+    }
+
     req.user = {
       userId: decoded.userId,
       username: decoded.username,
       role: decoded.role,
       name: decoded.name,
-      tenantId: decoded.tenantId || 1,
+      tenantId: decoded.tenantId,
+      tenantSlug: decoded.tenantSlug || null,
+      tenantName: decoded.tenantName || null,
+      isPlatformAdmin: Boolean(decoded.isPlatformAdmin),
     };
 
     next();
@@ -99,7 +106,10 @@ exports.optionalAuth = (req, res, next) => {
       username: decoded.username,
       role: decoded.role,
       name: decoded.name,
-      tenantId: decoded.tenantId || 1,
+      tenantId: decoded.tenantId || null,
+      tenantSlug: decoded.tenantSlug || null,
+      tenantName: decoded.tenantName || null,
+      isPlatformAdmin: Boolean(decoded.isPlatformAdmin),
     };
   } catch (error) {
     req.user = null;

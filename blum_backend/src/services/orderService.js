@@ -1,5 +1,6 @@
 const { sql, pool } = require("../config/database");
 const orderRepository = require("../repositories/orderRepository");
+const { requireTenantId, tenantIdFromAuth } = require("../utils/tenantContext");
 const {
   enrichOrder,
   representadasFromItems,
@@ -130,7 +131,8 @@ class OrderService {
     return map;
   }
 
-  async loadProductStockMap(productIds, tenantId = 1) {
+  async loadProductStockMap(productIds, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const intIds = [
       ...new Set(
         (productIds || [])
@@ -201,7 +203,8 @@ class OrderService {
     }
   }
 
-  async loadBrandIdsByNames(brandNames, tenantId = 1) {
+  async loadBrandIdsByNames(brandNames, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const unique = [...new Set((brandNames || []).filter(Boolean))];
     if (unique.length === 0) return new Map();
     const rows = await sql`
@@ -275,7 +278,8 @@ class OrderService {
     };
   }
 
-  async persistOrderItemsWithClient(client, orderId, calculatedItems, tenantId = 1) {
+  async persistOrderItemsWithClient(client, orderId, calculatedItems, tenantId) {
+    tenantId = requireTenantId(tenantId);
     await client.query("DELETE FROM order_items WHERE order_id = $1", [orderId]);
     if (!calculatedItems?.length) {
       return;
@@ -349,7 +353,8 @@ class OrderService {
     await client.query(insertSql, values);
   }
 
-  async persistOrderItems(orderId, calculatedItems, tenantId = 1) {
+  async persistOrderItems(orderId, calculatedItems, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -375,7 +380,8 @@ class OrderService {
       throw new Error("Sessão inválida");
     }
 
-    const { role, userId, tenantId = 1 } = authUser;
+    const { role, userId } = authUser;
+    const tenantId = tenantIdFromAuth(authUser);
 
     if (role === "admin") {
       let rows;
@@ -434,7 +440,8 @@ class OrderService {
     return [];
   }
 
-  async findById(id, tenantId = 1) {
+  async findById(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const result = await sql`
       SELECT o.*, u.name AS seller_name, u.username AS seller_username
       FROM orders o
@@ -463,7 +470,8 @@ class OrderService {
     return enrichOrder(order);
   }
 
-  async findBySeller(userId, tenantId = 1) {
+  async findBySeller(userId, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const rows = await sql`
       SELECT o.*, u.name AS seller_name, u.username AS seller_username,
         (SELECT COUNT(*)::int FROM order_items oi WHERE oi.order_id = o.id) AS items_count,
@@ -545,7 +553,7 @@ class OrderService {
     this.enforceDiscountRules(discount, payment);
 
     const sellerUserId = this.resolveSellerUserId(orderData, authUser);
-    const tenantId = authUser.tenantId || 1;
+    const tenantId = tenantIdFromAuth(authUser);
     const createdAt = parseCreatedAt(
       orderData.createdat ?? orderData.createdAt,
     );
@@ -599,7 +607,7 @@ class OrderService {
   }
 
   async update(id, orderData, authUser) {
-    const tenantId = authUser.tenantId || 1;
+    const tenantId = tenantIdFromAuth(authUser);
     const existing = await this.findById(id, tenantId);
     const clientid =
       orderData.clientid ?? orderData.clientId ?? orderData.client_id;
@@ -739,7 +747,8 @@ class OrderService {
     return this.findById(id);
   }
 
-  async updatePaymentMethod(id, paymentMethod, tenantId = 1) {
+  async updatePaymentMethod(id, paymentMethod, tenantId) {
+    tenantId = requireTenantId(tenantId);
     if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
       const err = new Error("Forma de pagamento inválida.");
       err.statusCode = 400;
@@ -764,7 +773,8 @@ class OrderService {
     return this.findById(id, tenantId);
   }
 
-  async duplicate(id, tenantId = 1) {
+  async duplicate(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const source = await this.findById(id, tenantId);
     const sourceItems = Array.isArray(source.items) ? source.items : [];
     if (sourceItems.length === 0) {
@@ -808,7 +818,7 @@ class OrderService {
       throw new Error("clientId e productId são obrigatórios");
     }
     const safeLimit = Math.min(30, Math.max(1, parseInt(limit, 10) || 8));
-    const tenantId = authUser?.tenantId || 1;
+    const tenantId = tenantIdFromAuth(authUser);
     if (authUser?.role === "salesperson") {
       return sql`
         SELECT
@@ -854,7 +864,8 @@ class OrderService {
     `;
   }
 
-  async convertToPedido(id, tenantId = 1, options = {}) {
+  async convertToPedido(id, tenantId, options = {}) {
+    tenantId = requireTenantId(tenantId);
     const order = await this.findById(id, tenantId);
     const orderDoc = order.document_type ?? order.documentType ?? null;
     if (orderDoc !== "orcamento") {
@@ -922,7 +933,8 @@ class OrderService {
     return this.findById(id, tenantId);
   }
 
-  async updateStatus(id, status, tenantId = 1) {
+  async updateStatus(id, status, tenantId) {
+    tenantId = requireTenantId(tenantId);
     if (!status) {
       throw new Error("Status é obrigatório");
     }
@@ -941,7 +953,8 @@ class OrderService {
     return result[0];
   }
 
-  async delete(id, tenantId = 1) {
+  async delete(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const result = await sql`DELETE FROM orders WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING *`;
 
     if (result.length === 0) {
@@ -949,7 +962,8 @@ class OrderService {
     }
   }
 
-  async finalize(id, tenantId = 1) {
+  async finalize(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const current = await this.findById(id, tenantId);
     const currentDoc =
       current.document_type ?? current.documentType ?? null;
@@ -1023,7 +1037,7 @@ class OrderService {
       throw new Error("O ID do cliente é obrigatório");
     }
 
-    const tenantId = authUser?.tenantId || 1;
+    const tenantId = tenantIdFromAuth(authUser);
     if (authUser && authUser.role === "salesperson") {
       const result = await sql`
         SELECT

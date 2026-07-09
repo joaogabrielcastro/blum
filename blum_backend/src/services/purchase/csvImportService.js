@@ -1,72 +1,23 @@
-const { sql, pool } = require("../../config/database");
-const { getValueByHeader, parseCsvLine } = require("./csvParseHelpers");
+const { pool } = require("../../config/database");
+const { parseSpreadsheetBuffer } = require("../product/productSpreadsheetParser");
 
 async function processCsvData(csvText, selectedBrand) {
-  const lines = csvText.split("\n").filter((line) => line.trim());
-  const products = [];
+  const buffer = Buffer.from(String(csvText || ""), "utf8");
+  const result = parseSpreadsheetBuffer(buffer, { filename: "import.csv" });
 
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCsvLine(lines[i]);
-
-    const product = {
-      productCode: getValueByHeader(headers, values, [
-        "codigo",
-        "sku",
-        "productcode",
-        "código",
-        "ean",
-      ]),
-      name: getValueByHeader(headers, values, [
-        "nome",
-        "descricao",
-        "descrição",
-        "name",
-        "product",
-        "produto",
-      ]),
-      price:
-        parseFloat(
-          getValueByHeader(headers, values, [
-            "preco",
-            "preço",
-            "price",
-            "valor",
-            "precounitario",
-          ]),
-        ) || 0,
-      stock:
-        parseInt(
-          getValueByHeader(headers, values, [
-            "estoque",
-            "stock",
-            "quantidade",
-            "qtd",
-            "quantity",
-          ]),
-        ) || 0,
-      brand: selectedBrand,
-      category: getValueByHeader(headers, values, [
-        "categoria",
-        "category",
-        "grupo",
-      ]),
-    };
-
-    if (
-      product.productCode &&
-      product.name &&
-      product.productCode.trim() !== ""
-    ) {
-      products.push(product);
-    }
-  }
-
-  return products;
+  return result.products.map((p) => ({
+    productCode: p.productCode,
+    name: p.name,
+    price: p.price,
+    stock: p.stock,
+    brand: selectedBrand,
+    category: "",
+  }));
 }
 
-async function importProductsToDatabase(products, tenantId = 1) {
+async function importProductsToDatabase(products, tenantId) {
+  const { requireTenantId } = require("../../utils/tenantContext");
+  tenantId = requireTenantId(tenantId);
   const results = {
     created: 0,
     updated: 0,
@@ -79,7 +30,7 @@ async function importProductsToDatabase(products, tenantId = 1) {
   }
 
   const normalized = products
-    .map((product, index) => {
+    .map((product) => {
       const productCode = String(product.productCode || "").trim();
       const name = String(product.name || "").trim();
       if (!productCode || !name) return null;

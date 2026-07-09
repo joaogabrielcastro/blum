@@ -1,4 +1,5 @@
 const reportService = require("../services/reportService");
+const XLSX = require("xlsx");
 const {
   mapSalesByRepPayload,
   mapCommissionReportPayload,
@@ -80,6 +81,35 @@ exports.getCommissionByBrand = async (req, res) => {
   } catch (error) {
     console.error("Erro ao gerar relatório por marca:", error);
     res.status(500).json({ error: "Erro ao gerar relatório" });
+  }
+};
+
+exports.exportSalesByRepExcel = async (req, res) => {
+  try {
+    const sales = await reportService.getSalesByRep(req.user.tenantId);
+    const rows = sales.map((row) => ({
+      Representante: row.sellerName || row.username,
+      Usuario: row.username,
+      "Vendas (R$)": parseFloat(row.totalSales) || 0,
+    }));
+
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Vendas por rep");
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="blum-vendas-por-representante.xlsx"',
+    );
+    res.status(200).send(buffer);
+  } catch (error) {
+    console.error("Erro ao exportar Excel:", error);
+    res.status(500).json({ error: "Erro ao exportar relatório Excel." });
   }
 };
 

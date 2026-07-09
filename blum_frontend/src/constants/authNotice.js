@@ -2,3 +2,4 @@
 export const AUTH_NOTICE_KEY = "blum_auth_notice";
 export const AUTH_NOTICE_SESSION_EXPIRED = "session_expired";
 export const AUTH_NOTICE_FORBIDDEN = "forbidden";
+export const AUTH_NOTICE_SUBSCRIPTION_REQUIRED = "subscription_required";

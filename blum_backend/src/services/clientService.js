@@ -1,5 +1,6 @@
 const { sql } = require("../config/database");
 const clientRepository = require("../repositories/clientRepository");
+const { requireTenantId } = require("../utils/tenantContext");
 const {
   normalizeClientBody,
   mapClientRow,
@@ -7,13 +8,15 @@ const {
 } = require("../mappers/clientMapper");
 
 class ClientService {
-  async findAll(tenantId = 1) {
+  async findAll(tenantId) {
+    tenantId = requireTenantId(tenantId);
     // Evita ORDER BY createdat vs "createdAt" conforme a base; id é sempre válido.
     const rows = await clientRepository.findAllByTenant(tenantId);
     return mapClients(rows);
   }
 
-  async findById(id, tenantId = 1) {
+  async findById(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     if (!id || isNaN(parseInt(id))) {
       throw new Error("ID do cliente inválido");
     }
@@ -27,12 +30,14 @@ class ClientService {
     return mapClientRow(clients[0]);
   }
 
-  async findByCnpj(cnpj, tenantId = 1) {
+  async findByCnpj(cnpj, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const clients = await clientRepository.findByCnpjAndTenant(cnpj, tenantId);
     return clients.length > 0 ? mapClientRow(clients[0]) : null;
   }
 
-  async create(clientData, tenantId = 1) {
+  async create(clientData, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const {
       companyName,
       nomeFantasia,
@@ -78,7 +83,8 @@ class ClientService {
     return mapClientRow(result[0]);
   }
 
-  async update(id, clientData, tenantId = 1) {
+  async update(id, clientData, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const {
       companyName,
       nomeFantasia,
@@ -122,7 +128,8 @@ class ClientService {
     return mapClientRow(result[0]);
   }
 
-  async delete(id, tenantId = 1) {
+  async delete(id, tenantId) {
+    tenantId = requireTenantId(tenantId);
     if (!id || isNaN(parseInt(id))) {
       throw new Error("ID do cliente inválido");
     }
@@ -134,13 +141,15 @@ class ClientService {
     }
   }
 
-  async findByRegion(region, tenantId = 1) {
+  async findByRegion(region, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const rows =
       await sql`SELECT * FROM clients WHERE region = ${region} AND tenant_id = ${tenantId} ORDER BY id DESC`;
     return mapClients(rows);
   }
 
-  async search(searchTerm, tenantId = 1) {
+  async search(searchTerm, tenantId) {
+    tenantId = requireTenantId(tenantId);
     if (!searchTerm || searchTerm.trim() === "") {
       return await this.findAll(tenantId);
     }
@@ -160,7 +169,8 @@ class ClientService {
     return mapClients(rows);
   }
 
-  async hasOrders(clientId, tenantId = 1) {
+  async hasOrders(clientId, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const orders =
       await sql`SELECT COUNT(*) as count FROM orders WHERE clientid = ${clientId} AND tenant_id = ${tenantId}`;
     return orders[0].count > 0;

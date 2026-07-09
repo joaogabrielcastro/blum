@@ -10,6 +10,7 @@ import ErrorMessage from "../components/ErrorMessage";
 import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
 import BulkPriceAdjustModal from "../components/products/BulkPriceAdjustModal";
+import ProductImportSection from "../components/products/ProductImportSection";
 
 const ProductsPage = ({ userRole }) => {
   const toast = useToast();
@@ -38,6 +39,8 @@ const ProductsPage = ({ userRole }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
   const [showBulkAdjust, setShowBulkAdjust] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState(null);
 
   const isAdmin = userRole === "admin";
 
@@ -274,6 +277,35 @@ const ProductsPage = ({ userRole }) => {
     setEditingProduct(null);
   };
 
+  const handleExportProducts = async (format) => {
+    if (!selectedBrandId) {
+      toast.warning("Selecione uma representada para exportar.");
+      return;
+    }
+    try {
+      setExportingFormat(format);
+      const blob = await apiService.downloadProductsExport(format, {
+        brandId: selectedBrandId,
+        q: debouncedSearch,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download =
+        format === "xlsx" ? "blum-produtos.xlsx" : "blum-produtos.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(
+        format === "xlsx" ? "Excel exportado." : "CSV exportado.",
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Não foi possível exportar produtos.");
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
   const openCatalogForBrand = (brand) => {
     const name =
       typeof brand === "string"
@@ -337,6 +369,37 @@ const ProductsPage = ({ userRole }) => {
           >
             Reajuste de preços
           </button>
+        )}
+
+        {isAdmin && selectedBrand && (
+          <button
+            type="button"
+            onClick={() => setShowImport(true)}
+            className="bg-teal-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm md:text-base"
+          >
+            Importar planilha
+          </button>
+        )}
+
+        {isAdmin && selectedBrand && (
+          <>
+            <button
+              type="button"
+              onClick={() => handleExportProducts("csv")}
+              disabled={exportingFormat != null}
+              className="bg-slate-600 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm md:text-base disabled:opacity-60"
+            >
+              {exportingFormat === "csv" ? "Exportando…" : "Exportar CSV"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExportProducts("xlsx")}
+              disabled={exportingFormat != null}
+              className="bg-slate-700 text-white font-bold px-4 py-2.5 md:py-2 rounded-lg hover:bg-slate-800 transition-colors text-sm md:text-base disabled:opacity-60"
+            >
+              {exportingFormat === "xlsx" ? "Exportando…" : "Exportar Excel"}
+            </button>
+          </>
         )}
 
         {isAdmin && (
@@ -661,6 +724,35 @@ const ProductsPage = ({ userRole }) => {
             await fetchProducts();
           }}
         />
+      )}
+
+      {isAdmin && showImport && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-5xl my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-800">
+                Importar produtos
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowImport(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                aria-label="Fechar"
+              >
+                ×
+              </button>
+            </div>
+            <ProductImportSection
+              brands={brands}
+              defaultBrandId={selectedBrandId}
+              onSuccess={async () => {
+                toast.success("Produtos importados com sucesso.");
+                await fetchProducts();
+              }}
+              onClose={() => setShowImport(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

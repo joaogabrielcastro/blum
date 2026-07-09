@@ -1,5 +1,6 @@
 const { sql } = require("../../config/database");
 const { invalidateProductsCache } = require("../../config/cache");
+const { tenantIdFromAuth } = require("../../utils/tenantContext");
 
 /**
  * Finalização de importação CSV ou PDF (mesma regra de negócio).
@@ -7,7 +8,7 @@ const { invalidateProductsCache } = require("../../config/cache");
  */
 async function finalizePurchaseFromImport(req, res) {
   const { brandId, purchaseDate, items } = req.body;
-  const tenantId = req.user?.tenantId || 1;
+  const tenantId = tenantIdFromAuth(req.user);
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Nenhum item válido foi recebido." });
@@ -233,7 +234,7 @@ async function finalizePurchaseFromImport(req, res) {
       }
     }
 
-    await invalidateProductsCache();
+    await invalidateProductsCache(tenantId);
 
     res.status(200).json({
       message: `Importação processada com sucesso! ${results.updated} produtos atualizados e ${results.created} novos produtos criados na marca ${brandName}.`,

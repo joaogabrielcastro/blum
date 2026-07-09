@@ -8,9 +8,11 @@ const PATHS = {
   reports: "/reports",
   purchases: "/purchases",
   team: "/team",
+  subscription: "/subscription",
+  platform: "/platform",
 };
 
-const Sidebar = ({ isOpen, onClose, onLogout, userRole }) => {
+const Sidebar = ({ isOpen, onClose, onLogout, userRole, isPlatformAdmin }) => {
   const navigate = useNavigate();
 
   const handleNavigate = (page) => {
@@ -185,6 +187,57 @@ const Sidebar = ({ isOpen, onClose, onLogout, userRole }) => {
                   Equipe
                 </button>
               </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("subscription")}
+                  className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-5 h-5 mr-3"
+                  >
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+                    <line x1="1" y1="10" x2="23" y2="10" />
+                  </svg>
+                  Assinatura
+                </button>
+              </li>
+              {isPlatformAdmin ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate("platform")}
+                    className="w-full flex items-center p-3 rounded-xl transition-colors duration-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="w-5 h-5 mr-3"
+                    >
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    Plataforma
+                  </button>
+                </li>
+              ) : null}
               <li>
                 <button
                   type="button"

@@ -215,6 +215,69 @@ exports.validateLogin = [
 
   body("password").notEmpty().withMessage("Senha é obrigatória"),
 
+  body("tenantSlug")
+    .optional({ values: "falsy" })
+    .trim()
+    .isLength({ min: 1, max: 60 })
+    .withMessage("Identificador da empresa inválido"),
+
+  handleValidationErrors,
+];
+
+exports.validateTenantSignup = [
+  body("companyName")
+    .trim()
+    .notEmpty()
+    .withMessage("Nome da empresa é obrigatório")
+    .isLength({ min: 2, max: 255 })
+    .withMessage("Nome da empresa deve ter entre 2 e 255 caracteres"),
+
+  body("slug")
+    .optional({ values: "falsy" })
+    .trim()
+    .isLength({ min: 3, max: 60 })
+    .withMessage("Identificador deve ter entre 3 e 60 caracteres"),
+
+  body("adminEmail")
+    .trim()
+    .notEmpty()
+    .withMessage("E-mail do administrador é obrigatório")
+    .isEmail()
+    .withMessage("E-mail do administrador inválido"),
+
+  body("adminPassword")
+    .notEmpty()
+    .withMessage("Senha é obrigatória")
+    .isLength({ min: 6 })
+    .withMessage("Senha deve ter no mínimo 6 caracteres"),
+
+  body("adminName")
+    .optional({ values: "falsy" })
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage("Nome do administrador inválido"),
+
+  handleValidationErrors,
+];
+
+exports.validateSlugParam = [
+  param("slug")
+    .trim()
+    .notEmpty()
+    .withMessage("Identificador é obrigatório")
+    .isLength({ min: 1, max: 60 })
+    .withMessage("Identificador inválido"),
+  handleValidationErrors,
+];
+
+exports.validateTenantStatusUpdate = [
+  param("tenantId").isInt({ min: 1 }).withMessage("ID de empresa inválido"),
+  body("status")
+    .trim()
+    .notEmpty()
+    .withMessage("Status é obrigatório")
+    .isIn(["active", "suspended"])
+    .withMessage('Status deve ser "active" ou "suspended"'),
   handleValidationErrors,
 ];
 

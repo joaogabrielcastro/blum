@@ -16,6 +16,11 @@ import PurchasesPage from "./Pages/PurchasesPage";
 import ReportsPage from "./Pages/ReportsPage";
 import ClientHistoryPage from "./Pages/ClientHistoryPage";
 import TeamPage from "./Pages/TeamPage";
+import SubscriptionPage from "./Pages/SubscriptionPage";
+import SignupPage from "./Pages/SignupPage";
+import PlatformAdminPage from "./Pages/PlatformAdminPage";
+import { resetOfflineStorage } from "./offline/db";
+import { clearStoredTenantSlug } from "./constants/tenantStorage";
 import apiService from "./services/apiService";
 import {
   getClientDisplayName,
@@ -32,6 +37,8 @@ const PAGE_PATH = {
   reports: "/reports",
   purchases: "/purchases",
   team: "/team",
+  subscription: "/subscription",
+  platform: "/platform",
 };
 
 function AppShell() {
@@ -43,9 +50,11 @@ function AppShell() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [subscription, setSubscription] = useState(null);
 
   const isLoggedIn = !!user;
   const userRole = user?.role;
+  const isPlatformAdmin = Boolean(user?.isPlatformAdmin);
   const username = user?.username;
   const userId = user?.id;
 
@@ -99,14 +108,27 @@ function AppShell() {
       role,
       username: userData.username,
       name: userData.name,
+      tenantId: userData.tenantId,
+      tenantSlug: userData.tenantSlug,
+      tenantName: userData.tenantName,
+      isPlatformAdmin: Boolean(userData.isPlatformAdmin),
     };
     setUser(userInfo);
-    navigate("/dashboard", { replace: true });
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    navigate(redirect || "/dashboard", { replace: true });
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await resetOfflineStorage();
+    } catch {
+      /* ignore */
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("refreshToken");
+    clearStoredTenantSlug();
     setUser(null);
     navigate("/login", { replace: true });
   };
@@ -119,8 +141,22 @@ function AppShell() {
       if (token && savedUser) {
         if (navigator.onLine) {
           try {
-            await verifyToken();
-            setUser(JSON.parse(savedUser));
+            const verifyData = await verifyToken();
+            const parsedUser = JSON.parse(savedUser);
+            const mergedUser = {
+              ...parsedUser,
+              ...(verifyData?.user || {}),
+            };
+            setUser(mergedUser);
+            localStorage.setItem("user", JSON.stringify(mergedUser));
+            setSubscription(verifyData?.subscription || null);
+            if (
+              verifyData?.subscription?.accessBlocked &&
+              parsedUser.role === "admin" &&
+              !window.location.pathname.startsWith("/subscription")
+            ) {
+              navigate("/subscription", { replace: true });
+            }
           } catch (error) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
@@ -133,7 +169,7 @@ function AppShell() {
     };
 
     checkAuth();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -168,6 +204,7 @@ function AppShell() {
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
@@ -181,6 +218,7 @@ function AppShell() {
           onClose={() => setIsSidebarOpen(false)}
           onLogout={handleLogout}
           userRole={userRole}
+          isPlatformAdmin={isPlatformAdmin}
         />
 
         {isSidebarOpen && (
@@ -217,6 +255,12 @@ function AppShell() {
             <div className="bg-yellow-500 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base leading-snug">
               Sem internet — modo campo ativo. Use Orçamentos para criar vendas
               offline; os dados serão enviados ao voltar online.
+            </div>
+          )}
+
+          {subscription?.accessBlocked && userRole !== "admin" && (
+            <div className="bg-red-600 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base">
+              A assinatura da empresa está inativa. Contacte o administrador.
             </div>
           )}
 
@@ -268,6 +312,19 @@ function AppShell() {
                   )
                 }
               />
+              <Route
+                path="/subscription"
+                element={
+                  userRole === "admin" ? (
+                    <SubscriptionPage />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              {isPlatformAdmin ? (
+                <Route path="/platform" element={<PlatformAdminPage />} />
+              ) : null}
               <Route path="/clients" element={<ClientsPage />} />
               <Route
                 path="/clients/:clientId/history"

@@ -19,10 +19,13 @@ const runIntegration =
 
 const describeIntegration = runIntegration ? describe : describe.skip;
 
+const DEFAULT_INTEGRATION_USER = "admin@jwsoftware.com.br";
+const DEFAULT_INTEGRATION_PASSWORD = "BlumAdmin2025!";
+
 describeIntegration("API v2 integration", () => {
   let app;
-  const user = process.env.INTEGRATION_USER || "admin";
-  const password = process.env.INTEGRATION_PASSWORD || "BlumAdmin2025!";
+  const user = process.env.INTEGRATION_USER || DEFAULT_INTEGRATION_USER;
+  const password = process.env.INTEGRATION_PASSWORD || DEFAULT_INTEGRATION_PASSWORD;
   const tenantSlug = process.env.INTEGRATION_TENANT_SLUG || "default";
 
   beforeAll(async () => {

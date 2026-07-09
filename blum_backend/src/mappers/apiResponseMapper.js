@@ -315,9 +315,18 @@ function mapAuthUserResponse(user, options = {}) {
   const mapped = {
     ...user,
     tenantId: user.tenantId ?? user.tenant_id ?? null,
+    tenantSlug: user.tenantSlug ?? user.tenant_slug ?? null,
+    tenantName: user.tenantName ?? user.tenant_name ?? null,
+    isPlatformAdmin: Boolean(
+      user.isPlatformAdmin ?? user.is_platform_admin ?? false,
+    ),
     createdAt: user.createdAt ?? user.createdat ?? null,
   };
-  return maybeStripLegacy(mapped, ["tenant_id", "createdat"], options);
+  return maybeStripLegacy(
+    mapped,
+    ["tenant_id", "tenant_slug", "tenant_name", "is_platform_admin", "createdat"],
+    options,
+  );
 }
 
 function mapAuthUsersPayload(users, options = {}) {

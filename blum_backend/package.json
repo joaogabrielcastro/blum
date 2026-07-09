@@ -9,11 +9,15 @@
     "test": "jest",
     "test:integration": "cross-env RUN_INTEGRATION=1 jest tests/integration --runInBand",
     "test:coverage": "jest --coverage",
+    "test:integration:coverage": "cross-env RUN_INTEGRATION=1 jest tests/integration --coverage --runInBand",
     "contract:v2": "node scripts/check_v2_contract.js",
     "perf:explain": "node scripts/perf_explain.js",
     "import:clients": "node scripts/import_clients_excel.js",
+    "import:products": "node scripts/import_products_excel.js",
     "update:client-addresses": "node scripts/update_clients_address_from_excel.js",
-    "backfill:client-fantasia": "node scripts/backfill_clients_nome_fantasia.js"
+    "backfill:client-fantasia": "node scripts/backfill_clients_nome_fantasia.js",
+    "stripe:setup": "node scripts/setup-stripe-billing.js",
+    "migrate:tenant": "node scripts/migrate_tenant_data.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -32,6 +36,7 @@
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.20.0",
+    "stripe": "^17.7.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

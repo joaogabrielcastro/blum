@@ -1,5 +1,7 @@
-const DB_NAME = "blum-offline-v1";
+import { getStoredTenantSlug } from "../constants/tenantStorage";
+
 const DB_VERSION = 1;
+const DB_PREFIX = "blum-offline-v1";
 
 const STORES = {
   meta: "meta",
@@ -8,9 +10,45 @@ const STORES = {
   pendingOrders: "pendingOrders",
 };
 
-function openDb() {
+function resolveDbName() {
+  const slug = getStoredTenantSlug() || "default";
+  const safe = String(slug).replace(/[^a-z0-9_-]/gi, "_").toLowerCase();
+  return `${DB_PREFIX}-${safe}`;
+}
+
+let activeDbName = null;
+
+export function deleteOfflineDatabase(dbName) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.deleteDatabase(dbName);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => resolve();
+  });
+}
+
+export async function resetOfflineStorage() {
+  const dbName = resolveDbName();
+  try {
+    await deleteOfflineDatabase(dbName);
+  } catch {
+    /* ignore */
+  }
+  if (activeDbName && activeDbName !== dbName) {
+    try {
+      await deleteOfflineDatabase(activeDbName);
+    } catch {
+      /* ignore */
+    }
+  }
+  activeDbName = dbName;
+}
+
+function openDb() {
+  const dbName = resolveDbName();
+  activeDbName = dbName;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName, DB_VERSION);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {

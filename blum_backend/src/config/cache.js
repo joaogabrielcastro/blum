@@ -44,8 +44,16 @@ async function cacheSet(key, value, ttlSec = TTL_SECONDS) {
   memCache.set(key, value, ttlSec);
 }
 
-async function invalidateProductsCache() {
-  const prefix = "products:";
+function productsCachePrefix(tenantId) {
+  const id = Number(tenantId);
+  if (!Number.isInteger(id) || id < 1) {
+    return "products:unknown:";
+  }
+  return `products:${id}:`;
+}
+
+async function invalidateProductsCache(tenantId) {
+  const prefix = productsCachePrefix(tenantId);
   if (redisClient) {
     try {
       let cursor = "0";
@@ -63,15 +71,24 @@ async function invalidateProductsCache() {
         cursor = nextCursor;
       } while (cursor !== "0");
     } catch (e) {
-      memCache.flushAll();
+      invalidateMemCacheByPrefix(prefix);
     }
   } else {
-    memCache.flushAll();
+    invalidateMemCacheByPrefix(prefix);
   }
 }
 
-function cacheKeyProducts(filters) {
-  return `products:${JSON.stringify(filters || {})}`;
+function invalidateMemCacheByPrefix(prefix) {
+  const keys = memCache.keys();
+  for (const key of keys) {
+    if (String(key).startsWith(prefix)) {
+      memCache.del(key);
+    }
+  }
+}
+
+function cacheKeyProducts(tenantId, filters) {
+  return `${productsCachePrefix(tenantId)}${JSON.stringify(filters || {})}`;
 }
 
 module.exports = {

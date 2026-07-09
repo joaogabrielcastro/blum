@@ -1,5 +1,6 @@
 const { sql } = require("../config/database");
 const brandAccessService = require("../services/brandAccessService");
+const { assertCanAddBrand } = require("../services/planLimitsService");
 const { mapBrandsPayload } = require("../mappers/apiResponseMapper");
 
 // ✅ CORRIGIDO: Agora retorna o ID também
@@ -42,6 +43,7 @@ exports.createBrand = async (req, res) => {
   }
 
   try {
+    await assertCanAddBrand(req.user.tenantId);
     await sql`
       INSERT INTO brands (name, commission_rate, logo_url, tenant_id) 
       VALUES (${name}, ${commission_rate}, ${logo_url || null}, ${req.user.tenantId}) 
@@ -50,7 +52,10 @@ exports.createBrand = async (req, res) => {
     res.status(201).json({ message: "Marca criada com sucesso!" });
   } catch (error) {
     console.error("Erro ao criar marca:", error);
-    res.status(500).json({ error: "Erro ao criar marca." });
+    const status = error.statusCode || 500;
+    res.status(status).json({
+      error: error.message || "Erro ao criar marca.",
+    });
   }
 };
 

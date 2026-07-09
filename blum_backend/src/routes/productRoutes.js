@@ -1,12 +1,43 @@
 const express = require("express");
 const router = express.Router();
 const productsController = require("../controllers/productController");
+const productImportController = require("../controllers/productImportController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { uploadSpreadsheet } = require("../middleware/upload");
 const {
   validateProduct,
   validateProductUpdate,
   validateId,
 } = require("../middleware/validation");
+
+router.post(
+  "/import/preview",
+  authenticate,
+  authorize("admin"),
+  uploadSpreadsheet,
+  productImportController.previewImport,
+);
+
+router.post(
+  "/import/finalize",
+  authenticate,
+  authorize("admin"),
+  productImportController.finalizeImport,
+);
+
+router.get(
+  "/export.csv",
+  authenticate,
+  authorize("admin"),
+  productImportController.exportCsv,
+);
+
+router.get(
+  "/export.xlsx",
+  authenticate,
+  authorize("admin"),
+  productImportController.exportExcel,
+);
 
 // Rotas públicas (com autenticação mas sem restrição de role)
 router.get("/", authenticate, productsController.getAll);

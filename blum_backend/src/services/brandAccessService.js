@@ -1,10 +1,12 @@
 const { sql } = require("../config/database");
+const { requireTenantId } = require("../utils/tenantContext");
 
 /**
  * Se o vendedor tem restrição explícita, devolve lista de nomes de marcas.
  * null = sem restrição (admin ou vendedor sem linhas em user_allowed_brands).
  */
-async function getRestrictedBrandNamesOrNull(userId, role, tenantId = 1) {
+async function getRestrictedBrandNamesOrNull(userId, role, tenantId) {
+  tenantId = requireTenantId(tenantId);
   if (role === "admin") return null;
 
   const rows = await sql`
@@ -21,7 +23,8 @@ async function getRestrictedBrandNamesOrNull(userId, role, tenantId = 1) {
   return rows.map((r) => r.name);
 }
 
-async function getAllowedBrandIdsForUser(userId, tenantId = 1) {
+async function getAllowedBrandIdsForUser(userId, tenantId) {
+  tenantId = requireTenantId(tenantId);
   const rows = await sql`
     SELECT brand_id FROM user_allowed_brands
     WHERE user_id = ${userId} AND tenant_id = ${tenantId}
@@ -29,7 +32,8 @@ async function getAllowedBrandIdsForUser(userId, tenantId = 1) {
   return rows.map((r) => r.brand_id);
 }
 
-async function setAllowedBrandIdsForUser(userId, brandIds, tenantId = 1) {
+async function setAllowedBrandIdsForUser(userId, brandIds, tenantId) {
+  tenantId = requireTenantId(tenantId);
   const ids = Array.from(
     new Set(
       (brandIds || [])

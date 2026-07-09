@@ -5,6 +5,12 @@ import {
   AUTH_NOTICE_KEY,
   AUTH_NOTICE_SESSION_EXPIRED,
 } from "../constants/authNotice";
+import {
+  getStoredTenantSlug,
+  setStoredTenantSlug,
+  clearStoredTenantSlug,
+} from "../constants/tenantStorage";
+import { resetOfflineStorage } from "../offline/db";
 
 export const API_URL =
   process.env.REACT_APP_API_URL || "/api/v2";
@@ -12,9 +18,20 @@ export const API_URL =
 // ==================== HELPER FUNCTIONS ====================
 const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
+  let tenantSlug = getStoredTenantSlug();
+  try {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser);
+      if (parsed?.tenantSlug) tenantSlug = parsed.tenantSlug;
+    }
+  } catch {
+    /* ignore */
+  }
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenantSlug ? { "x-tenant-slug": tenantSlug } : {}),
   };
 };
 
@@ -82,7 +99,9 @@ const apiRequest = async (url, options = {}) => {
   }
 
   if (!response.ok) {
-    handleAuthError(response.status);
+    if (response.status !== 402) {
+      handleAuthError(response.status);
+    }
     const rawText = await response.text();
     let error = {};
     try {
@@ -128,6 +147,7 @@ const apiRequest = async (url, options = {}) => {
     );
     customError.status = response.status;
     customError.code = error.code;
+    customError.subscription = error.subscription;
     customError.stockWarnings = error.stockWarnings;
     throw customError;
   }
@@ -136,15 +156,17 @@ const apiRequest = async (url, options = {}) => {
 };
 
 // ==================== AUTHENTICATION ====================
-export const login = async (username, password) => {
+export const login = async (username, password, tenantSlug) => {
+  const slug = (tenantSlug || getStoredTenantSlug() || "default").trim();
   let response;
   try {
     response = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-tenant-slug": slug,
       },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, tenantSlug: slug }),
     });
   } catch {
     throw new Error(
@@ -154,8 +176,12 @@ export const login = async (username, password) => {
 
   if (!response.ok) {
     if (response.status >= 502 && response.status <= 504) {
+      const viaProxy =
+        typeof API_URL === "string" && API_URL.startsWith("/");
       throw new Error(
-        `A API não foi alcançada (${response.status}). Reveja o proxy/Nginx ou a variável BACKEND_PROXY_HOST; não indica senha errada.`,
+        viaProxy
+          ? `A API não foi alcançada (${response.status}). Em dev: suba a API em :3011 (docker compose up -d). Em produção (Coolify): defina REACT_APP_API_URL=https://api-blum.jwsoftware.com.br/api/v2 no build do frontend ou corrija BACKEND_PROXY_HOST. Não indica senha errada.`
+          : `A API não foi alcançada (${response.status}). Verifique se ${API_URL} está online. Não indica senha errada.`,
       );
     }
     const error = await response.json().catch(() => ({}));
@@ -170,16 +196,80 @@ export const login = async (username, password) => {
     throw new Error(fromServer || fallback429 || "Credenciais inválidas");
   }
 
-  return response.json();
+  const data = await response.json();
+  if (data?.user?.tenantSlug) {
+    setStoredTenantSlug(data.user.tenantSlug);
+  } else if (slug) {
+    setStoredTenantSlug(slug);
+  }
+  return data;
+};
+
+export const signupTenant = async ({
+  companyName,
+  slug,
+  adminEmail,
+  adminPassword,
+  adminName,
+}) => {
+  let response;
+  try {
+    response = await fetch(`${API_URL}/tenants/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyName,
+        slug,
+        adminEmail,
+        adminPassword,
+        adminName,
+      }),
+    });
+  } catch {
+    throw new Error(
+      "Sem ligação à internet ou servidor indisponível. Verifique a rede e tente novamente.",
+    );
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error || payload.message || "Não foi possível criar a empresa",
+    );
+  }
+  if (payload?.tenant?.slug) {
+    setStoredTenantSlug(payload.tenant.slug);
+  }
+  return payload;
+};
+
+export const checkTenantSlug = async (slug) => {
+  const normalized = encodeURIComponent(String(slug || "").trim());
+  if (!normalized) {
+    return { available: false, slug: "", error: "Identificador obrigatório" };
+  }
+  const response = await fetch(`${API_URL}/tenants/check-slug/${normalized}`);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Erro ao verificar identificador");
+  }
+  return payload;
 };
 
 export const verifyToken = async () => {
   return apiRequest(`${API_URL}/auth/verify`);
 };
 
-export const logout = () => {
+export const logout = async () => {
+  try {
+    await resetOfflineStorage();
+  } catch {
+    /* ignore */
+  }
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  localStorage.removeItem("refreshToken");
+  clearStoredTenantSlug();
 };
 
 // ==================== API SERVICE ====================
@@ -283,6 +373,57 @@ const apiService = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+
+  previewProductImport: async (formData) => {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_URL}/products/import/preview`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      handleAuthError(response.status);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Erro ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  finalizeProductImport: async (payload) => {
+    return apiRequest(`${API_URL}/products/import/finalize`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  downloadProductsExport: async (format, { brandId, q } = {}) => {
+    const token = localStorage.getItem("token");
+    const params = new URLSearchParams();
+    if (brandId != null && brandId !== "") params.append("brandId", String(brandId));
+    if (q != null && String(q).trim() !== "") params.append("q", String(q).trim());
+
+    const ext = format === "xlsx" ? "xlsx" : "csv";
+    const response = await fetch(
+      `${API_URL}/products/export.${ext}?${params.toString()}`,
+      {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      },
+    );
+
+    if (!response.ok) {
+      handleAuthError(response.status);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Erro ao exportar produtos");
+    }
+
+    return response.blob();
   },
 
   getProductById: async (productId) => {
@@ -658,6 +799,55 @@ const apiService = {
       uf: data.estabelecimento?.estado?.sigla || "",
       email: data.estabelecimento?.email || "",
     };
+  },
+
+  // ==================== BILLING / STRIPE ====================
+  getBillingPlans: async () => apiRequest(`${API_URL}/billing/plans`),
+
+  getSubscription: async () => apiRequest(`${API_URL}/billing/subscription`),
+
+  createCheckoutSession: async (planSlug) =>
+    apiRequest(`${API_URL}/billing/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ planSlug }),
+    }),
+
+  createBillingPortalSession: async () =>
+    apiRequest(`${API_URL}/billing/portal`, { method: "POST" }),
+
+  changeBillingPlan: async (planSlug) =>
+    apiRequest(`${API_URL}/billing/change-plan`, {
+      method: "POST",
+      body: JSON.stringify({ planSlug }),
+    }),
+
+  cancelSubscription: async () =>
+    apiRequest(`${API_URL}/billing/cancel`, { method: "POST" }),
+
+  reactivateSubscription: async () =>
+    apiRequest(`${API_URL}/billing/reactivate`, { method: "POST" }),
+
+  // ==================== PLATFORM ADMIN ====================
+  listPlatformTenants: async () => apiRequest(`${API_URL}/platform/tenants`),
+
+  updatePlatformTenantStatus: async (tenantId, status) =>
+    apiRequest(`${API_URL}/platform/tenants/${tenantId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  getPlatformTenantDetail: async (tenantId) =>
+    apiRequest(`${API_URL}/platform/tenants/${tenantId}`),
+
+  downloadSalesByRepExcel: async () => {
+    const response = await fetch(`${API_URL}/reports/sales-by-rep/export.xlsx`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || "Erro ao exportar Excel");
+    }
+    return response.blob();
   },
 
   // ==================== STATUS ====================

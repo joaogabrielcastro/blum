@@ -8,7 +8,7 @@ const { sql } = require("../config/database");
  */
 const DEFAULT_SEED_USERS = [
   {
-    username: "admin",
+    username: "admin@jwsoftware.com.br",
     password: "BlumAdmin2025!",
     role: "admin",
     name: "Administrador",

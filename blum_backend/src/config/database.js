@@ -1,5 +1,8 @@
 const fs = require("fs");
+const { AsyncLocalStorage } = require("async_hooks");
 const { Pool } = require("pg");
+
+const dbContextStorage = new AsyncLocalStorage();
 
 /**
  * Dentro do Docker, DATABASE_URL vinda do .env local (127.0.0.1 / localhost :5433)
@@ -43,9 +46,51 @@ function isSqlFragment(value) {
   );
 }
 
+function getDbContext() {
+  return dbContextStorage.getStore() || null;
+}
+
+function runWithDbContext(context, fn) {
+  return dbContextStorage.run(context || {}, fn);
+}
+
+async function applyDbContext(client, ctx) {
+  if (ctx?.bypassRls) {
+    await client.query("SELECT set_config('app.bypass_rls', 'true', true)");
+    await client.query("SELECT set_config('app.tenant_id', '', true)");
+    return;
+  }
+  if (ctx?.tenantId) {
+    await client.query("SELECT set_config('app.bypass_rls', 'false', true)");
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [
+      String(ctx.tenantId),
+    ]);
+    return;
+  }
+  await client.query("SELECT set_config('app.bypass_rls', 'false', true)");
+  await client.query("SELECT set_config('app.tenant_id', '', true)");
+}
+
 async function execute(text, values = []) {
-  const result = await pool.query(text, values);
-  return result.rows;
+  const ctx = getDbContext();
+  if (!ctx) {
+    const result = await pool.query(text, values);
+    return result.rows;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await applyDbContext(client, ctx);
+    const result = await client.query(text, values);
+    await client.query("COMMIT");
+    return result.rows;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 function createFragment(text, values) {
@@ -119,4 +164,6 @@ pool
 module.exports = {
   pool,
   sql,
+  runWithDbContext,
+  getDbContext,
 };
