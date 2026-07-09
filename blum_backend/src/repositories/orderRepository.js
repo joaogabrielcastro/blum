@@ -29,9 +29,9 @@ async function updateOrderCore(executor, payload) {
     payment,
     createdAt,
     hasStockWarning = false,
-    tenantId,
+    tenantId: tenantIdInput,
   } = payload;
-  tenantId = requireTenantId(tenantId);
+  const tenantId = requireTenantId(tenantIdInput);
 
   const result = await db.query(
     `
@@ -68,8 +68,8 @@ async function updateOrderCore(executor, payload) {
   return result.rows || result;
 }
 
-async function markOrderDelivered(executor, id, tenantId) {
-  tenantId = requireTenantId(tenantId);
+async function markOrderDelivered(executor, id, tenantIdInput) {
+  const tenantId = requireTenantId(tenantIdInput);
   const db = resolveExecutor(executor);
   const result = await db.query(
     `
@@ -85,8 +85,8 @@ async function markOrderDelivered(executor, id, tenantId) {
   return result.rows || result;
 }
 
-async function getOrderStatusById(executor, id, tenantId) {
-  tenantId = requireTenantId(tenantId);
+async function getOrderStatusById(executor, id, tenantIdInput) {
+  const tenantId = requireTenantId(tenantIdInput);
   const db = resolveExecutor(executor);
   const result = await db.query(
     "SELECT id, status FROM orders WHERE id = $1 AND tenant_id = $2",
@@ -96,8 +96,8 @@ async function getOrderStatusById(executor, id, tenantId) {
   return rows[0] || null;
 }
 
-async function getOrderLinesForStock(executor, id, tenantId) {
-  tenantId = requireTenantId(tenantId);
+async function getOrderLinesForStock(executor, id, tenantIdInput) {
+  const tenantId = requireTenantId(tenantIdInput);
   const db = resolveExecutor(executor);
   const result = await db.query(
     `
@@ -110,8 +110,8 @@ async function getOrderLinesForStock(executor, id, tenantId) {
   return result.rows || result;
 }
 
-async function decreaseProductStock(executor, { productId, quantity, tenantId }) {
-  tenantId = requireTenantId(tenantId);
+async function decreaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput }) {
+  const tenantId = requireTenantId(tenantIdInput);
   const db = resolveExecutor(executor);
   const qInt = quantityToIntForStock(quantity);
   if (qInt == null) {
@@ -131,8 +131,8 @@ async function decreaseProductStock(executor, { productId, quantity, tenantId })
   return result.rows || result;
 }
 
-async function increaseProductStock(executor, { productId, quantity, tenantId }) {
-  tenantId = requireTenantId(tenantId);
+async function increaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput }) {
+  const tenantId = requireTenantId(tenantIdInput);
   const db = resolveExecutor(executor);
   const qInt = quantityToIntForStock(quantity);
   if (qInt == null) {
