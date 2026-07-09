@@ -6,6 +6,14 @@ function normalizeTenantSlug(value) {
   return slug || null;
 }
 
+function resolveLoginTenantSlug(bodySlug, headerSlug) {
+  let tenantSlug = normalizeTenantSlug(bodySlug || headerSlug);
+  if (tenantSlug === "default" && !normalizeTenantSlug(headerSlug)) {
+    tenantSlug = null;
+  }
+  return tenantSlug;
+}
+
 async function findUsersForLogin(username, tenantSlug) {
   const slug = normalizeTenantSlug(tenantSlug);
   if (slug) {
@@ -43,6 +51,7 @@ function buildTenantChoicePayload(user) {
 
 module.exports = {
   normalizeTenantSlug,
+  resolveLoginTenantSlug,
   findUsersForLogin,
   matchUsersByPassword,
   buildTenantChoicePayload,

@@ -13,7 +13,7 @@ const billingService = require("../services/billingService");
 const { resolvePlatformAdminFlag } = require("../utils/platformAdmin");
 const { assertCanAddUser } = require("../services/planLimitsService");
 const {
-  normalizeTenantSlug,
+  resolveLoginTenantSlug,
   findUsersForLogin,
   matchUsersByPassword,
   buildTenantChoicePayload,
@@ -79,8 +79,9 @@ async function issueLoginSuccess(req, res, user, mapOptions) {
 
 exports.login = async (req, res) => {
   let { username, password } = req.body;
-  const tenantSlug = normalizeTenantSlug(
-    req.body.tenantSlug || req.headers["x-tenant-slug"],
+  const tenantSlug = resolveLoginTenantSlug(
+    req.body.tenantSlug,
+    req.headers["x-tenant-slug"],
   );
 
   username = username?.trim();

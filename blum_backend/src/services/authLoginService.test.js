@@ -11,6 +11,7 @@ const bcrypt = require("bcrypt");
 const authRepository = require("../repositories/authRepository");
 const {
   normalizeTenantSlug,
+  resolveLoginTenantSlug,
   findUsersForLogin,
   matchUsersByPassword,
   buildTenantChoicePayload,
@@ -56,6 +57,12 @@ describe("authLoginService", () => {
     expect(matched).toHaveLength(1);
     expect(matched[0].id).toBe(2);
     expect(suspendedValid).toHaveLength(1);
+  });
+
+  test("resolveLoginTenantSlug ignora default do body (frontend legado)", () => {
+    expect(resolveLoginTenantSlug("default", undefined)).toBeNull();
+    expect(resolveLoginTenantSlug("default", "default")).toBe("default");
+    expect(resolveLoginTenantSlug("blu1m", undefined)).toBe("blu1m");
   });
 
   test("buildTenantChoicePayload expõe slug, nome e role", () => {
