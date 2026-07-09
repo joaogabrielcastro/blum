@@ -12,6 +12,12 @@ const {
 const billingService = require("../services/billingService");
 const { resolvePlatformAdminFlag } = require("../utils/platformAdmin");
 const { assertCanAddUser } = require("../services/planLimitsService");
+const {
+  normalizeTenantSlug,
+  findUsersForLogin,
+  matchUsersByPassword,
+  buildTenantChoicePayload,
+} = require("../services/authLoginService");
 
 function buildTokenPayload(user) {
   const isPlatformAdmin = resolvePlatformAdminFlag(user);
@@ -43,74 +49,81 @@ function buildUserResponse(user, mapOptions) {
   );
 }
 
-exports.login = async (req, res) => {
-  let { username, password } = req.body; // use let para permitir alteração
-  const tenantSlug = String(
-    req.body.tenantSlug || req.headers["x-tenant-slug"] || "default",
-  ).trim();
+async function issueLoginSuccess(req, res, user, mapOptions) {
+  const token = jwt.sign(buildTokenPayload(user), getJwtSecret(), {
+    expiresIn: "8h",
+  });
+  const refreshToken = await refreshTokenService.issueRefreshToken({
+    tenantId: user.tenant_id,
+    userId: user.id,
+    userAgent: req.headers["user-agent"] || null,
+    ipAddress: req.ip || null,
+  });
 
-  // Limpeza de segurança no servidor
+  await logAuditEvent({
+    tenantId: user.tenant_id,
+    actorUserId: user.id,
+    action: "auth.login.success",
+    resourceType: "user",
+    resourceId: String(user.id),
+    requestId: req.requestId,
+    metadata: { username: user.username },
+  });
+
+  res.json({
+    token,
+    refreshToken,
+    user: buildUserResponse(user, mapOptions),
+  });
+}
+
+exports.login = async (req, res) => {
+  let { username, password } = req.body;
+  const tenantSlug = normalizeTenantSlug(
+    req.body.tenantSlug || req.headers["x-tenant-slug"],
+  );
+
   username = username?.trim();
   password = password?.trim();
 
   try {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };
-    // Validação básica
     if (!username || !password) {
       return res
         .status(400)
         .json({ error: "Usuário e senha são obrigatórios" });
     }
 
-    const users = await authRepository.findUserByUsernameAndTenantSlug(
-      username,
-      tenantSlug,
-    );
+    const candidates = await findUsersForLogin(username, tenantSlug);
 
-    if (!users || users.length === 0) {
+    if (!candidates || candidates.length === 0) {
       return res.status(401).json({ error: "Credenciais inválidas" });
     }
 
-    const user = users[0];
+    const { matched, suspendedValid } = await matchUsersByPassword(
+      candidates,
+      password,
+    );
 
-    if (user.tenant_status && user.tenant_status !== "active") {
-      return res.status(403).json({
-        error: "Esta empresa está suspensa. Contacte o suporte.",
+    if (matched.length === 0) {
+      if (suspendedValid.length > 0) {
+        return res.status(403).json({
+          error: "Esta empresa está suspensa. Contacte o suporte.",
+        });
+      }
+      return res.status(401).json({ error: "Credenciais inválidas" });
+    }
+
+    if (matched.length > 1) {
+      return res.status(409).json({
+        error: "multiple_tenants",
+        message:
+          "Esta conta existe em mais de uma empresa. Escolha qual acessar.",
+        tenants: matched.map(buildTenantChoicePayload),
       });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-
-    if (!validPassword) {
-      return res.status(401).json({ error: "Credenciais inválidas" });
-    }
-
-    // Gerar token JWT
-    const token = jwt.sign(buildTokenPayload(user), getJwtSecret(), {
-      expiresIn: "8h",
-    });
-    const refreshToken = await refreshTokenService.issueRefreshToken({
-      tenantId: user.tenant_id,
-      userId: user.id,
-      userAgent: req.headers["user-agent"] || null,
-      ipAddress: req.ip || null,
-    });
-
-    await logAuditEvent({
-      tenantId: user.tenant_id,
-      actorUserId: user.id,
-      action: "auth.login.success",
-      resourceType: "user",
-      resourceId: String(user.id),
-      requestId: req.requestId,
-      metadata: { username: user.username },
-    });
-
-    res.json({
-      token,
-      refreshToken,
-      user: buildUserResponse(user, mapOptions),
-    });
+    await issueLoginSuccess(req, res, matched[0], mapOptions);
   } catch (error) {
     console.error("❌ ERRO FATAL no processo de login:", error);
     res.status(500).json({ error: "Erro no servidor" });

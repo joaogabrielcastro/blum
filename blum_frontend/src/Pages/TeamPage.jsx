@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import ErrorMessage from "../components/ErrorMessage";
 import { useToast } from "../context/ToastContext";
+import { useAppData } from "../context/AppDataProvider";
 
 const emptyForm = { username: "", password: "", name: "" };
 
 const TeamPage = () => {
   const toast = useToast();
+  const { brands } = useAppData();
   const [users, setUsers] = useState([]);
-  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [newUser, setNewUser] = useState(emptyForm);
@@ -26,12 +27,8 @@ const TeamPage = () => {
     setError(null);
     setLoading(true);
     try {
-      const [u, b] = await Promise.all([
-        apiService.getUsers(),
-        apiService.getBrands(),
-      ]);
+      const u = await apiService.getUsers();
       setUsers(Array.isArray(u) ? u : []);
-      setBrands(Array.isArray(b) ? b : []);
     } catch (e) {
       const msg = e.message || "Erro ao carregar equipe";
       setError(msg);

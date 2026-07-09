@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import apiService from "../services/apiService";
 import ClientsForm from "../components/ClientsForm";
@@ -7,23 +7,23 @@ import ListPageSkeleton from "../components/ListPageSkeleton";
 import EmptyState from "../components/EmptyState";
 import { getClientDisplayName } from "../utils/clients";
 import { useToast } from "../context/ToastContext";
+import { useAppData } from "../context/AppDataProvider";
 
 const ClientsPage = () => {
   const navigate = useNavigate();
   const toast = useToast();
-  const [clients, setClients] = useState([]);
+  const { clientsList, isLoadingClients, clientsError, invalidateClients } =
+    useAppData();
   const [filteredClients, setFilteredClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loadError, setLoadError] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
+  const loading = isLoadingClients;
+  const loadError = clientsError?.message ?? null;
+  const clients = clientsList;
 
   // Filtra clientes baseado no termo de busca
   useEffect(() => {
@@ -53,27 +53,10 @@ const ClientsPage = () => {
     }
   }, [searchTerm, clients]);
 
-  const fetchClients = useCallback(async () => {
-    try {
-      setLoading(true);
-      setLoadError(null);
-      const clientsData = await apiService.getClients();
-      setClients(clientsData);
-      setFilteredClients(clientsData);
-    } catch (error) {
-      console.error("Erro ao buscar clientes:", error);
-      const msg =
-        error?.message || "Falha ao carregar clientes. Tente novamente.";
-      setLoadError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const handleClientAdded = () => {
     setShowForm(false);
     setEditingClient(null);
-    fetchClients();
+    invalidateClients();
   };
 
   const handleEditClient = (client) => {
@@ -115,7 +98,7 @@ const ClientsPage = () => {
           : "Falha ao excluir cliente. Tente novamente.";
       toast.error(errorMessage);
       // Atualiza a lista mesmo com erro
-      await fetchClients();
+      await invalidateClients();
     } finally {
       setDeleting(false);
       setDeleteConfirm(null);

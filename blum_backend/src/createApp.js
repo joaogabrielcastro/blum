@@ -6,7 +6,11 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const purchaseRoutes = require("./routes/purchaseRoutes");
 const { sql } = require("./config/database");
-const { authenticate, authorize } = require("./middleware/authMiddleware");
+const {
+  authenticate,
+  authorize,
+  optionalAuth,
+} = require("./middleware/authMiddleware");
 const authRoutes = require("./routes/authRoutes");
 const clientRoutes = require("./routes/clientRoutes");
 const productRoutes = require("./routes/productRoutes");
@@ -176,6 +180,8 @@ function createApp() {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+  // Decodifica JWT (se presente) antes do contexto RLS — tenant autenticado vem do token.
+  app.use("/api/v2", optionalAuth);
   app.use("/api/v2", tenantDbContextMiddleware);
 
   app.use((req, res, next) => {

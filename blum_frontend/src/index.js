@@ -1,7 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ToastProvider } from './context/ToastContext';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
   let refreshing = false;
@@ -40,8 +50,10 @@ if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </QueryClientProvider>
   </React.StrictMode>
 );

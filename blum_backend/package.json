@@ -17,7 +17,8 @@
     "update:client-addresses": "node scripts/update_clients_address_from_excel.js",
     "backfill:client-fantasia": "node scripts/backfill_clients_nome_fantasia.js",
     "stripe:setup": "node scripts/setup-stripe-billing.js",
-    "migrate:tenant": "node scripts/migrate_tenant_data.js"
+    "migrate:tenant": "node scripts/migrate_tenant_data.js",
+    "normalize:tenant-emails": "node scripts/normalize_tenant_emails.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

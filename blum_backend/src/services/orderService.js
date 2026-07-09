@@ -603,7 +603,7 @@ class OrderService {
 
     await this.persistOrderItems(result[0].id, calculated.items, tenantId);
 
-    return this.findById(result[0].id);
+    return this.findById(result[0].id, tenantId);
   }
 
   async update(id, orderData, authUser) {
@@ -744,7 +744,7 @@ class OrderService {
       client.release();
     }
 
-    return this.findById(id);
+    return this.findById(id, tenantId);
   }
 
   async updatePaymentMethod(id, paymentMethod, tenantId) {

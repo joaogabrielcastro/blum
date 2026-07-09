@@ -7,10 +7,12 @@ const { defineConfig, devices } = require("@playwright/test");
  * Depois:
  *   npm run test:e2e --prefix blum_frontend
  *
- * PLAYWRIGHT_BASE_URL — URL do CRA (default http://127.0.0.1:3000)
+ * PLAYWRIGHT_BASE_URL — URL do CRA (default http://127.0.0.1:3000; use :3001 se a porta 3000 estiver ocupada)
+ * E2E_API_URL — health check do backend (default http://127.0.0.1:3011)
  */
 module.exports = defineConfig({
   testDir: "./e2e",
+  globalSetup: require.resolve("./e2e/global-setup.js"),
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

@@ -13,6 +13,7 @@
     "eject": "react-scripts eject"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.2",
     "react": "^18.2.0",
@@ -47,11 +48,13 @@
     ]
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
     "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1"
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^26.1.1",
+    "cross-env": "^7.0.3",
+    "typescript": "^7.0.2"
   },
   "jest": {
     "collectCoverageFrom": [

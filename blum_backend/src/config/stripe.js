@@ -3,8 +3,11 @@
  */
 
 function isBillingEnforced() {
-  const v = String(process.env.BILLING_ENFORCE || "").trim().toLowerCase();
-  return v === "1" || v === "true" || v === "yes";
+  const raw = String(process.env.BILLING_ENFORCE ?? "").trim().toLowerCase();
+  if (raw === "0" || raw === "false" || raw === "no") return false;
+  if (raw === "1" || raw === "true" || raw === "yes") return true;
+  // Produção: cobrança ativa por defeito (dev permanece desligado sem flag explícita).
+  return process.env.NODE_ENV === "production";
 }
 
 function getStripeSecretKey() {

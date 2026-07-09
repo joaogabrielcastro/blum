@@ -6,82 +6,39 @@ import OrdersForm from "../components/OrdersForm";
 import OrderStockWarningModal from "../components/orders/OrderStockWarningModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
-import formatCurrency, { formatOrderData } from "../utils/format";
-import {
-  getClientDisplayName,
-  normalizeClientsResponse,
-} from "../utils/clients";
-import {
-  orderSellerUserKey,
-  orderSellerName,
-  orderSellerUsername,
-} from "../utils/orderApiFields";
+import { formatOrderData } from "../utils/format";
 import PaymentMethodBadge from "../components/orders/PaymentMethodBadge";
 import OfflineSyncBar from "../components/offline/OfflineSyncBar";
 import { useOfflineSync } from "../hooks/useOfflineSync";
-import {
-  getCachedClients,
-  listPendingOrders,
-  pendingOrderToListItem,
-  isBrowserOnline,
-} from "../offline";
-
-function formatOpenDays(createdAt, status) {
-  if (!createdAt || status === "Entregue") return null;
-  const d = new Date(createdAt);
-  if (Number.isNaN(d.getTime())) return null;
-  return Math.max(
-    0,
-    Math.floor((Date.now() - d.getTime()) / 86400000),
-  );
-}
-
-function formatDaySectionLabel(dateKey) {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  const thatDay = new Date(y, m - 1, d);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tt = new Date(thatDay);
-  tt.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((today - tt) / 86400000);
-  if (diffDays === 0) return "Hoje";
-  if (diffDays === 1) return "Ontem";
-  return thatDay.toLocaleDateString("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function groupOrdersByDay(orders) {
-  const groups = new Map();
-  for (const order of orders) {
-    const raw = order.createdAt ?? order.createdat;
-    if (!raw) continue;
-    const dt = new Date(raw);
-    if (Number.isNaN(dt.getTime())) continue;
-    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(order);
-  }
-  const keys = [...groups.keys()].sort((a, b) => b.localeCompare(a));
-  return keys.map((dateKey) => ({
-    dateKey,
-    label: formatDaySectionLabel(dateKey),
-    orders: groups.get(dateKey),
-  }));
-}
+import { useAppData } from "../context/AppDataProvider";
+import { useOrdersList } from "../hooks/useOrdersList";
+import { formatOpenDays } from "../utils/ordersListUtils";
 
 const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   const toast = useToast();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { clientsList: sharedClientsList } = useAppData();
+  const {
+    orders,
+    setOrders,
+    loading,
+    clients,
+    listFetchError,
+    orderSearch,
+    setOrderSearch,
+    sellerFilterKey,
+    setSellerFilterKey,
+    visibleDayGroups,
+    setVisibleDayGroups,
+    sellerOptions,
+    filteredOrdersByDay,
+    filteredOrdersByDayPaged,
+    fetchData,
+    formatCurrency,
+    clientsList,
+  } = useOrdersList({ sharedClientsList, toast, userId, userRole });
   const [editingLoading, setEditingLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
-  const [clients, setClients] = useState({});
-  const [clientsList, setClientsList] = useState([]);
   const [pdfOrder, setPdfOrder] = useState(null);
   const [pdfLoadingOrderId, setPdfLoadingOrderId] = useState(null);
   const [duplicatingOrderId, setDuplicatingOrderId] = useState(null);
@@ -89,19 +46,12 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   const [paymentDialogMethod, setPaymentDialogMethod] = useState("boleto");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
-  const [orderSearch, setOrderSearch] = useState("");
-  const [sellerFilterKey, setSellerFilterKey] = useState("");
-  const [listFetchError, setListFetchError] = useState(null);
-  const [visibleDayGroups, setVisibleDayGroups] = useState(10);
   const [convertStockModal, setConvertStockModal] = useState({
     open: false,
     orderId: null,
     lines: [],
   });
-  const [offlinePendingOrders, setOfflinePendingOrders] = useState([]);
 
-  // Validar e transformar brands; memoizado para não trocar de referência
-  // a cada render (isso resetava o OrdersForm aberto).
   const safeBrands = useMemo(
     () =>
       Array.isArray(brands)
@@ -129,90 +79,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     isLoggedIn: Boolean(userId),
     toast,
   });
-
-  useEffect(() => {
-    if (userId && userRole) fetchData();
-  }, [userId, userRole]);
-
-  const applyClientsList = (list) => {
-    setClientsList(list);
-    const clientsMap = {};
-    list.forEach((client) => {
-      const id = client.id ?? client.Id;
-      if (id == null) return;
-      clientsMap[id] =
-        getClientDisplayName(client) ||
-        (client.cnpj != null && String(client.cnpj).trim()
-          ? `CNPJ ${String(client.cnpj).trim()}`
-          : "");
-    });
-    setClients(clientsMap);
-    return clientsMap;
-  };
-
-  const loadOfflinePendingOrders = async (clientsMap = clients) => {
-    try {
-      const pending = await listPendingOrders();
-      setOfflinePendingOrders(
-        pending.map((entry) => pendingOrderToListItem(entry, clientsMap)),
-      );
-      await refreshOfflineStatus();
-    } catch (error) {
-      console.error("Erro ao carregar orçamentos offline:", error);
-    }
-  };
-
-  const loadCachedClientsIfNeeded = async () => {
-    const cached = await getCachedClients();
-    if (!cached.length) return false;
-    applyClientsList(cached);
-    toast.info(
-      "Sem internet — usando clientes guardados neste aparelho para o orçamento.",
-    );
-    return true;
-  };
-
-  useEffect(() => {
-    setVisibleDayGroups(10);
-  }, [orderSearch, orders.length, sellerFilterKey]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setListFetchError(null);
-      const [ordersData, clientsData] = await Promise.all([
-        apiService.getOrders({}),
-        apiService.getClients(),
-      ]);
-
-      const formattedOrders = ordersData.map((order) => formatOrderData(order));
-      setOrders(formattedOrders);
-
-      const list = normalizeClientsResponse(clientsData);
-      const clientsMap = applyClientsList(list);
-      await loadOfflinePendingOrders(clientsMap);
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-      const usedCache = await loadCachedClientsIfNeeded();
-      await loadOfflinePendingOrders();
-      if (!usedCache && !isBrowserOnline()) {
-        const msg =
-          error?.message ||
-          "Sem internet e sem dados locais. Baixe os dados offline antes de ir para o campo.";
-        setListFetchError(msg);
-        toast.error(msg);
-      } else if (!usedCache) {
-        const msg =
-          error?.message || "Não foi possível carregar pedidos e clientes.";
-        setListFetchError(msg);
-        toast.error(msg);
-      } else {
-        setListFetchError(null);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAction = async () => {
     const { type, orderId } = modalAction;
@@ -461,64 +327,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       </div>
     );
   };
-
-  const sellerOptions = useMemo(() => {
-    const byKey = new Map();
-    for (const order of orders) {
-      const key = orderSellerUserKey(order);
-      if (byKey.has(key)) continue;
-      const name = orderSellerName(order);
-      const user = orderSellerUsername(order);
-      const label =
-        name && user ? `${name} (@${user})` : name || user || key;
-      byKey.set(key, { key, label });
-    }
-    return [...byKey.values()].sort((a, b) =>
-      a.label.localeCompare(b.label, "pt-BR"),
-    );
-  }, [orders]);
-
-  const ordersForList = useMemo(() => {
-    const merged = [...offlinePendingOrders, ...orders];
-    if (!sellerFilterKey) return merged;
-    return merged.filter(
-      (o) => o.isOfflinePending || orderSellerUserKey(o) === sellerFilterKey,
-    );
-  }, [orders, offlinePendingOrders, sellerFilterKey]);
-
-  const ordersByDay = useMemo(
-    () => groupOrdersByDay(ordersForList),
-    [ordersForList],
-  );
-  const filteredOrdersByDay = useMemo(() => {
-    const term = orderSearch.trim().toLocaleLowerCase("pt-BR");
-    if (!term) return ordersByDay;
-    return ordersByDay
-      .map((group) => ({
-        ...group,
-        orders: group.orders.filter((order) => {
-          const clientLabel = clients[order.clientId] || "";
-          const haystack = [
-            order.id,
-            order.description,
-            order.status,
-            order.representadas,
-            order.sellerName,
-            order.sellerUsername,
-            clientLabel,
-          ]
-            .map((v) => String(v || "").toLocaleLowerCase("pt-BR"))
-            .join(" ");
-          return haystack.includes(term);
-        }),
-      }))
-      .filter((group) => group.orders.length > 0);
-  }, [ordersByDay, orderSearch, clients]);
-
-  const filteredOrdersByDayPaged = useMemo(
-    () => filteredOrdersByDay.slice(0, visibleDayGroups),
-    [filteredOrdersByDay, visibleDayGroups],
-  );
 
   if (loading || editingLoading) {
     return (

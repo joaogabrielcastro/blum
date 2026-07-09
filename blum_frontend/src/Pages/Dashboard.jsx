@@ -7,8 +7,10 @@ import {
   formatOrderDateLabel,
   prepareCumulativeSalesChartData,
 } from "../utils/orderApiFields";
+import { useAppData } from "../context/AppDataProvider";
 
 const Dashboard = ({ onNavigate, userId, userRole }) => {
+  const { clientsList } = useAppData();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     clients: 0,
@@ -27,9 +29,8 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
       try {
         if (opts.showSpinner) setLoading(true);
 
-        const [clientsData, productsResponse, ordersResponse, salesResponse] =
+        const [productsResponse, ordersResponse, salesResponse] =
           await Promise.all([
-            apiService.getClients(),
             apiService.getProducts("all", 1, 1),
             apiService.getOrders({ limit: 50 }),
             apiService.getReportStats({}),
@@ -37,7 +38,7 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
 
         const ordersList = Array.isArray(ordersResponse) ? ordersResponse : [];
 
-        const clientsCount = Array.isArray(clientsData) ? clientsData.length : 0;
+        const clientsCount = clientsList.length;
         const productsCount =
           productsResponse?.pagination?.total ??
           (Array.isArray(productsResponse?.data)
@@ -64,7 +65,7 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
         if (opts.showSpinner) setLoading(false);
       }
     },
-    [],
+    [clientsList],
   );
 
   useEffect(() => {

@@ -1,48 +1,47 @@
 const bcrypt = require("bcrypt");
 const { sql } = require("../config/database");
 
+const DEV_DEFAULT_PASSWORD = "BlumAdmin2025!";
+
 /**
- * Lista única de utilizadores “de fábrica” (desenvolvimento / primeiro arranque).
- * Novos vendedores em produção: admin cria em Equipe → API POST /auth/users
- * (não adicione aqui — não é preciso mudar este ficheiro nem correr script manual).
+ * Utilizador admin inicial — apenas bootstrap do tenant `default`.
+ * Novos utilizadores em produção: admin cria em Equipe → POST /auth/users.
+ *
+ * Variáveis:
+ * - SEED_ADMIN_EMAIL (default: admin@jwsoftware.com.br)
+ * - SEED_ADMIN_PASSWORD (obrigatória em produção; em dev usa DEV_DEFAULT_PASSWORD)
  */
-const DEFAULT_SEED_USERS = [
-  {
-    username: "admin@jwsoftware.com.br",
-    password: "BlumAdmin2025!",
+function buildSeedAdminUser() {
+  const username = String(
+    process.env.SEED_ADMIN_EMAIL || "admin@jwsoftware.com.br",
+  ).trim();
+  const password = String(process.env.SEED_ADMIN_PASSWORD || "").trim();
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!password) {
+    if (isProd) {
+      return null;
+    }
+    return {
+      username,
+      password: DEV_DEFAULT_PASSWORD,
+      role: "admin",
+      name: "Administrador",
+    };
+  }
+
+  return {
+    username,
+    password,
     role: "admin",
     name: "Administrador",
-  },
-  {
-    username: "siane",
-    password: "Siane2025!",
-    role: "salesperson",
-    name: "Siane",
-  },
-  {
-    username: "eduardo",
-    password: "Eduardo2025!",
-    role: "salesperson",
-    name: "Eduardo",
-  },
-  {
-    username: "Antonio",
-    password: "123456",
-    role: "salesperson",
-    name: "Vendedor",
-  },
-  {
-    username: "Ricardo",
-    password: "123456!",
-    role: "salesperson",
-    name: "Vendedor",
-  },
-];
+  };
+}
 
 /**
  * @param {{ onlyIfDatabaseEmpty?: boolean; verbose?: boolean }} [options]
- * - onlyIfDatabaseEmpty: true → só corre se não existir nenhum utilizador (arranque Docker / primeira instalação).
- * - onlyIfDatabaseEmpty: false → tenta criar cada um que ainda não exista (comportamento do script CLI).
+ * - onlyIfDatabaseEmpty: true → só corre se não existir nenhum utilizador.
+ * - onlyIfDatabaseEmpty: false → tenta criar o admin se ainda não existir.
  */
 async function seedDefaultUsers(options = {}) {
   const onlyIfDatabaseEmpty = Boolean(options.onlyIfDatabaseEmpty);
@@ -53,6 +52,14 @@ async function seedDefaultUsers(options = {}) {
       "[bootstrap] BLUM_SKIP_AUTO_USER_SEED=1 — seed de utilizadores ignorado.",
     );
     return { skipped: true, reason: "env", created: 0 };
+  }
+
+  const seedUser = buildSeedAdminUser();
+  if (!seedUser) {
+    console.warn(
+      "[bootstrap] SEED_ADMIN_PASSWORD não definida em produção — seed de admin ignorado.",
+    );
+    return { skipped: true, reason: "no_password", created: 0 };
   }
 
   const countRows = await sql`SELECT COUNT(*)::int AS c FROM users`;
@@ -71,42 +78,31 @@ async function seedDefaultUsers(options = {}) {
     return { skipped: true, reason: "not_empty", created: 0 };
   }
 
-  let created = 0;
-  for (const user of DEFAULT_SEED_USERS) {
-    const existing = await sql`
-      SELECT id FROM users WHERE username = ${user.username}
-    `;
+  const existing = await sql`
+    SELECT id FROM users WHERE username = ${seedUser.username}
+  `;
 
-    if (existing.length > 0) {
-      if (verbose) {
-        console.log(`⚠️  Utilizador ${user.username} já existe, a ignorar…`);
-      }
-      continue;
-    }
-
-    const password_hash = await bcrypt.hash(user.password, 10);
-    await sql`
-      INSERT INTO users (username, password_hash, role, name, tenant_id)
-      VALUES (${user.username}, ${password_hash}, ${user.role}, ${user.name}, ${defaultTenantId})
-    `;
-    created += 1;
+  if (existing.length > 0) {
     if (verbose) {
-      console.log(`✅ Utilizador ${user.username} criado (${user.role}).`);
+      console.log(`⚠️  Utilizador ${seedUser.username} já existe, a ignorar…`);
     }
+    return { skipped: false, created: 0 };
   }
 
-  if (created > 0) {
-    console.log(
-      `[bootstrap] ${created} utilizador(es) inicial(is) criado(s). Altere as senhas após o primeiro login.`,
-    );
-  } else if (verbose && !onlyIfDatabaseEmpty) {
-    console.log("Nenhum utilizador novo (todos já existiam).");
-  }
+  const password_hash = await bcrypt.hash(seedUser.password, 10);
+  await sql`
+    INSERT INTO users (username, password_hash, role, name, tenant_id)
+    VALUES (${seedUser.username}, ${password_hash}, ${seedUser.role}, ${seedUser.name}, ${defaultTenantId})
+  `;
 
-  return { skipped: false, created };
+  console.log(
+    `[bootstrap] Admin inicial criado (${seedUser.username}). Altere a senha após o primeiro login.`,
+  );
+
+  return { skipped: false, created: 1 };
 }
 
 module.exports = {
-  DEFAULT_SEED_USERS,
+  buildSeedAdminUser,
   seedDefaultUsers,
 };

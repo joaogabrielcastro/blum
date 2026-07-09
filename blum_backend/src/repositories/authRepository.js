@@ -20,6 +20,26 @@ async function findUserByUsernameAndTenantSlug(username, tenantSlug = "default")
   `;
 }
 
+async function findUsersByUsername(username) {
+  return sql`
+    SELECT
+      u.id,
+      u.username,
+      u.password_hash,
+      u.role,
+      u.name,
+      u.tenant_id,
+      t.slug AS tenant_slug,
+      t.name AS tenant_name,
+      t.status AS tenant_status,
+      u.is_platform_admin
+    FROM users u
+    INNER JOIN tenants t ON t.id = u.tenant_id
+    WHERE LOWER(TRIM(username)) = LOWER(${username})
+    ORDER BY t.name ASC, u.id ASC
+  `;
+}
+
 async function findUserByIdAndTenant(userId, tenantId) {
   return sql`
     SELECT
@@ -85,6 +105,7 @@ async function deleteSalespersonById(userId, tenantId) {
 
 module.exports = {
   findUserByUsernameAndTenantSlug,
+  findUsersByUsername,
   findUserByIdAndTenant,
   createUser,
   listUsersByTenant,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { login } from "../services/apiService";
+import { persistAuthSession } from "../utils/authSession";
 import {
   AUTH_NOTICE_KEY,
   AUTH_NOTICE_FORBIDDEN,
@@ -50,21 +51,21 @@ function BrandMark({ size = "md", onLogoError }) {
   );
 }
 
+const ROLE_LABELS = {
+  admin: "Administrador",
+  salesperson: "Vendedor",
+};
+
 const Login = ({ onLogin }) => {
   const location = useLocation();
   const hostTenantSlug = resolveTenantSlugFromHost();
   const usernameRef = useRef(null);
 
-  const initialSlug =
-    hostTenantSlug || getStoredTenantSlug() || "default";
-
-  const [tenantSlug, setTenantSlug] = useState(initialSlug);
   const tenantFromSubdomain = Boolean(hostTenantSlug);
-  const [showCompanyField, setShowCompanyField] = useState(
-    () =>
-      tenantFromSubdomain ||
-      (initialSlug && initialSlug !== "default"),
-  );
+  const [tenantSlug, setTenantSlug] = useState(hostTenantSlug || "");
+  const [showManualTenant, setShowManualTenant] = useState(false);
+  const [tenantChoices, setTenantChoices] = useState(null);
+  const [pendingLogin, setPendingLogin] = useState(null);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -73,15 +74,18 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const requiresManualSlug = showManualTenant && !tenantFromSubdomain;
   const isFormValid =
-    tenantSlug.trim() !== "" && username.trim() !== "" && password.trim() !== "";
+    username.trim() !== "" &&
+    password.trim() !== "" &&
+    (!requiresManualSlug || tenantSlug.trim() !== "");
 
   useEffect(() => {
     const state = location.state;
     if (state?.tenantSlug) {
       setTenantSlug(state.tenantSlug);
       setStoredTenantSlug(state.tenantSlug);
-      if (state.tenantSlug !== "default") setShowCompanyField(true);
+      setShowManualTenant(true);
     }
     if (state?.message) {
       setSuccess(state.message);
@@ -111,17 +115,38 @@ const Login = ({ onLogin }) => {
     return () => clearTimeout(t);
   }, []);
 
+  const completeLogin = (response) => {
+    persistAuthSession(response);
+    onLogin(response.user.role, response.user.id, response.user);
+  };
+
+  const resolveTenantSlugForRequest = () => {
+    if (tenantFromSubdomain) {
+      return tenantSlug.trim();
+    }
+    if (showManualTenant && tenantSlug.trim()) {
+      return tenantSlug.trim();
+    }
+    return undefined;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setTenantChoices(null);
 
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
-    const cleanSlug = tenantSlug.trim() || "default";
+    const cleanSlug = resolveTenantSlugForRequest();
 
     if (!cleanUsername || !cleanPassword) {
       setError("Preencha e-mail e senha.");
+      return;
+    }
+
+    if (requiresManualSlug && !cleanSlug) {
+      setError("Informe o identificador da empresa.");
       return;
     }
 
@@ -129,14 +154,35 @@ const Login = ({ onLogin }) => {
 
     try {
       const response = await login(cleanUsername, cleanPassword, cleanSlug);
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-      if (response.user?.tenantSlug) {
-        setStoredTenantSlug(response.user.tenantSlug);
-      }
-      onLogin(response.user.role, response.user.id, response.user);
+      completeLogin(response);
     } catch (err) {
+      if (err.code === "MULTIPLE_TENANTS" && err.tenants?.length) {
+        setPendingLogin({ username: cleanUsername, password: cleanPassword });
+        setTenantChoices(err.tenants);
+        setError("");
+        return;
+      }
       setError(err.message || "E-mail ou senha incorretos. Tente novamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectTenant = async (slug) => {
+    if (!pendingLogin || !slug) return;
+    setError("");
+    setIsLoading(true);
+    try {
+      const response = await login(
+        pendingLogin.username,
+        pendingLogin.password,
+        slug,
+      );
+      setTenantChoices(null);
+      setPendingLogin(null);
+      completeLogin(response);
+    } catch (err) {
+      setError(err.message || "Não foi possível entrar nesta empresa.");
     } finally {
       setIsLoading(false);
     }
@@ -209,7 +255,9 @@ const Login = ({ onLogin }) => {
                 <p className="mt-1.5 text-sm text-slate-500">
                   {tenantFromSubdomain
                     ? `Acesso à empresa ${tenantSlug}`
-                    : "Use suas credenciais para acessar o sistema."}
+                    : tenantChoices?.length
+                      ? "Escolha a empresa para continuar."
+                      : "Informe e-mail e senha — identificamos sua empresa automaticamente."}
                 </p>
               </div>
 
@@ -240,8 +288,41 @@ const Login = ({ onLogin }) => {
                 </div>
               ) : null}
 
+              {tenantChoices?.length ? (
+                <div className="mb-5 space-y-2" role="listbox" aria-label="Empresas disponíveis">
+                  {tenantChoices.map((tenant) => (
+                    <button
+                      key={tenant.slug}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => handleSelectTenant(tenant.slug)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      <div>
+                        <p className="font-semibold text-slate-900">{tenant.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {ROLE_LABELS[tenant.role] || tenant.role}
+                        </p>
+                      </div>
+                      <span className="font-mono text-xs text-slate-400">{tenant.slug}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                    onClick={() => {
+                      setTenantChoices(null);
+                      setPendingLogin(null);
+                    }}
+                  >
+                    Voltar
+                  </button>
+                </div>
+              ) : null}
+
               <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-                {/* Empresa: subdomínio, expandido ou colapsado */}
+                {!tenantChoices?.length ? (
+                  <>
                 {tenantFromSubdomain ? (
                   <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-blue-700/80">
@@ -254,7 +335,7 @@ const Login = ({ onLogin }) => {
                       Identificado automaticamente pelo endereço.
                     </p>
                   </div>
-                ) : showCompanyField ? (
+                ) : showManualTenant ? (
                   <div>
                     <label htmlFor="tenantSlug" className="mb-1.5 block text-sm font-medium text-slate-700">
                       Identificador da empresa
@@ -270,28 +351,13 @@ const Login = ({ onLogin }) => {
                         );
                         setError("");
                       }}
-                      placeholder="ex.: minha-empresa"
+                      placeholder="ex.: blu1m"
                       required
                       disabled={isLoading}
                       className={`${inputClass} px-4 font-mono text-sm`}
                     />
-                    <p className="mt-1.5 text-xs text-slate-500">
-                      Código da sua empresa no Blum. Ambiente legado:{" "}
-                      <button
-                        type="button"
-                        className="font-mono text-blue-600 hover:underline"
-                        onClick={() => {
-                          setTenantSlug("default");
-                          setError("");
-                        }}
-                      >
-                        default
-                      </button>
-                    </p>
                   </div>
-                ) : (
-                  <input type="hidden" id="tenantSlug" name="tenantSlug" value={tenantSlug} readOnly />
-                )}
+                ) : null}
 
                 <div>
                   <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -366,13 +432,16 @@ const Login = ({ onLogin }) => {
                   </div>
                 </div>
 
-                {!tenantFromSubdomain && !showCompanyField ? (
+                {!tenantFromSubdomain && !showManualTenant ? (
                   <button
                     type="button"
-                    onClick={() => setShowCompanyField(true)}
+                    onClick={() => {
+                      setShowManualTenant(true);
+                      setTenantSlug(getStoredTenantSlug() || "");
+                    }}
                     className="text-left text-sm text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    Acessar outra empresa
+                    Informar empresa manualmente
                   </button>
                 ) : null}
 
@@ -393,6 +462,8 @@ const Login = ({ onLogin }) => {
                     "Entrar"
                   )}
                 </button>
+                  </>
+                ) : null}
               </form>
 
               <div className="mt-6 border-t border-slate-100 pt-6 text-center">

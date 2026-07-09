@@ -101,12 +101,17 @@ exports.optionalAuth = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, getJwtSecret());
 
+    if (!decoded.tenantId) {
+      req.user = null;
+      return next();
+    }
+
     req.user = {
       userId: decoded.userId,
       username: decoded.username,
       role: decoded.role,
       name: decoded.name,
-      tenantId: decoded.tenantId || null,
+      tenantId: decoded.tenantId,
       tenantSlug: decoded.tenantSlug || null,
       tenantName: decoded.tenantName || null,
       isPlatformAdmin: Boolean(decoded.isPlatformAdmin),

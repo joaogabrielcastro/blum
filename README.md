@@ -29,7 +29,7 @@ O **BLUM** é um sistema de gestão comercial desenvolvido para facilitar o gere
 
 ### Principais Diferenciais:
 
-- 🤖 **Importação Inteligente**: Upload de PDF/CSV com extração automática via IA (Gemini)
+- 📄 **Importação de catálogo**: Upload de PDF/CSV com extração estruturada de produtos
 - 📊 **Relatórios Dinâmicos**: Gráficos e estatísticas em tempo real
 - 💼 **Sistema de Comissões**: Controle automático de comissões por representada
 - 📱 **Responsivo**: Interface adaptada para mobile, tablet e desktop
@@ -63,8 +63,7 @@ O **BLUM** é um sistema de gestão comercial desenvolvido para facilitar o gere
 - **Express.js** - Framework web
 - **Neon Database** - PostgreSQL serverless
 - **Multer** - Upload de arquivos
-- **pdf-parse** - Processamento de PDFs
-- **Google Generative AI** - Extração inteligente de dados
+- **pdf-parse** - Processamento de PDFs de compras
 
 ### Frontend
 - **React 18** - Biblioteca JavaScript
@@ -80,7 +79,6 @@ Antes de começar, certifique-se de ter instalado:
 - **Node.js** (versão 16 ou superior)
 - **npm** ou **yarn**
 - Conta no **Neon Database** (ou PostgreSQL local)
-- **API Key do Google Gemini** (opcional, para importação via IA)
 
 ## 🔧 Instalação
 
@@ -129,8 +127,9 @@ REDIS_URL=redis://127.0.0.1:6379
 # Frontend (CORS)
 # FRONTEND_URL=https://seu-dominio.com
 
-# IA (Opcional - para importação inteligente)
-GEMINI_API_KEY=sua_chave_api_gemini
+# Admin inicial (seed no primeiro arranque — obrigatório em produção)
+# SEED_ADMIN_EMAIL=admin@jwsoftware.com.br
+# SEED_ADMIN_PASSWORD=altere_em_producao
 ```
 
 > Dica: existe um template em `blum_backend/.env.example`.
