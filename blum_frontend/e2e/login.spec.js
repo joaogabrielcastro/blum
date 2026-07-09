@@ -19,8 +19,11 @@ const runE2e = process.env.RUN_E2E === "1";
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
   });
 
-  test("login com slug default via campo empresa", async ({ page }) => {
-    await submitLogin(page, { tenantSlug: "default" });
+  test("login só com e-mail e senha, sem campo de empresa", async ({ page }) => {
+    await expect(
+      page.getByLabel("Identificador da empresa"),
+    ).toHaveCount(0);
+    await submitLogin(page);
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
   });
 });

@@ -12,19 +12,9 @@ async function clearSession(page) {
   await page.reload();
 }
 
-async function submitLogin(page, { user, password, tenantSlug } = {}) {
+async function submitLogin(page, { user, password } = {}) {
   const email = user || DEFAULT_USER;
   const pass = password || DEFAULT_PASSWORD;
-
-  if (tenantSlug != null) {
-    const expandCompany = page.getByRole("button", {
-      name: /informar empresa manualmente/i,
-    });
-    if (await expandCompany.isVisible()) {
-      await expandCompany.click();
-    }
-    await page.getByLabel("Identificador da empresa").fill(tenantSlug);
-  }
 
   await page.locator("#username").fill(email);
   await page.locator("#password").fill(pass);

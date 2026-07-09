@@ -7,10 +7,6 @@ import {
   AUTH_NOTICE_FORBIDDEN,
   AUTH_NOTICE_SESSION_EXPIRED,
 } from "../constants/authNotice";
-import {
-  getStoredTenantSlug,
-  setStoredTenantSlug,
-} from "../constants/tenantStorage";
 import { resolveTenantSlugFromHost } from "../utils/tenantHost";
 
 const FEATURES = [
@@ -62,8 +58,7 @@ const Login = ({ onLogin }) => {
   const usernameRef = useRef(null);
 
   const tenantFromSubdomain = Boolean(hostTenantSlug);
-  const [tenantSlug, setTenantSlug] = useState(hostTenantSlug || "");
-  const [showManualTenant, setShowManualTenant] = useState(false);
+  const [tenantSlug] = useState(hostTenantSlug || "");
   const [tenantChoices, setTenantChoices] = useState(null);
   const [pendingLogin, setPendingLogin] = useState(null);
 
@@ -74,19 +69,10 @@ const Login = ({ onLogin }) => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const requiresManualSlug = showManualTenant && !tenantFromSubdomain;
-  const isFormValid =
-    username.trim() !== "" &&
-    password.trim() !== "" &&
-    (!requiresManualSlug || tenantSlug.trim() !== "");
+  const isFormValid = username.trim() !== "" && password.trim() !== "";
 
   useEffect(() => {
     const state = location.state;
-    if (state?.tenantSlug) {
-      setTenantSlug(state.tenantSlug);
-      setStoredTenantSlug(state.tenantSlug);
-      setShowManualTenant(true);
-    }
     if (state?.message) {
       setSuccess(state.message);
     }
@@ -124,9 +110,6 @@ const Login = ({ onLogin }) => {
     if (tenantFromSubdomain) {
       return tenantSlug.trim();
     }
-    if (showManualTenant && tenantSlug.trim()) {
-      return tenantSlug.trim();
-    }
     return undefined;
   };
 
@@ -142,11 +125,6 @@ const Login = ({ onLogin }) => {
 
     if (!cleanUsername || !cleanPassword) {
       setError("Preencha e-mail e senha.");
-      return;
-    }
-
-    if (requiresManualSlug && !cleanSlug) {
-      setError("Informe o identificador da empresa.");
       return;
     }
 
@@ -335,28 +313,6 @@ const Login = ({ onLogin }) => {
                       Identificado automaticamente pelo endereço.
                     </p>
                   </div>
-                ) : showManualTenant ? (
-                  <div>
-                    <label htmlFor="tenantSlug" className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Identificador da empresa
-                    </label>
-                    <input
-                      id="tenantSlug"
-                      type="text"
-                      autoComplete="organization"
-                      value={tenantSlug}
-                      onChange={(e) => {
-                        setTenantSlug(
-                          e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
-                        );
-                        setError("");
-                      }}
-                      placeholder="ex.: blu1m"
-                      required
-                      disabled={isLoading}
-                      className={`${inputClass} px-4 font-mono text-sm`}
-                    />
-                  </div>
                 ) : null}
 
                 <div>
@@ -431,19 +387,6 @@ const Login = ({ onLogin }) => {
                     </button>
                   </div>
                 </div>
-
-                {!tenantFromSubdomain && !showManualTenant ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowManualTenant(true);
-                      setTenantSlug(getStoredTenantSlug() || "");
-                    }}
-                    className="text-left text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    Informar empresa manualmente
-                  </button>
-                ) : null}
 
                 <button
                   type="submit"

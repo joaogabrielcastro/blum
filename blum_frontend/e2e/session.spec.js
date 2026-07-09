@@ -15,7 +15,7 @@ const runE2e = process.env.RUN_E2E === "1";
   });
 
   test("tokens permanecem ao navegar entre páginas", async ({ page }) => {
-    await loginAsAdmin(page, { tenantSlug: "default" });
+    await loginAsAdmin(page);
 
     await openSidebarNav(page, "Clientes");
     await openSidebarNav(page, "Produtos");

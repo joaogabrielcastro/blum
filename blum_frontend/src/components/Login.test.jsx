@@ -45,6 +45,16 @@ describe("Login", () => {
     expect(screen.getByLabelText(/^senha$/i)).toBeTruthy();
   });
 
+  it("não exibe campo de identificador da empresa", async () => {
+    renderLogin();
+    expect(screen.queryByLabelText(/identificador da empresa/i)).toBeNull();
+    expect(
+      await screen.findByText(
+        /identificamos sua empresa automaticamente/i,
+      ),
+    ).toBeTruthy();
+  });
+
   it("faz login e persiste sessão com refresh token", async () => {
     const onLogin = jest.fn();
     const user = userEvent.setup();
