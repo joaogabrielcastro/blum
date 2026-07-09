@@ -59,9 +59,11 @@ describe("authLoginService", () => {
     expect(suspendedValid).toHaveLength(1);
   });
 
-  test("resolveLoginTenantSlug ignora default do body (frontend legado)", () => {
+  test("resolveLoginTenantSlug ignora default (body, header ou ambos)", () => {
     expect(resolveLoginTenantSlug("default", undefined)).toBeNull();
-    expect(resolveLoginTenantSlug("default", "default")).toBe("default");
+    expect(resolveLoginTenantSlug(undefined, "default")).toBeNull();
+    expect(resolveLoginTenantSlug("default", "default")).toBeNull();
+    expect(resolveLoginTenantSlug("blu1m", "default")).toBe("blu1m");
     expect(resolveLoginTenantSlug("blu1m", undefined)).toBe("blu1m");
   });
 

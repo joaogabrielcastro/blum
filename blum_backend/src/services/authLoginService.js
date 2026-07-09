@@ -8,7 +8,8 @@ function normalizeTenantSlug(value) {
 
 function resolveLoginTenantSlug(bodySlug, headerSlug) {
   let tenantSlug = normalizeTenantSlug(bodySlug || headerSlug);
-  if (tenantSlug === "default" && !normalizeTenantSlug(headerSlug)) {
+  // Frontend legado envia default no body e no header — usar descoberta automática.
+  if (tenantSlug === "default") {
     tenantSlug = null;
   }
   return tenantSlug;

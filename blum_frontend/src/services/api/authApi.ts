@@ -1,5 +1,4 @@
 import {
-  getStoredTenantSlug,
   setStoredTenantSlug,
   clearStoredTenantSlug,
 } from "../../constants/tenantStorage";
@@ -33,21 +32,50 @@ export const login = async (
   password: string,
   tenantSlug?: string,
 ): Promise<AuthResponse> => {
-  const slug = (tenantSlug || getStoredTenantSlug() || "default").trim();
+  const slug =
+    tenantSlug != null && String(tenantSlug).trim() !== ""
+      ? String(tenantSlug).trim()
+      : null;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const body: Record<string, string> = { username, password };
+  if (slug) {
+    headers["x-tenant-slug"] = slug;
+    body.tenantSlug = slug;
+  }
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-tenant-slug": slug,
-      },
-      body: JSON.stringify({ username, password, tenantSlug: slug }),
+      headers,
+      body: JSON.stringify(body),
     });
   } catch {
     throw new Error(
       "Sem ligação à internet ou servidor indisponível. Verifique a rede e tente novamente.",
     );
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as AuthResponse & {
+    error?: string;
+    message?: string;
+    tenants?: Array<{ slug: string; name: string; role: string }>;
+  };
+
+  if (response.status === 409 && payload.error === "multiple_tenants") {
+    const err = new Error(
+      payload.message ||
+        "Esta conta existe em mais de uma empresa. Escolha qual acessar.",
+    ) as Error & {
+      code?: string;
+      tenants?: Array<{ slug: string; name: string; role: string }>;
+    };
+    err.code = "MULTIPLE_TENANTS";
+    err.tenants = Array.isArray(payload.tenants) ? payload.tenants : [];
+    throw err;
   }
 
   if (!response.ok) {
@@ -60,13 +88,9 @@ export const login = async (
           : `A API não foi alcançada (${response.status}). Verifique se ${API_URL} está online. Não indica senha errada.`,
       );
     }
-    const error = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      message?: string;
-    };
     const fromServer =
-      (typeof error.error === "string" && error.error.trim()) ||
-      (typeof error.message === "string" && error.message.trim()) ||
+      (typeof payload.error === "string" && payload.error.trim()) ||
+      (typeof payload.message === "string" && payload.message.trim()) ||
       "";
     const fallback429 =
       response.status === 429
@@ -75,7 +99,7 @@ export const login = async (
     throw new Error(fromServer || fallback429 || "Credenciais inválidas");
   }
 
-  const data = (await response.json()) as AuthResponse;
+  const data = payload as AuthResponse;
   if (data?.user?.tenantSlug) {
     setStoredTenantSlug(data.user.tenantSlug);
   } else if (slug) {
