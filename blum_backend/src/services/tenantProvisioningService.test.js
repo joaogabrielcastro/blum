@@ -1,5 +1,6 @@
 jest.mock("../repositories/tenantRepository");
 jest.mock("../utils/tenantSlug");
+jest.mock("../utils/tenantTaxId");
 jest.mock("./auditService", () => ({ logAuditEvent: jest.fn() }));
 jest.mock("./emailService", () => ({ sendWelcomeEmail: jest.fn().mockResolvedValue({}) }));
 jest.mock("../config/database", () => ({
@@ -8,10 +9,10 @@ jest.mock("../config/database", () => ({
   },
 }));
 
-const bcrypt = require("bcrypt");
 const { pool } = require("../config/database");
 const tenantRepository = require("../repositories/tenantRepository");
-const { validateTenantSlug } = require("../utils/tenantSlug");
+const { validateTenantSlug, slugFromCompanyName } = require("../utils/tenantSlug");
+const { validateTenantTaxId } = require("../utils/tenantTaxId");
 const tenantProvisioningService = require("./tenantProvisioningService");
 
 describe("tenantProvisioningService", () => {
@@ -25,6 +26,11 @@ describe("tenantProvisioningService", () => {
     };
     pool.connect.mockResolvedValue(client);
     client.query.mockResolvedValue({ rows: [] });
+    slugFromCompanyName.mockImplementation((name) =>
+      String(name || "")
+        .toLowerCase()
+        .replace(/\s+/g, "-"),
+    );
   });
 
   test("checkSlugAvailability delega validação", async () => {
@@ -34,12 +40,27 @@ describe("tenantProvisioningService", () => {
     expect(result.available).toBe(true);
   });
 
+  test("checkTaxIdAvailability delega validação", async () => {
+    validateTenantTaxId.mockReturnValue({
+      ok: true,
+      taxId: "11222333000181",
+      type: "cnpj",
+      error: null,
+    });
+    tenantRepository.taxIdExists.mockResolvedValue(false);
+    const result = await tenantProvisioningService.checkTaxIdAvailability(
+      "11.222.333/0001-81",
+    );
+    expect(result.available).toBe(true);
+    expect(result.type).toBe("cnpj");
+  });
+
   test("provisionTenant rejeita signup desativado", async () => {
     process.env.TENANT_SIGNUP_ENABLED = "false";
     await expect(
       tenantProvisioningService.provisionTenant({
         companyName: "X",
-        slug: "x",
+        taxId: "11222333000181",
         adminEmail: "a@test.com",
         adminPassword: "123456",
       }),
@@ -48,10 +69,18 @@ describe("tenantProvisioningService", () => {
   });
 
   test("provisionTenant valida email", async () => {
+    validateTenantTaxId.mockReturnValue({
+      ok: true,
+      taxId: "11222333000181",
+      type: "cnpj",
+      error: null,
+    });
+    tenantRepository.taxIdExists.mockResolvedValue(false);
+
     await expect(
       tenantProvisioningService.provisionTenant({
         companyName: "Acme",
-        slug: "acme",
+        taxId: "11222333000181",
         adminEmail: "invalid",
         adminPassword: "123456",
       }),
@@ -59,12 +88,19 @@ describe("tenantProvisioningService", () => {
   });
 
   test("provisionTenant cria tenant e admin", async () => {
+    validateTenantTaxId.mockReturnValue({
+      ok: true,
+      taxId: "11222333000181",
+      type: "cnpj",
+      error: null,
+    });
+    tenantRepository.taxIdExists.mockResolvedValue(false);
     validateTenantSlug.mockReturnValue({ ok: true, slug: "acme" });
     tenantRepository.slugExists.mockResolvedValue(false);
 
     client.query
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -73,10 +109,12 @@ describe("tenantProvisioningService", () => {
             name: "Acme",
             status: "active",
             billing_email: "admin@acme.com",
+            tax_id: "11222333000181",
+            tax_id_type: "cnpj",
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [] }) // existing user
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -88,17 +126,18 @@ describe("tenantProvisioningService", () => {
           },
         ],
       })
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+      .mockResolvedValueOnce({ rows: [] });
 
     const result = await tenantProvisioningService.provisionTenant({
       companyName: "Acme",
-      slug: "acme",
+      taxId: "11222333000181",
       adminEmail: "admin@acme.com",
       adminPassword: "123456",
       adminName: "Admin",
     });
 
     expect(result.tenant.slug).toBe("acme");
+    expect(result.tenant.taxId).toBe("11222333000181");
     expect(result.admin.username).toBe("admin@acme.com");
     expect(client.query).toHaveBeenCalledWith("COMMIT");
   });

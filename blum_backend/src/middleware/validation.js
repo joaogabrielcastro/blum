@@ -238,6 +238,13 @@ exports.validateTenantSignup = [
     .isLength({ min: 3, max: 60 })
     .withMessage("Identificador deve ter entre 3 e 60 caracteres"),
 
+  body("taxId")
+    .trim()
+    .notEmpty()
+    .withMessage("CNPJ ou CPF é obrigatório")
+    .isLength({ min: 11, max: 18 })
+    .withMessage("CNPJ ou CPF inválido"),
+
   body("adminEmail")
     .trim()
     .notEmpty()
@@ -267,6 +274,16 @@ exports.validateSlugParam = [
     .withMessage("Identificador é obrigatório")
     .isLength({ min: 1, max: 60 })
     .withMessage("Identificador inválido"),
+  handleValidationErrors,
+];
+
+exports.validateTaxIdParam = [
+  param("taxId")
+    .trim()
+    .notEmpty()
+    .withMessage("CNPJ ou CPF é obrigatório")
+    .isLength({ min: 11, max: 18 })
+    .withMessage("CNPJ ou CPF inválido"),
   handleValidationErrors,
 ];
 

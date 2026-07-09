@@ -1,6 +1,22 @@
 const tenantProvisioningService = require("../services/tenantProvisioningService");
 const { validateTenantSlug } = require("../utils/tenantSlug");
 
+exports.checkTaxId = async (req, res) => {
+  try {
+    const rawTaxId = req.params.taxId || req.query.taxId || "";
+    const result = await tenantProvisioningService.checkTaxIdAvailability(rawTaxId);
+    return res.status(200).json({
+      taxId: result.taxId,
+      type: result.type,
+      available: result.available,
+      error: result.error,
+    });
+  } catch (error) {
+    console.error("checkTaxId:", error);
+    return res.status(500).json({ error: "Erro ao verificar CNPJ/CPF" });
+  }
+};
+
 exports.checkSlug = async (req, res) => {
   try {
     const rawSlug = req.params.slug || req.query.slug || "";
@@ -18,10 +34,11 @@ exports.checkSlug = async (req, res) => {
 
 exports.signup = async (req, res) => {
   try {
-    const { companyName, slug, adminEmail, adminPassword, adminName } = req.body;
+    const { companyName, slug, taxId, adminEmail, adminPassword, adminName } = req.body;
     const result = await tenantProvisioningService.provisionTenant({
       companyName,
       slug,
+      taxId,
       adminEmail,
       adminPassword,
       adminName,
@@ -35,6 +52,8 @@ exports.signup = async (req, res) => {
         slug: result.tenant.slug,
         name: result.tenant.name,
         status: result.tenant.status,
+        taxId: result.tenant.taxId,
+        taxIdType: result.tenant.taxIdType,
       },
       admin: {
         id: result.admin.id,

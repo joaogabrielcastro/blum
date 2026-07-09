@@ -1,77 +1,93 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { signupTenant, checkTenantSlug, login } from "../services/apiService";
+import { signupTenant, checkTenantTaxId, login } from "../services/apiService";
 import { persistAuthSession } from "../utils/authSession";
-import { getTenantLoginUrl } from "../utils/tenantHost";
-
-function slugifyPreview(name) {
-  return String(name || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
+import {
+  formatTaxIdInput,
+  formatTaxIdLabel,
+  onlyTaxIdDigits,
+  validateTaxIdClient,
+} from "../utils/taxId";
 
 const SignupPage = () => {
   const [companyName, setCompanyName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [taxId, setTaxId] = useState("");
+  const [taxIdDigits, setTaxIdDigits] = useState("");
+  const [taxIdType, setTaxIdType] = useState(null);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminName, setAdminName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [slugStatus, setSlugStatus] = useState(null);
+  const [taxIdStatus, setTaxIdStatus] = useState(null);
+  const [localTaxIdError, setLocalTaxIdError] = useState("");
 
-  useEffect(() => {
-    if (!slugTouched && companyName) {
-      setSlug(slugifyPreview(companyName));
-    }
-  }, [companyName, slugTouched]);
-
-  const verifySlug = useCallback(async (value) => {
-    const trimmed = value.trim();
-    if (trimmed.length < 3) {
-      setSlugStatus(null);
+  const verifyTaxId = useCallback(async (digits) => {
+    const local = validateTaxIdClient(digits);
+    if (!local.ok) {
+      setTaxIdStatus(null);
+      setLocalTaxIdError(local.error || "");
       return;
     }
+    setLocalTaxIdError("");
+    setTaxIdType(local.type);
     try {
-      const result = await checkTenantSlug(trimmed);
-      setSlugStatus(result);
+      const result = await checkTenantTaxId(local.digits);
+      setTaxIdStatus(result);
+      if (result.type) setTaxIdType(result.type);
     } catch {
-      setSlugStatus(null);
+      setTaxIdStatus(null);
     }
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (slug.trim().length >= 3) verifySlug(slug);
-      else setSlugStatus(null);
+      if (taxIdDigits.length >= 11) verifyTaxId(taxIdDigits);
+      else {
+        setTaxIdStatus(null);
+        setLocalTaxIdError(
+          taxIdDigits.length > 0 && taxIdDigits.length < 11
+            ? "Informe os 11 dígitos do CPF ou 14 do CNPJ"
+            : "",
+        );
+      }
     }, 400);
     return () => clearTimeout(timer);
-  }, [slug, verifySlug]);
+  }, [taxIdDigits, verifyTaxId]);
+
+  const handleTaxIdChange = (value) => {
+    const digits = onlyTaxIdDigits(value).slice(0, 14);
+    setTaxIdDigits(digits);
+    setTaxId(formatTaxIdInput(digits));
+    setTaxIdStatus(null);
+    if (digits.length < 11) {
+      setLocalTaxIdError("");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const local = validateTaxIdClient(taxIdDigits);
+    if (!local.ok) {
+      setLocalTaxIdError(local.error || "CNPJ ou CPF inválido");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const trimmedSlug = slug.trim();
       const trimmedEmail = adminEmail.trim();
       const trimmedPassword = adminPassword.trim();
 
       await signupTenant({
         companyName: companyName.trim(),
-        slug: trimmedSlug,
+        taxId: local.digits,
         adminEmail: trimmedEmail,
         adminPassword: trimmedPassword,
         adminName: adminName.trim() || companyName.trim(),
       });
 
-      const auth = await login(trimmedEmail, trimmedPassword, trimmedSlug);
+      const auth = await login(trimmedEmail, trimmedPassword);
       persistAuthSession(auth);
 
       window.location.href = "/subscription?onboarding=1";
@@ -82,12 +98,18 @@ const SignupPage = () => {
     }
   };
 
+  const taxIdComplete =
+    taxIdDigits.length === 11 || taxIdDigits.length === 14;
+  const taxIdValid = validateTaxIdClient(taxIdDigits).ok;
+
   const isFormValid =
     companyName.trim().length >= 2 &&
-    slug.trim().length >= 3 &&
+    taxIdComplete &&
+    taxIdValid &&
     adminEmail.trim() !== "" &&
     adminPassword.trim().length >= 6 &&
-    slugStatus?.available !== false;
+    taxIdStatus?.available !== false &&
+    !localTaxIdError;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center px-4 py-10 sm:px-8">
@@ -96,9 +118,9 @@ const SignupPage = () => {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 text-xl font-bold text-white shadow-lg">
             B
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Criar empresa no Blum</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Criar conta no Blum</h1>
           <p className="mt-2 text-sm text-slate-500">
-            Cadastre sua empresa e comece a usar a plataforma.
+            Para empresas e representantes comerciais autônomos.
           </p>
         </div>
 
@@ -112,7 +134,7 @@ const SignupPage = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="companyName" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Nome da empresa
+                Nome da empresa ou representante
               </label>
               <input
                 id="companyName"
@@ -127,32 +149,33 @@ const SignupPage = () => {
             </div>
 
             <div>
-              <label htmlFor="slug" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Identificador da empresa
+              <label htmlFor="taxId" className="mb-1.5 block text-sm font-medium text-slate-700">
+                CNPJ ou CPF
               </label>
               <input
-                id="slug"
+                id="taxId"
                 type="text"
-                value={slug}
-                onChange={(e) => {
-                  setSlugTouched(true);
-                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                }}
-                placeholder="acme-representacoes"
+                inputMode="numeric"
+                autoComplete="off"
+                value={taxId}
+                onChange={(e) => handleTaxIdChange(e.target.value)}
+                placeholder="00.000.000/0000-00 ou 000.000.000-00"
                 required
                 disabled={isLoading}
                 className="w-full rounded-xl border border-slate-300 px-4 py-2.5 font-mono text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-50"
               />
               <p className="mt-1.5 text-xs text-slate-500">
-                Usado no login para identificar sua empresa (ex.: <span className="font-mono">acme-representacoes</span>).
+                Documento da empresa (CNPJ) ou do representante autônomo (CPF). Identifica sua conta no sistema.
               </p>
-              {slugStatus && !slugStatus.available ? (
-                <p className="mt-1 text-xs text-red-600">{slugStatus.error}</p>
+              {localTaxIdError ? (
+                <p className="mt-1 text-xs text-red-600">{localTaxIdError}</p>
               ) : null}
-              {slugStatus?.available ? (
+              {taxIdStatus && !taxIdStatus.available ? (
+                <p className="mt-1 text-xs text-red-600">{taxIdStatus.error}</p>
+              ) : null}
+              {taxIdStatus?.available && taxIdType ? (
                 <p className="mt-1 text-xs text-emerald-600">
-                  Identificador disponível — URL:{" "}
-                  <span className="font-mono">{getTenantLoginUrl(slug)}</span>
+                  {formatTaxIdLabel(taxIdType)} disponível para cadastro.
                 </p>
               ) : null}
             </div>
@@ -212,7 +235,7 @@ const SignupPage = () => {
               disabled={isLoading || !isFormValid}
               className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLoading ? "Criando empresa…" : "Criar empresa"}
+              {isLoading ? "Criando conta…" : "Criar conta"}
             </button>
           </form>
 

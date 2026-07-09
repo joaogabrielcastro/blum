@@ -1,7 +1,8 @@
 const bcrypt = require("bcrypt");
 const { pool } = require("../config/database");
 const tenantRepository = require("../repositories/tenantRepository");
-const { validateTenantSlug } = require("../utils/tenantSlug");
+const { validateTenantSlug, slugFromCompanyName } = require("../utils/tenantSlug");
+const { validateTenantTaxId } = require("../utils/tenantTaxId");
 const { logAuditEvent } = require("./auditService");
 const { sendWelcomeEmail } = require("./emailService");
 
@@ -9,6 +10,28 @@ function isSignupEnabled() {
   const flag = process.env.TENANT_SIGNUP_ENABLED;
   if (flag === "false" || flag === "0") return false;
   return true;
+}
+
+async function resolveUniqueSlug(preferred) {
+  const base = slugFromCompanyName(preferred) || "empresa";
+  const baseValidation = validateTenantSlug(base);
+  let candidate = baseValidation.ok ? baseValidation.slug : "empresa";
+  if (!(await tenantRepository.slugExists(candidate))) {
+    return candidate;
+  }
+  for (let n = 2; n < 1000; n += 1) {
+    const suffix = `-${n}`;
+    const trimmed = candidate.slice(0, Math.max(3, 60 - suffix.length));
+    const next = `${trimmed}${suffix}`;
+    const check = validateTenantSlug(next);
+    if (!check.ok) continue;
+    if (!(await tenantRepository.slugExists(check.slug))) {
+      return check.slug;
+    }
+  }
+  const err = new Error("Não foi possível gerar identificador interno da empresa");
+  err.statusCode = 500;
+  throw err;
 }
 
 async function checkSlugAvailability(rawSlug) {
@@ -27,9 +50,37 @@ async function checkSlugAvailability(rawSlug) {
   return { available: true, slug: validation.slug, error: null };
 }
 
+async function checkTaxIdAvailability(rawTaxId) {
+  const validation = validateTenantTaxId(rawTaxId);
+  if (!validation.ok) {
+    return {
+      available: false,
+      taxId: validation.taxId,
+      type: validation.type,
+      error: validation.error,
+    };
+  }
+  const exists = await tenantRepository.taxIdExists(validation.taxId);
+  if (exists) {
+    return {
+      available: false,
+      taxId: validation.taxId,
+      type: validation.type,
+      error: "Este CNPJ/CPF já está cadastrado",
+    };
+  }
+  return {
+    available: true,
+    taxId: validation.taxId,
+    type: validation.type,
+    error: null,
+  };
+}
+
 async function provisionTenant({
   companyName,
   slug: rawSlug,
+  taxId: rawTaxId,
   adminEmail,
   adminPassword,
   adminName = null,
@@ -61,11 +112,24 @@ async function provisionTenant({
     throw err;
   }
 
-  const slugCheck = await checkSlugAvailability(rawSlug || company);
-  if (!slugCheck.available) {
-    const err = new Error(slugCheck.error);
+  const taxCheck = await checkTaxIdAvailability(rawTaxId);
+  if (!taxCheck.available) {
+    const err = new Error(taxCheck.error);
     err.statusCode = 409;
     throw err;
+  }
+
+  let slug;
+  if (rawSlug) {
+    const slugCheck = await checkSlugAvailability(rawSlug);
+    if (!slugCheck.available) {
+      const err = new Error(slugCheck.error);
+      err.statusCode = 409;
+      throw err;
+    }
+    slug = slugCheck.slug;
+  } else {
+    slug = await resolveUniqueSlug(company);
   }
 
   const client = await pool.connect();
@@ -74,10 +138,10 @@ async function provisionTenant({
     await client.query("SELECT set_config('app.bypass_rls', 'true', true)");
 
     const tenantResult = await client.query(
-      `INSERT INTO tenants (slug, name, status, billing_email, onboarding_completed_at)
-       VALUES ($1, $2, 'active', $3, NOW())
-       RETURNING id, slug, name, status, billing_email, onboarding_completed_at, created_at`,
-      [slugCheck.slug, company, email],
+      `INSERT INTO tenants (slug, name, status, billing_email, onboarding_completed_at, tax_id, tax_id_type)
+       VALUES ($1, $2, 'active', $3, NOW(), $4, $5)
+       RETURNING id, slug, name, status, billing_email, tax_id, tax_id_type, onboarding_completed_at, created_at`,
+      [slug, company, email, taxCheck.taxId, taxCheck.type],
     );
     const tenant = tenantResult.rows[0];
 
@@ -110,7 +174,11 @@ async function provisionTenant({
       resourceType: "tenant",
       resourceId: String(tenant.id),
       requestId,
-      metadata: { slug: tenant.slug, companyName: company },
+      metadata: {
+        slug: tenant.slug,
+        companyName: company,
+        taxIdType: taxCheck.type,
+      },
     });
 
     sendWelcomeEmail({
@@ -125,6 +193,8 @@ async function provisionTenant({
         slug: tenant.slug,
         name: tenant.name,
         status: tenant.status,
+        taxId: tenant.tax_id,
+        taxIdType: tenant.tax_id_type,
       },
       admin: {
         id: user.id,
@@ -137,7 +207,7 @@ async function provisionTenant({
   } catch (error) {
     await client.query("ROLLBACK");
     if (error.code === "23505") {
-      const err = new Error("Este identificador ou e-mail já está em uso");
+      const err = new Error("Este CNPJ/CPF ou e-mail já está em uso");
       err.statusCode = 409;
       throw err;
     }
@@ -168,6 +238,8 @@ async function getCurrentTenantSummary(tenantId) {
 module.exports = {
   isSignupEnabled,
   checkSlugAvailability,
+  checkTaxIdAvailability,
+  resolveUniqueSlug,
   provisionTenant,
   getCurrentTenantSummary,
 };

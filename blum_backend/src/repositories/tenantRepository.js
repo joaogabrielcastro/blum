@@ -1,5 +1,12 @@
 const { sql } = require("../config/database");
 
+async function taxIdExists(taxId) {
+  const rows = await sql`
+    SELECT id FROM tenants WHERE tax_id = ${taxId} LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 async function findBySlug(slug) {
   const rows = await sql`
     SELECT
@@ -238,6 +245,7 @@ async function updateTenantStatus(tenantId, status) {
 module.exports = {
   findBySlug,
   slugExists,
+  taxIdExists,
   createTenant,
   findBillingById,
   findByStripeCustomerId,

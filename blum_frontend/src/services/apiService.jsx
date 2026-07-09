@@ -4,6 +4,7 @@ export {
   login,
   signupTenant,
   checkTenantSlug,
+  checkTenantTaxId,
   verifyToken,
   logout,
 } from "./api/authApi";

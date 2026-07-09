@@ -5,9 +5,11 @@ const { authenticate } = require("../middleware/authMiddleware");
 const {
   validateTenantSignup,
   validateSlugParam,
+  validateTaxIdParam,
 } = require("../middleware/validation");
 
 router.get("/check-slug/:slug", validateSlugParam, tenantController.checkSlug);
+router.get("/check-tax-id/:taxId", validateTaxIdParam, tenantController.checkTaxId);
 router.get("/preview-slug", tenantController.previewSlug);
 router.post("/signup", validateTenantSignup, tenantController.signup);
 router.get("/current", authenticate, tenantController.getCurrent);

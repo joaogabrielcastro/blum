@@ -9,7 +9,8 @@ import type { AuthResponse, VerifyTokenResponse } from "../../types/api";
 
 export interface SignupTenantParams {
   companyName: string;
-  slug: string;
+  taxId: string;
+  slug?: string;
   adminEmail: string;
   adminPassword: string;
   adminName: string;
@@ -19,6 +20,13 @@ export interface SignupTenantResponse {
   tenant?: { slug?: string };
   error?: string;
   message?: string;
+}
+
+export interface CheckTaxIdResponse {
+  available: boolean;
+  taxId: string;
+  type?: "cpf" | "cnpj" | null;
+  error?: string;
 }
 
 export interface CheckSlugResponse {
@@ -132,6 +140,25 @@ export const signupTenant = async (
   }
   if (payload?.tenant?.slug) {
     setStoredTenantSlug(payload.tenant.slug);
+  }
+  return payload;
+};
+
+export const checkTenantTaxId = async (
+  taxId: string,
+): Promise<CheckTaxIdResponse> => {
+  const digits = String(taxId || "").replace(/\D/g, "");
+  if (!digits) {
+    return { available: false, taxId: "", error: "CNPJ ou CPF obrigatório" };
+  }
+  const response = await fetch(
+    `${API_URL}/tenants/check-tax-id/${encodeURIComponent(digits)}`,
+  );
+  const payload = (await response.json().catch(() => ({}))) as CheckTaxIdResponse & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new Error(payload.error || "Erro ao verificar CNPJ/CPF");
   }
   return payload;
 };
