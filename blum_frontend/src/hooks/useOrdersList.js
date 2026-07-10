@@ -42,19 +42,16 @@ export function useOrdersList({ sharedClientsList, toast, userId, userRole }) {
     return clientsMap;
   }, []);
 
-  const loadOfflinePendingOrders = useCallback(
-    async (clientsMap = clients) => {
-      try {
-        const pending = await listPendingOrders();
-        setOfflinePendingOrders(
-          pending.map((entry) => pendingOrderToListItem(entry, clientsMap)),
-        );
-      } catch (error) {
-        console.error("Erro ao carregar orçamentos offline:", error);
-      }
-    },
-    [clients],
-  );
+  const loadOfflinePendingOrders = useCallback(async (clientsMap = {}) => {
+    try {
+      const pending = await listPendingOrders();
+      setOfflinePendingOrders(
+        pending.map((entry) => pendingOrderToListItem(entry, clientsMap)),
+      );
+    } catch (error) {
+      console.error("Erro ao carregar orçamentos offline:", error);
+    }
+  }, []);
 
   const loadCachedClientsIfNeeded = useCallback(async () => {
     const cached = await getCachedClients();

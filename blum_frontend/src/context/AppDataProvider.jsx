@@ -13,6 +13,7 @@ import {
 import { queryKeys } from "../services/queryKeys";
 
 const AppDataContext = createContext(null);
+const EMPTY_LIST = [];
 
 function buildClientsMap(list) {
   const clientsMap = {};
@@ -49,8 +50,8 @@ export function AppDataProvider({ enabled = true, children }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const clientsList = clientsQuery.data ?? [];
-  const brands = brandsQuery.data ?? [];
+  const clientsList = clientsQuery.data ?? EMPTY_LIST;
+  const brands = brandsQuery.data ?? EMPTY_LIST
 
   const clientsMap = useMemo(
     () => buildClientsMap(clientsList),
