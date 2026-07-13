@@ -31,7 +31,7 @@ function buildSubscriptionCheckoutParams({
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${baseUrl}/subscription?checkout=success`,
-    cancel_url: `${baseUrl}/subscription?checkout=canceled&onboarding=1`,
+    cancel_url: `${baseUrl}/subscription?checkout=canceled`,
     client_reference_id: String(tenantId),
     locale: "pt-BR",
     payment_method_types: paymentMethodTypes,

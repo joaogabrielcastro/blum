@@ -41,14 +41,17 @@ const PLAN_DEFINITIONS = [
   {
     slug: "enterprise",
     name: "Enterprise",
-    description: "Operação completa com recursos avançados.",
+    description:
+      "Para operações grandes que precisam de acompanhamento próximo e integrações sob medida.",
     envPriceKey: "STRIPE_PRICE_ENTERPRISE",
     defaultAmountCents: 39900,
     limits: { maxUsers: null, maxBrands: null },
     features: [
       "Tudo do Profissional",
-      "Múltiplas representadas",
-      "Integrações personalizadas",
+      "Onboarding assistido da equipe",
+      "Suporte dedicado com canal direto",
+      "Integrações personalizadas (ERP/CRM/API)",
+      "Prioridade na evolução do produto",
     ],
     sortOrder: 3,
   },

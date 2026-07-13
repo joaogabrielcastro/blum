@@ -56,7 +56,9 @@ const SubscriptionPage = () => {
   useEffect(() => {
     if (loading || autoCheckoutStarted.current) return;
     if (searchParams.get("onboarding") !== "1") return;
-    if (subscription?.hasAccess && subscription?.stripeSubscriptionId) return;
+    // Não reabrir checkout se o usuário acabou de cancelar no Stripe
+    if (searchParams.get("checkout") === "canceled") return;
+    if (subscription?.stripeSubscriptionId) return;
 
     const targetPlan = plans.find((plan) => plan.slug === onboardingPlanSlug);
     if (!targetPlan) return;
@@ -87,14 +89,15 @@ const SubscriptionPage = () => {
       load();
     } else if (checkout === "canceled") {
       toast.warning("Checkout cancelado. Nenhuma cobrança foi feita.");
-      setSearchParams({ onboarding: "1" }, { replace: true });
+      // Limpa onboarding para não redirecionar de volta ao Stripe
+      setSearchParams({}, { replace: true });
     } else if (onboarding === "1" && !onboardingToastShown.current) {
       onboardingToastShown.current = true;
       toast.info(
         `Redirecionando para o pagamento do plano ${onboardingPlanSlug}…`,
       );
     }
-  }, [searchParams, setSearchParams, toast, load]);
+  }, [searchParams, setSearchParams, toast, load, onboardingPlanSlug]);
 
   const redirectToUrl = (url) => {
     if (url) window.location.href = url;
