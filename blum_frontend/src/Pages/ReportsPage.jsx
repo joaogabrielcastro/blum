@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
 import ReportsMonthFilter from "../components/reports/ReportsMonthFilter";
 import ReportsSummaryCards from "../components/reports/ReportsSummaryCards";
@@ -24,11 +25,26 @@ import { buildPdfFile, downloadPdfFile } from "../utils/pdfDownload";
 import { useToast } from "../context/ToastContext";
 import { useReportsData, defaultMonthKey } from "../hooks/useReportsData";
 import { useReportsMetrics } from "../hooks/useReportsMetrics";
+import {
+  canUseFeature,
+  PLAN_FEATURE_REQUIRED_EVENT,
+} from "../utils/planFeatures";
 
-const ReportsPage = ({ userRole, userId }) => {
+const ReportsPage = ({ userRole, userId, subscription }) => {
   const toast = useToast();
   const [exportingPdf, setExportingPdf] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const canExcel = canUseFeature(subscription, "excel-export");
+  const canCommissionPdf = canUseFeature(subscription, "commission-pdf");
+  const canBrandCompare = canUseFeature(subscription, "brand-comparison");
+
+  const requestUpgrade = (feature) => {
+    window.dispatchEvent(
+      new CustomEvent(PLAN_FEATURE_REQUIRED_EVENT, {
+        detail: { feature, requiredPlan: "professional" },
+      }),
+    );
+  };
 
   const data = useReportsData({ userRole, userId });
   const {
@@ -95,6 +111,10 @@ const ReportsPage = ({ userRole, userId }) => {
 
   const handleExportSalesExcel = async () => {
     if (userRole !== "admin") return;
+    if (!canExcel) {
+      requestUpgrade("excel-export");
+      return;
+    }
     try {
       setExportingExcel(true);
       const blob = await apiService.downloadSalesByRepExcel();
@@ -107,13 +127,21 @@ const ReportsPage = ({ userRole, userId }) => {
       toast.success("Excel exportado.");
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível exportar Excel.");
+      toast.error(
+        error?.code === "PLAN_FEATURE_REQUIRED"
+          ? error.message
+          : "Não foi possível exportar Excel.",
+      );
     } finally {
       setExportingExcel(false);
     }
   };
 
   const handleExportAllCommissionsPdf = async () => {
+    if (!canCommissionPdf) {
+      requestUpgrade("commission-pdf");
+      return;
+    }
     if (!commissionsByRep.length) {
       toast.warning("Não há comissões para exportar neste período.");
       return;
@@ -148,6 +176,10 @@ const ReportsPage = ({ userRole, userId }) => {
   };
 
   const handleExportRepCommissionPdf = async (sale) => {
+    if (!canCommissionPdf) {
+      requestUpgrade("commission-pdf");
+      return;
+    }
     const repOrders = ordersToDisplay.filter(
       (order) => orderSellerUserKey(order) === sale.userId,
     );
@@ -260,11 +292,29 @@ const ReportsPage = ({ userRole, userId }) => {
 
       <ReportsMonthlyHistoryTable monthlySummaries={monthlySummaries} />
 
-      <ReportsBrandComparison
-        brandBars={brandBars}
-        totalSales={totalSales}
-        mediaPorRepresentada={mediaPorRepresentada}
-      />
+      {canBrandCompare ? (
+        <ReportsBrandComparison
+          brandBars={brandBars}
+          totalSales={totalSales}
+          mediaPorRepresentada={mediaPorRepresentada}
+        />
+      ) : (
+        <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950">
+          <h2 className="text-lg font-semibold">
+            Comparativo entre representadas
+          </h2>
+          <p className="mt-1 text-sm">
+            Disponível no plano Profissional. Compare vendas por marca e
+            identifique o mix da operação.
+          </p>
+          <Link
+            to="/subscription"
+            className="mt-3 inline-block text-sm font-semibold underline underline-offset-2"
+          >
+            Ver planos
+          </Link>
+        </div>
+      )}
 
       <ReportsOrdersTable
         ordersToDisplay={ordersToDisplay}
@@ -287,6 +337,8 @@ const ReportsPage = ({ userRole, userId }) => {
         onExportSalesExcel={handleExportSalesExcel}
         onExportAllCommissionsPdf={handleExportAllCommissionsPdf}
         onExportRepCommissionPdf={handleExportRepCommissionPdf}
+        canExcel={canExcel}
+        canCommissionPdf={canCommissionPdf}
       />
     </div>
   );

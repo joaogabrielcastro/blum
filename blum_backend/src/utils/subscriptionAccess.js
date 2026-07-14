@@ -1,4 +1,5 @@
 const { isBillingEnforced } = require("../config/stripe");
+const { listFeaturesForTenant } = require("./planFeatures");
 
 /** Status Stripe que permitem uso do sistema. */
 const ACCESS_GRANTED_STATUSES = new Set(["active", "trialing"]);
@@ -82,6 +83,7 @@ function mapSubscriptionSummary(tenant, plans = []) {
     isLegacy: legacy,
     hasAccess,
     accessBlocked: requiresSubscriptionCheck(tenant) && !hasAccess,
+    features: listFeaturesForTenant(tenant),
   };
 }
 

@@ -26,9 +26,10 @@ function normalizeDetailPath(path) {
     .trim();
 }
 
-const ClientsForm = ({ client, onClientAdded, onCancel }) => {
+const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
   const toast = useToast();
   const isEditing = !!client;
+  const isDrawer = variant === "drawer";
 
   const [formData, setFormData] = useState({
     companyName: client?.companyName || "",
@@ -230,60 +231,68 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-auto">
-        <div className="bg-white p-2 sm:p-4 md:p-8 rounded-2xl shadow-xl border border-gray-200 max-w-4xl mx-auto w-full">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">
-            {isEditing ? "Editar Cliente" : "Adicionar Novo Cliente"}
-          </h2>
+    <div className={isDrawer ? "flex flex-col" : "flex h-full flex-col"}>
+      <div className={isDrawer ? "" : "flex-1 overflow-auto"}>
+        <div
+          className={
+            isDrawer
+              ? "w-full"
+              : "mx-auto w-full max-w-4xl rounded-2xl border border-zinc-200/80 bg-white/80 p-4 shadow-soft backdrop-blur-md sm:p-6 md:p-8"
+          }
+        >
+          {!isDrawer ? (
+            <h2 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900">
+              {isEditing ? "Editar Cliente" : "Adicionar Novo Cliente"}
+            </h2>
+          ) : null}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {/* Campo CNPJ Corrigido */}
               <div className="md:col-span-2">
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   CNPJ *
                 </label>
                 <input
-                  className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.cnpj ? "border-red-500" : "border-gray-300"
+                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30 ${
+                    errors.cnpj ? "border-red-400" : "border-zinc-200"
                   }`}
                   type="text"
-                  value={formatCNPJ(formData.cnpj)} // Exibe formatado
+                  value={formatCNPJ(formData.cnpj)}
                   onChange={handleCnpjChange}
-                  onPaste={handleCnpjPaste} // Adiciona handler para colar
-                  onBlur={handleCnpjBlur} // Busca ao sair do campo
+                  onPaste={handleCnpjPaste}
+                  onBlur={handleCnpjBlur}
                   disabled={isSearching || isEditing}
                   placeholder="00.000.000/0000-00"
-                  maxLength={18} // Permite caracteres de formatação
+                  maxLength={18}
                 />
                 {errors.cnpj && (
-                  <p className="text-red-500 text-xs mt-1">{errors.cnpj}</p>
+                  <p className="mt-1 text-xs text-red-500">{errors.cnpj}</p>
                 )}
                 {isSearching && (
-                  <p className="text-blue-500 text-xs mt-1">
-                    🔍 Buscando dados do CNPJ...
+                  <p className="mt-1 text-xs text-brand">
+                    A procurar dados do CNPJ…
                   </p>
                 )}
                 {isEditing && (
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="mt-1 text-xs text-zinc-400">
                     CNPJ não pode ser alterado em edição
                   </p>
                 )}
                 {!isEditing && (
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="mt-1 text-xs text-zinc-400">
                     Digite ou cole os 14 dígitos do CNPJ
                   </p>
                 )}
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Nome da Empresa *
                 </label>
                 <input
-                  className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.companyName ? "border-red-500" : "border-gray-300"
+                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30 ${
+                    errors.companyName ? "border-red-400" : "border-zinc-200"
                   }`}
                   type="text"
                   name="companyName"
@@ -292,35 +301,35 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                   required
                 />
                 {errors.companyName && (
-                  <p className="text-red-500 text-xs mt-1">
+                  <p className="mt-1 text-xs text-red-500">
                     {errors.companyName}
                   </p>
                 )}
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Nome fantasia
                 </label>
                 <input
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                   type="text"
                   name="nomeFantasia"
                   value={formData.nomeFantasia}
                   onChange={handleChange}
                   placeholder="Como o cliente é conhecido no dia a dia (opcional)"
                 />
-                <p className="text-gray-500 text-xs mt-1">
+                <p className="mt-1 text-xs text-zinc-400">
                   Usado na busca de clientes nos pedidos.
                 </p>
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Pessoa de Contato
                 </label>
                 <input
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                   type="text"
                   name="contactPerson"
                   value={formData.contactPerson}
@@ -330,11 +339,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Telefone
                 </label>
                 <input
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                   type="tel"
                   name="phone"
                   value={formData.phone}
@@ -344,11 +353,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Email
                 </label>
                 <input
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                   type="email"
                   name="email"
                   value={formData.email}
@@ -358,11 +367,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
               </div>
 
               <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">
+                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Região
                 </label>
                 <input
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                   type="text"
                   name="region"
                   value={formData.region}
@@ -372,20 +381,20 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
               </div>
 
               <div className="md:col-span-2">
-                <h3 className="text-sm font-semibold text-gray-800 mb-2">
+                <h3 className="mb-1 text-sm font-semibold text-zinc-900">
                   Endereço
                 </h3>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="mb-3 text-xs text-zinc-400">
                   Para clientes da base PR (Paraná / PRL), preencha logradouro,
                   cidade e CEP para entregas e documentos.
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="md:col-span-2">
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       Logradouro
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="street"
                       value={formData.street}
@@ -394,11 +403,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       Número
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="number"
                       value={formData.number}
@@ -406,11 +415,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       Complemento
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="complement"
                       value={formData.complement}
@@ -418,11 +427,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       Bairro
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="neighborhood"
                       value={formData.neighborhood}
@@ -430,11 +439,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       Cidade
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="city"
                       value={formData.city}
@@ -442,11 +451,11 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 text-sm font-medium mb-2">
+                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
                       CEP
                     </label>
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
                       type="text"
                       name="zipcode"
                       value={formData.zipcode}
@@ -458,25 +467,29 @@ const ClientsForm = ({ client, onClientAdded, onCancel }) => {
               </div>
             </div>
 
-            <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
+            <div
+              className={`mt-6 flex justify-end gap-2 border-t border-zinc-200/80 pt-5 ${
+                isDrawer ? "sticky bottom-0 bg-white/90 pb-1 backdrop-blur-md" : ""
+              }`}
+            >
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-6 py-3 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors"
+                className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-50"
                 disabled={loading}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all duration-200 hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={loading || isSearching}
               >
                 {loading
                   ? "A guardar..."
                   : isEditing
-                    ? "Atualizar Cliente"
-                    : "Guardar Cliente"}
+                    ? "Atualizar cliente"
+                    : "Guardar cliente"}
               </button>
             </div>
           </form>

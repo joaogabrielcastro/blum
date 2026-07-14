@@ -3,6 +3,7 @@ const router = express.Router();
 const productsController = require("../controllers/productController");
 const productImportController = require("../controllers/productImportController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { requirePlanFeature } = require("../middleware/planFeatureMiddleware");
 const { uploadSpreadsheet } = require("../middleware/upload");
 const {
   validateProduct,
@@ -14,6 +15,7 @@ router.post(
   "/import/preview",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("product-import"),
   uploadSpreadsheet,
   productImportController.previewImport,
 );
@@ -22,6 +24,7 @@ router.post(
   "/import/finalize",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("product-import"),
   productImportController.finalizeImport,
 );
 
@@ -29,6 +32,7 @@ router.get(
   "/export.csv",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("product-export"),
   productImportController.exportCsv,
 );
 
@@ -36,6 +40,7 @@ router.get(
   "/export.xlsx",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("product-export"),
   productImportController.exportExcel,
 );
 
@@ -49,6 +54,7 @@ router.post(
   "/bulk-price-adjust",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("price-batch"),
   productsController.bulkAdjustPrices,
 );
 

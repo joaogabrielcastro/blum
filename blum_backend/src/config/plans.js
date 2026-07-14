@@ -1,8 +1,19 @@
 /**
  * Planos disponíveis — Price IDs vêm do Stripe via variáveis de ambiente.
+ * `features` = copy de marketing; `entitlements` = IDs gated (API/UI).
  */
 
 const { buildPlanPricingFromEnv } = require("../utils/planPricing");
+
+const PRO_ENTITLEMENTS = [
+  "product-import",
+  "product-export",
+  "purchase-import",
+  "price-batch",
+  "brand-comparison",
+  "excel-export",
+  "commission-pdf",
+];
 
 const PLAN_DEFINITIONS = [
   {
@@ -12,6 +23,7 @@ const PLAN_DEFINITIONS = [
     envPriceKey: "STRIPE_PRICE_STARTER",
     defaultAmountCents: 9900,
     limits: { maxUsers: 3, maxBrands: 1 },
+    entitlements: [],
     features: [
       "Até 3 usuários",
       "1 representada",
@@ -28,6 +40,7 @@ const PLAN_DEFINITIONS = [
     envPriceKey: "STRIPE_PRICE_PROFESSIONAL",
     defaultAmountCents: 19900,
     limits: { maxUsers: null, maxBrands: null },
+    entitlements: [...PRO_ENTITLEMENTS],
     features: [
       "Usuários ilimitados",
       "Representadas ilimitadas",
@@ -46,6 +59,7 @@ const PLAN_DEFINITIONS = [
     envPriceKey: "STRIPE_PRICE_ENTERPRISE",
     defaultAmountCents: 39900,
     limits: { maxUsers: null, maxBrands: null },
+    entitlements: [...PRO_ENTITLEMENTS],
     features: [
       "Tudo do Profissional",
       "Onboarding assistido da equipe",
@@ -119,6 +133,7 @@ function assertPlanAvailable(slug) {
 
 module.exports = {
   PLAN_DEFINITIONS,
+  PRO_ENTITLEMENTS,
   getPlanBySlug,
   getPlanByStripePriceId,
   getStripePriceIdForPlan,

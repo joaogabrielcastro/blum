@@ -21,8 +21,16 @@ export interface AuthResponse {
 
 export interface SubscriptionSummary {
   accessBlocked?: boolean;
+  hasAccess?: boolean;
   status?: string | null;
+  subscriptionStatus?: string | null;
   planSlug?: string | null;
+  planName?: string | null;
+  isLegacy?: boolean;
+  billingEnforced?: boolean;
+  features?: string[];
+  trialEndsAt?: string | null;
+  currentPeriodEnd?: string | null;
 }
 
 export interface VerifyTokenResponse {
@@ -35,6 +43,8 @@ export interface ApiErrorBody {
   message?: string;
   details?: unknown;
   code?: string;
+  feature?: string;
+  requiredPlan?: string;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
   requestId?: string;

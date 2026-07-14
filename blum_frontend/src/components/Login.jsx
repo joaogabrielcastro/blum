@@ -6,6 +6,7 @@ import {
   AUTH_NOTICE_KEY,
   AUTH_NOTICE_FORBIDDEN,
   AUTH_NOTICE_SESSION_EXPIRED,
+  AUTH_NOTICE_SUBSCRIPTION_REQUIRED,
 } from "../constants/authNotice";
 import { resolveTenantSlugFromHost } from "../utils/tenantHost";
 
@@ -88,6 +89,10 @@ const Login = ({ onLogin }) => {
         } else if (reason === AUTH_NOTICE_FORBIDDEN) {
           setError(
             "Sem permissão para essa ação. Use uma conta com acesso adequado.",
+          );
+        } else if (reason === AUTH_NOTICE_SUBSCRIPTION_REQUIRED) {
+          setError(
+            "Assinatura inativa. Inicie sessão e regularize o plano em Assinatura.",
           );
         }
       }

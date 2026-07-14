@@ -3,36 +3,41 @@ const router = express.Router();
 const purchaseController = require("../controllers/purchaseController");
 const { uploadPdf, uploadCsv } = require("../middleware/upload");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { requirePlanFeature } = require("../middleware/planFeatureMiddleware");
 
 // Todas as rotas de compras são apenas para admin
 const adminOnly = [authenticate, authorize("admin")];
+const purchaseImport = [
+  ...adminOnly,
+  requirePlanFeature("purchase-import"),
+];
 
 // Rotas de processamento
 router.post(
   "/process-pdf",
-  ...adminOnly,
+  ...purchaseImport,
   uploadPdf,
   purchaseController.processPdf
 );
 router.post(
   "/process-csv",
-  ...adminOnly,
+  ...purchaseImport,
   uploadCsv,
   purchaseController.processCsv
 );
 router.post(
   "/finalize-pdf",
-  ...adminOnly,
+  ...purchaseImport,
   purchaseController.finalizePurchaseFromPdf
 );
 router.post(
   "/finalize-csv",
-  ...adminOnly,
+  ...purchaseImport,
   purchaseController.finalizePurchaseFromCsv
 );
 router.post(
   "/import-csv",
-  ...adminOnly,
+  ...purchaseImport,
   uploadCsv,
   purchaseController.importCsv
 );

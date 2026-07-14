@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import PriceHistoryModal from './PriceHistoryModal';
+import { useState } from "react";
+import PriceHistoryModal from "./PriceHistoryModal";
+import KebabMenu from "./ui/KebabMenu";
 
-const ProductRow = ({ 
-  product, 
-  onEdit, 
-  onDelete, 
-  confirmDelete, 
-  deleteType, 
-  deleteId, 
-  onConfirmDelete, 
+const ProductRow = ({
+  product,
+  onEdit,
+  onDelete,
+  confirmDelete,
+  deleteType,
+  deleteId,
+  onConfirmDelete,
   onCancelDelete,
   userRole,
   selectable = false,
@@ -16,139 +17,126 @@ const ProductRow = ({
   onToggleSelect,
 }) => {
   const [showPriceHistory, setShowPriceHistory] = useState(false);
+  const lowStock = product.stock <= (product.minstock || 0);
+  const price =
+    product.price != null && !Number.isNaN(Number(product.price))
+      ? Number(product.price).toFixed(2)
+      : "0.00";
+
+  const menuItems = [
+    userRole === "admin"
+      ? {
+          id: "history",
+          label: "Histórico de preços",
+          onClick: () => setShowPriceHistory(true),
+        }
+      : null,
+    {
+      id: "edit",
+      label: "Editar",
+      onClick: () => onEdit(product),
+    },
+    userRole === "admin"
+      ? {
+          id: "delete",
+          label: "Excluir",
+          tone: "danger",
+          onClick: () => onDelete("product", product.id, product.name),
+        }
+      : null,
+  ].filter(Boolean);
 
   return (
     <>
-      <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors duration-150">
+      <tr className="border-b border-zinc-100 transition-colors duration-200 ease-in-out hover:bg-zinc-50/50">
         {selectable ? (
-          <td className="py-4 px-3 w-10">
+          <td className="w-10 px-3 py-3.5">
             <input
               type="checkbox"
               checked={selected}
               onChange={() => onToggleSelect?.(product.id)}
               aria-label={`Selecionar ${product.name}`}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+              className="h-4 w-4 rounded border-zinc-300 text-brand focus:ring-brand/30"
             />
           </td>
         ) : null}
-        {/* Nome do Produto */}
-        <td className="py-4 px-4">
-          <div className="flex flex-col">
-            <h3 className="font-semibold text-gray-800">{product.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                Código: {product.productcode}
-              </span>
-            </div>
+        <td className="px-4 py-3.5">
+          <div className="flex min-w-0 flex-col">
+            <h3 className="font-semibold text-zinc-900">{product.name}</h3>
+            <span className="mt-1 w-fit rounded-md border border-zinc-200/80 bg-zinc-50 px-2 py-0.5 font-mono text-xs text-zinc-500">
+              {product.productcode}
+            </span>
           </div>
         </td>
-
-        {/* Marca */}
-        <td className="py-4 px-4">
-          <span className="text-sm text-gray-700">{product.brand}</span>
-        </td>
-
-        {/* Preço */}
-        <td className="py-4 px-4">
-          <span className="text-lg font-bold text-green-600">
-            R$ {product.price != null && !isNaN(product.price) ? Number(product.price).toFixed(2) : '0.00'}
+        <td className="px-4 py-3.5 text-sm text-zinc-600">{product.brand}</td>
+        <td className="px-4 py-3.5 text-right">
+          <span className="text-base font-semibold tabular-nums text-zinc-900">
+            R$ {price}
           </span>
         </td>
-
-        {/* Estoque */}
-        <td className="py-4 px-4">
-          <div className="flex flex-col">
-            <span className={`text-sm font-medium ${
-              product.stock <= (product.minstock || 0) 
-                ? 'text-red-600' 
-                : 'text-gray-700'
-            }`}>
-              {product.stock} unidades
+        <td className="px-4 py-3.5 text-right">
+          <div className="flex flex-col items-end">
+            <span
+              className={`text-sm font-medium tabular-nums ${
+                lowStock ? "text-red-600" : "text-zinc-700"
+              }`}
+            >
+              {product.stock} un.
             </span>
-            {product.minstock > 0 && (
-              <span className="text-xs text-orange-600 mt-1">
-                Mín: {product.minstock}
+            {product.minstock > 0 ? (
+              <span className="mt-0.5 text-xs text-zinc-400">
+                Mín. {product.minstock}
               </span>
-            )}
+            ) : null}
           </div>
         </td>
-
-        {/* Ações */}
-        <td className="py-4 px-4">
-          <div className="flex gap-2">
-            {/* Botão Histórico de Preços - APENAS ADMIN */}
-            {userRole === 'admin' && (
-              <button
-                onClick={() => setShowPriceHistory(true)}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-1"
-                title="Histórico de Preços"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </button>
-            )}
-
-            {/* Botão Editar */}
-            <button
-              onClick={() => onEdit(product)}
-              className="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
-              title="Editar Produto"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-
-            {/* Botão Excluir (apenas admin) */}
-            {userRole === 'admin' && (
-              <button
-                onClick={() => onDelete('product', product.id, product.name)}
-                className="bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
-                title="Excluir Produto"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            )}
-          </div>
+        <td className="px-3 py-3.5 text-right">
+          <KebabMenu items={menuItems} />
         </td>
       </tr>
 
-      {/* Modal de Confirmação de Exclusão */}
-      {confirmDelete && deleteType === 'product' && deleteId === product.id && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-bold text-gray-800 mb-2">Confirmar Exclusão</h3>
-            <p className="text-gray-600 mb-4">
-              Tem certeza que deseja excluir <strong>{confirmDelete}</strong>?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={onCancelDelete}
-                className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => onConfirmDelete(product.id)}
-                className="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Excluir
-              </button>
+      {confirmDelete &&
+      deleteType === "product" &&
+      deleteId === product.id ? (
+        <tr>
+          <td colSpan={selectable ? 6 : 5} className="p-0">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-sm rounded-2xl border border-zinc-200/80 bg-white/95 p-6 shadow-glass backdrop-blur-md">
+                <h3 className="text-lg font-semibold text-zinc-900">
+                  Excluir produto?
+                </h3>
+                <p className="mt-2 text-sm text-zinc-500">
+                  Tem certeza que deseja excluir{" "}
+                  <strong className="text-zinc-800">{confirmDelete}</strong>?
+                </p>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onCancelDelete}
+                    className="flex-1 rounded-xl border border-zinc-200 py-2 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:bg-zinc-50 active:scale-[0.98]"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onConfirmDelete(product.id)}
+                    className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-700 active:scale-[0.98]"
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </td>
+        </tr>
+      ) : null}
 
-      {/* Modal de Histórico de Preços */}
-      {showPriceHistory && (
-        <PriceHistoryModal 
-          product={product} 
-          onClose={() => setShowPriceHistory(false)} 
+      {showPriceHistory ? (
+        <PriceHistoryModal
+          product={product}
+          onClose={() => setShowPriceHistory(false)}
         />
-      )}
+      ) : null}
     </>
   );
 };

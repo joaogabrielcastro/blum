@@ -13,6 +13,9 @@ import SignupPage from "./Pages/SignupPage";
 import { verifyToken, logout as apiLogout } from "./services/apiService";
 import { useToast } from "./context/ToastContext";
 import { AppDataProvider, useAppData } from "./context/AppDataProvider";
+import PlanUpgradePrompt from "./components/billing/PlanUpgradePrompt";
+import StarterUpgradeBanner from "./components/billing/StarterUpgradeBanner";
+import { PLAN_FEATURE_REQUIRED_EVENT } from "./utils/planFeatures";
 
 const ProductsPage = lazy(() => import("./Pages/ProductsPage"));
 const ClientsPage = lazy(() => import("./Pages/ClientsPage"));
@@ -113,7 +116,9 @@ function AuthenticatedApp({
             </div>
           )}
 
-          <main className="flex-1 p-2 sm:p-4 md:p-6 max-w-full">
+          <StarterUpgradeBanner subscription={subscription} />
+
+          <main className="max-w-full flex-1 bg-zinc-50/50 p-2 sm:p-4 md:p-6">
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route
@@ -145,7 +150,7 @@ function AuthenticatedApp({
                   path="/purchases"
                   element={
                     userRole === "admin" ? (
-                      <PurchasesPage />
+                      <PurchasesPage subscription={subscription} />
                     ) : (
                       <Navigate to="/dashboard" replace />
                     )
@@ -181,12 +186,21 @@ function AuthenticatedApp({
                 />
                 <Route
                   path="/products"
-                  element={<ProductsPage userRole={userRole} />}
+                  element={
+                    <ProductsPage
+                      userRole={userRole}
+                      subscription={subscription}
+                    />
+                  }
                 />
                 <Route
                   path="/reports"
                   element={
-                    <ReportsPage userRole={userRole} userId={userId} />
+                    <ReportsPage
+                      userRole={userRole}
+                      userId={userId}
+                      subscription={subscription}
+                    />
                   }
                 />
                 <Route
@@ -220,6 +234,7 @@ function AppShell() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [planUpgrade, setPlanUpgrade] = useState(null);
 
   const isLoggedIn = !!user;
   const userRole = user?.role;
@@ -246,6 +261,9 @@ function AppShell() {
       isPlatformAdmin: Boolean(userData.isPlatformAdmin),
     };
     setUser(userInfo);
+    const displayName =
+      String(userData.name || userData.username || "").trim() || "utilizador";
+    toast.success(`Bem-vindo, ${displayName}!`);
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect");
     navigate(redirect || "/dashboard", { replace: true });
@@ -306,6 +324,23 @@ function AppShell() {
     };
   }, []);
 
+  useEffect(() => {
+    const onPlanFeature = (event) => {
+      const detail = event?.detail || {};
+      setPlanUpgrade({
+        feature: detail.feature,
+        requiredPlan: detail.requiredPlan || "professional",
+      });
+      toast.warning?.(
+        detail.message ||
+          "Este recurso está disponível no plano Profissional.",
+      );
+    };
+    window.addEventListener(PLAN_FEATURE_REQUIRED_EVENT, onPlanFeature);
+    return () =>
+      window.removeEventListener(PLAN_FEATURE_REQUIRED_EVENT, onPlanFeature);
+  }, [toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -341,6 +376,12 @@ function AppShell() {
         subscription={subscription}
         onLogout={handleLogout}
         onNavigate={navigateByPage}
+      />
+      <PlanUpgradePrompt
+        open={Boolean(planUpgrade)}
+        feature={planUpgrade?.feature}
+        requiredPlan={planUpgrade?.requiredPlan}
+        onClose={() => setPlanUpgrade(null)}
       />
     </AppDataProvider>
   );

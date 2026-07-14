@@ -9,6 +9,10 @@ function isEmailConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
 }
 
+function frontendBase() {
+  return process.env.FRONTEND_URL || "https://blum.jwsoftware.com.br";
+}
+
 async function sendEmail({ to, subject, html, text }) {
   const recipients = Array.isArray(to) ? to : [to];
   const valid = recipients.filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e)));
@@ -47,7 +51,7 @@ async function sendEmail({ to, subject, html, text }) {
 }
 
 async function sendWelcomeEmail({ to, companyName, tenantSlug }) {
-  const base = process.env.FRONTEND_URL || "https://blum.jwsoftware.com.br";
+  const base = frontendBase();
   const loginUrl =
     tenantSlug && tenantSlug !== "default"
       ? `https://${tenantSlug}.${process.env.TENANT_BASE_DOMAIN || "blum.jwsoftware.com.br"}/login`
@@ -65,12 +69,52 @@ async function sendWelcomeEmail({ to, companyName, tenantSlug }) {
 }
 
 async function sendPaymentFailedEmail({ to, companyName }) {
+  const url = `${frontendBase()}/subscription`;
   return sendEmail({
     to,
     subject: `Blum — falha no pagamento (${companyName})`,
     html: `<p>O pagamento da assinatura Blum para <strong>${companyName}</strong> falhou.</p>
-<p>Atualize o método de pagamento em Assinatura para evitar interrupção do serviço.</p>`,
-    text: `Falha no pagamento Blum para ${companyName}. Atualize em Assinatura.`,
+<p><a href="${url}">Atualize o método de pagamento em Assinatura</a> para evitar interrupção do serviço.</p>`,
+    text: `Falha no pagamento Blum para ${companyName}. Atualize em ${url}`,
+  });
+}
+
+async function sendSubscriptionActivatedEmail({ to, companyName, planName }) {
+  const url = `${frontendBase()}/subscription`;
+  const plan = planName || "seu plano";
+  return sendEmail({
+    to,
+    subject: `Blum — assinatura ativa (${companyName})`,
+    html: `<p>A assinatura Blum da empresa <strong>${companyName}</strong> está ativa (${plan}).</p>
+<p><a href="${url}">Ver detalhes da assinatura</a></p>`,
+    text: `Assinatura Blum ativa para ${companyName} (${plan}). ${url}`,
+  });
+}
+
+async function sendSubscriptionCanceledEmail({ to, companyName, endsAtLabel }) {
+  const url = `${frontendBase()}/subscription`;
+  const ends =
+    endsAtLabel != null
+      ? `<p>O acesso permanece disponível até <strong>${endsAtLabel}</strong>, se aplicável.</p>`
+      : "";
+  return sendEmail({
+    to,
+    subject: `Blum — assinatura cancelada (${companyName})`,
+    html: `<p>A assinatura Blum de <strong>${companyName}</strong> foi cancelada.</p>
+${ends}
+<p><a href="${url}">Reativar em Assinatura</a></p>`,
+    text: `Assinatura Blum cancelada para ${companyName}. Reative em ${url}`,
+  });
+}
+
+async function sendTrialEndingEmail({ to, companyName, trialEndsAtLabel }) {
+  const url = `${frontendBase()}/subscription`;
+  return sendEmail({
+    to,
+    subject: `Blum — período de teste a terminar (${companyName})`,
+    html: `<p>O período de teste da empresa <strong>${companyName}</strong> termina em <strong>${trialEndsAtLabel || "breve"}</strong>.</p>
+<p><a href="${url}">Escolha um plano</a> para continuar sem interrupção.</p>`,
+    text: `Trial Blum de ${companyName} termina em ${trialEndsAtLabel || "breve"}. Assine em ${url}`,
   });
 }
 
@@ -79,4 +123,7 @@ module.exports = {
   sendEmail,
   sendWelcomeEmail,
   sendPaymentFailedEmail,
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionCanceledEmail,
+  sendTrialEndingEmail,
 };

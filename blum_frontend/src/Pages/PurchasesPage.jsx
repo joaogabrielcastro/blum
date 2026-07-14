@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
 import LoadingSpinner from "../components/LoadingSpinner";
 import VerificationTable from "../components/common/VerificationTable";
@@ -18,10 +19,12 @@ import {
   maybeMergeDuplicateProductCodes,
   validatePurchaseImportRows,
 } from "../utils/purchaseImportUtils";
+import { canUseFeature } from "../utils/planFeatures";
 
-const PurchasesPage = () => {
+const PurchasesPage = ({ subscription }) => {
   const purchaseLogic = usePurchaseLogic();
   const [activeTab, setActiveTab] = useState("pdf");
+  const canImportPurchases = canUseFeature(subscription, "purchase-import");
 
   const {
     selectedFile,
@@ -187,6 +190,25 @@ const PurchasesPage = () => {
           </p>
         </div>
 
+        {!canImportPurchases ? (
+          <div className="rounded-2xl border border-amber-200 bg-white p-8 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Importação de compras no plano Profissional
+            </h2>
+            <p className="mt-2 text-sm text-gray-600 max-w-xl">
+              No Starter você continua com catálogo e orçamentos. A importação
+              de compras por CSV/PDF, atualização de estoque e preços a partir
+              de notas está disponível a partir do Profissional.
+            </p>
+            <Link
+              to="/subscription"
+              className="mt-5 inline-flex rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Ver planos e fazer upgrade
+            </Link>
+          </div>
+        ) : (
+          <>
         <PurchaseTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {isLoading ? (
@@ -277,6 +299,8 @@ const PurchasesPage = () => {
                   : undefined
               }
             />
+          </>
+        )}
           </>
         )}
       </div>
