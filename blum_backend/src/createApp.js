@@ -23,6 +23,14 @@ const platformAdminRoutes = require("./routes/platformAdminRoutes");
 const stripeWebhookController = require("./controllers/stripeWebhookController");
 const { requireActiveSubscription } = require("./middleware/subscriptionMiddleware");
 const { tenantDbContextMiddleware } = require("./middleware/tenantDbContextMiddleware");
+const {
+  setupSentryExpress,
+  captureRequestContext,
+  getActiveTraceId,
+  getObservabilityStatus,
+  getRelease,
+  getEnvironment,
+} = require("./observability");
 
 /**
  * Cria a aplicação Express (sem abrir porta). Usado em testes de integração.
@@ -99,7 +107,10 @@ function createApp() {
       "X-Requested-With",
       "x-request-id",
       "x-tenant-slug",
+      "sentry-trace",
+      "baggage",
     ],
+    exposedHeaders: ["x-request-id", "x-api-version"],
     optionsSuccessStatus: 204,
   };
 
@@ -188,12 +199,14 @@ function createApp() {
     const requestId = req.headers["x-request-id"] || randomUUID();
     req.requestId = requestId;
     res.setHeader("x-request-id", requestId);
+    captureRequestContext(req);
 
     const start = process.hrtime.bigint();
     res.on("finish", () => {
       const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000;
       const payload = {
         requestId,
+        traceId: getActiveTraceId(),
         method: req.method,
         path: req.originalUrl || req.url,
         statusCode: res.statusCode,
@@ -215,6 +228,17 @@ function createApp() {
 
   app.get("/health", (req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+
+  app.get("/api/v2/observability", (req, res) => {
+    const status = getObservabilityStatus();
+    res.status(200).json({
+      status: "ok",
+      release: getRelease(),
+      environment: getEnvironment(),
+      sentry: status.sentry,
+      otel: status.otel,
+    });
   });
 
   const setApiVersion = (req, res, next) => {
@@ -333,6 +357,9 @@ function createApp() {
   };
 
   mountApiRoutes("/api/v2");
+
+  // Sentry error handler antes do handler JSON (captura exceções não tratadas).
+  setupSentryExpress(app);
 
   app.use((err, req, res, next) => {
     if (res.headersSent) {

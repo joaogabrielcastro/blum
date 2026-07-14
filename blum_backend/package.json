@@ -21,6 +21,12 @@
     "normalize:tenant-emails": "node scripts/normalize_tenant_emails.js"
   },
   "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.78.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
+    "@opentelemetry/resources": "^2.9.0",
+    "@opentelemetry/sdk-node": "^0.220.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@sentry/node": "^10.65.0",
     "bcrypt": "^6.0.0",
     "canvas": "^3.2.0",
     "cors": "^2.8.5",

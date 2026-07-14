@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blum Control Plane</title>
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #1a222c;
+        --border: #2a3542;
+        --text: #e7eef6;
+        --muted: #8b9aab;
+        --accent: #3d8bfd;
+        --critical: #f07178;
+        --error: #ef9f6c;
+        --warning: #d4a017;
+        --ok: #7fd962;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      header {
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: end;
+        justify-content: space-between;
+      }
+      h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+      .sub { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      input, select, button {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 0.9rem;
+      }
+      input { min-width: 220px; }
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        border-color: transparent;
+        font-weight: 600;
+      }
+      button.secondary { background: var(--panel); border-color: var(--border); }
+      main { padding: 20px 24px; display: grid; gap: 16px; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+      .stat .label { color: var(--muted); font-size: 0.75rem; }
+      .stat .value { font-size: 1.4rem; font-weight: 650; margin-top: 4px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      th, td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.88rem;
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-weight: 600; background: #151c24; }
+      tr:last-child td { border-bottom: none; }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #243041;
+      }
+      .sev-critical { color: var(--critical); }
+      .sev-error { color: var(--error); }
+      .sev-warning { color: var(--warning); }
+      .sev-info { color: var(--accent); }
+      .msg { color: var(--muted); font-size: 0.8rem; margin-top: 4px; max-width: 420px; }
+      .error-banner {
+        background: #3a1f24;
+        color: #ffb4b8;
+        border: 1px solid #5c2c34;
+        padding: 10px 12px;
+        border-radius: 8px;
+        display: none;
+      }
+      .empty { color: var(--muted); padding: 24px; text-align: center; }
+      a { color: var(--accent); }
+      .detail {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+      .detail h2 { margin: 0 0 8px; font-size: 1rem; }
+      .detail ul { margin: 8px 0; padding-left: 18px; color: var(--muted); }
+      .detail .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Control Plane</h1>
+        <div class="sub">Fase 5 — PR após approve (sem merge) + status de CI</div>
+      </div>
+      <div class="controls">
+        <input id="token" type="password" placeholder="Admin token" />
+        <select id="projectFilter">
+          <option value="">Todos os projetos</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">Todos status</option>
+          <option value="open">open</option>
+          <option value="acknowledged">acknowledged</option>
+          <option value="resolved">resolved</option>
+          <option value="ignored">ignored</option>
+        </select>
+        <button id="refresh" type="button">Atualizar</button>
+        <button id="saveToken" class="secondary" type="button">Salvar token</button>
+      </div>
+    </header>
+    <main>
+      <div id="error" class="error-banner"></div>
+      <div class="stats">
+        <div class="stat"><div class="label">Projetos</div><div class="value" id="statProjects">—</div></div>
+        <div class="stat"><div class="label">Incidentes</div><div class="value" id="statIncidents">—</div></div>
+        <div class="stat"><div class="label">Abertos</div><div class="value" id="statOpen">—</div></div>
+        <div class="stat"><div class="label">Com diagnóstico</div><div class="value" id="statDiag">—</div></div>
+        <div class="stat"><div class="label">Eventos (soma)</div><div class="value" id="statEvents">—</div></div>
+      </div>
+      <div id="detail" class="detail" style="display:none"></div>
+      <div>
+        <table>
+          <thead>
+            <tr>
+              <th>Severidade</th>
+              <th>Título</th>
+              <th>Diagnóstico</th>
+              <th>Projeto</th>
+              <th>Status</th>
+              <th>Count</th>
+              <th>Último</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="8" class="empty">Informe o admin token e clique em Atualizar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+    <script>
+      const lsKey = "control_plane_admin_token";
+      const tokenEl = document.getElementById("token");
+      const errorEl = document.getElementById("error");
+      const rowsEl = document.getElementById("rows");
+      const projectFilter = document.getElementById("projectFilter");
+      const statusFilter = document.getElementById("statusFilter");
+
+      tokenEl.value = localStorage.getItem(lsKey) || "";
+
+      function showError(msg) {
+        errorEl.style.display = msg ? "block" : "none";
+        errorEl.textContent = msg || "";
+      }
+
+      function authHeaders() {
+        return {
+          Authorization: "Bearer " + tokenEl.value.trim(),
+          "Content-Type": "application/json",
+        };
+      }
+
+      function fmtDate(value) {
+        if (!value) return "—";
+        try {
+          return new Date(value).toLocaleString();
+        } catch {
+          return value;
+        }
+      }
+
+      async function api(path) {
+        const res = await fetch(path, { headers: authHeaders() });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "HTTP " + res.status);
+        }
+        return res.json();
+      }
+
+      async function loadProjects() {
+        const data = await api("/api/v1/projects");
+        const selected = projectFilter.value;
+        projectFilter.innerHTML = '<option value="">Todos os projetos</option>';
+        for (const p of data.projects || []) {
+          const opt = document.createElement("option");
+          opt.value = p.slug;
+          opt.textContent = p.name + " (" + p.slug + ")";
+          projectFilter.appendChild(opt);
+        }
+        projectFilter.value = selected;
+        document.getElementById("statProjects").textContent = String(
+          (data.projects || []).length
+        );
+        return data.projects || [];
+      }
+
+      async function loadIncidents() {
+        const params = new URLSearchParams();
+        if (projectFilter.value) params.set("projectSlug", projectFilter.value);
+        if (statusFilter.value) params.set("status", statusFilter.value);
+        params.set("limit", "100");
+        const data = await api("/api/v1/incidents?" + params.toString());
+        const incidents = data.incidents || [];
+        document.getElementById("statIncidents").textContent = String(incidents.length);
+        document.getElementById("statOpen").textContent = String(
+          incidents.filter((i) => i.status === "open").length
+        );
+        document.getElementById("statDiag").textContent = String(
+          incidents.filter((i) => i.diagnosis_status === "ready").length
+        );
+        document.getElementById("statEvents").textContent = String(
+          incidents.reduce((sum, i) => sum + Number(i.event_count || 0), 0)
+        );
+
+        if (!incidents.length) {
+          rowsEl.innerHTML =
+            '<tr><td colspan="8" class="empty">Nenhum incidente.</td></tr>';
+          return;
+        }
+
+        rowsEl.innerHTML = incidents
+          .map((i) => {
+            const sev = i.severity || "error";
+            const conf =
+              i.diagnosis_confidence != null
+                ? Math.round(Number(i.diagnosis_confidence) * 100) + "%"
+                : "—";
+            const hyp = i.diagnosis_hypothesis
+              ? escapeHtml(String(i.diagnosis_hypothesis).slice(0, 140))
+              : '<span class="msg">' +
+                escapeHtml(i.diagnosis_status || "none") +
+                "</span>";
+            return (
+              "<tr>" +
+              '<td class="sev-' +
+              sev +
+              '"><span class="pill">' +
+              sev +
+              "</span></td>" +
+              "<td><div>" +
+              escapeHtml(i.title) +
+              "</div>" +
+              (i.culprit
+                ? '<div class="msg">' + escapeHtml(i.culprit) + "</div>"
+                : "") +
+              "</td>" +
+              "<td><div>" +
+              hyp +
+              '</div><div class="msg">conf ' +
+              conf +
+              (i.diagnosis_category
+                ? " · " + escapeHtml(i.diagnosis_category)
+                : "") +
+              (i.proposal_status && i.proposal_status !== "none"
+                ? " · prop " + escapeHtml(i.proposal_status)
+                : "") +
+              "</div></td>" +
+              "<td>" +
+              escapeHtml(i.project_slug || "") +
+              "</td>" +
+              "<td>" +
+              escapeHtml(i.status) +
+              "</td>" +
+              "<td>" +
+              i.event_count +
+              "</td>" +
+              "<td>" +
+              fmtDate(i.last_seen) +
+              "</td>" +
+              "<td>" +
+              '<button class="secondary" data-view="' +
+              i.id +
+              '">Ver</button> ' +
+              (i.status !== "resolved"
+                ? '<button class="secondary" data-resolve="' +
+                  i.id +
+                  '">Resolver</button>'
+                : "") +
+              "</td>" +
+              "</tr>"
+            );
+          })
+          .join("");
+      }
+
+      function escapeHtml(str) {
+        return String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function renderPrBlock(proposal) {
+        const prStatus = proposal.pr_status || "none";
+        let body =
+          '<div class="msg">Proposta aprovada · PR ' +
+          escapeHtml(prStatus) +
+          " · CI " +
+          escapeHtml(proposal.ci_status || "none") +
+          "</div>";
+
+        if (proposal.pr_url) {
+          body +=
+            '<div><a href="' +
+            escapeHtml(proposal.pr_url) +
+            '" target="_blank" rel="noopener">Abrir PR #' +
+            escapeHtml(String(proposal.pr_number || "")) +
+            "</a>" +
+            (proposal.pr_branch
+              ? ' · <span class="msg">' +
+                escapeHtml(proposal.pr_branch) +
+                "</span>"
+              : "") +
+            "</div>";
+        } else if (prStatus === "queued" || prStatus === "opening") {
+          body +=
+            '<div class="msg">Abrindo PR via Cursor… atualize em 1–3 min.</div>';
+        } else if (prStatus === "skipped") {
+          body +=
+            '<div class="msg">' +
+            escapeHtml(proposal.pr_error || "PR omitida") +
+            "</div>";
+        } else if (prStatus === "failed") {
+          body +=
+            '<div class="msg">' +
+            escapeHtml(proposal.pr_error || "Falha ao abrir PR") +
+            "</div>" +
+            '<div class="actions"><button data-openpr="' +
+            proposal.id +
+            '">Tentar abrir PR de novo</button></div>';
+        } else if (prStatus === "none") {
+          body +=
+            '<div class="actions"><button data-openpr="' +
+            proposal.id +
+            '">Abrir PR agora</button></div>';
+        }
+
+        if (proposal.pr_url || proposal.pr_number) {
+          body +=
+            '<div class="actions"><button class="secondary" data-refreshci="' +
+            proposal.id +
+            '">Atualizar CI</button></div>';
+        }
+        return body;
+      }
+
+      async function refresh() {
+        showError("");
+        if (!tokenEl.value.trim()) {
+          showError("Informe o CONTROL_PLANE_ADMIN_TOKEN.");
+          return;
+        }
+        try {
+          await loadProjects();
+          await loadIncidents();
+        } catch (err) {
+          showError(err.message);
+        }
+      }
+
+      document.getElementById("refresh").addEventListener("click", refresh);
+      document.getElementById("saveToken").addEventListener("click", () => {
+        localStorage.setItem(lsKey, tokenEl.value.trim());
+        refresh();
+      });
+      projectFilter.addEventListener("change", refresh);
+      statusFilter.addEventListener("change", refresh);
+      rowsEl.addEventListener("click", async (ev) => {
+        const resolveId = ev.target.getAttribute("data-resolve");
+        const viewId = ev.target.getAttribute("data-view");
+        if (viewId) {
+          try {
+            const data = await api("/api/v1/incidents/" + viewId);
+            const d = data.diagnosis;
+            const detail = document.getElementById("detail");
+            detail.style.display = "block";
+            if (!d) {
+              detail.innerHTML =
+                "<h2>Sem diagnóstico ainda</h2>" +
+                '<div class="actions">' +
+                '<button data-rediag="' +
+                viewId +
+                '">Rodar diagnóstico</button></div>';
+              return;
+            }
+            if (d.status === "pending") {
+              detail.innerHTML =
+                "<h2>Diagnóstico em andamento</h2>" +
+                '<div class="msg">O agente (Cursor) ainda está analisando. Clique em Atualizar em 20–60s.</div>' +
+                '<div class="actions">' +
+                '<button class="secondary" id="closeDetail">Fechar</button></div>';
+              return;
+            }
+            if (d.status === "failed") {
+              detail.innerHTML =
+                "<h2>Diagnóstico falhou</h2>" +
+                '<div class="msg">' +
+                escapeHtml(d.error_message || "erro desconhecido") +
+                "</div>" +
+                '<div class="actions">' +
+                '<button data-rediag="' +
+                viewId +
+                '">Tentar de novo</button>' +
+                '<button class="secondary" id="closeDetail">Fechar</button></div>';
+              return;
+            }
+            const evidence = Array.isArray(d.evidence)
+              ? d.evidence
+              : [];
+            const steps = Array.isArray(d.recommended_next_steps)
+              ? d.recommended_next_steps
+              : [];
+            const files = Array.isArray(d.suspect_files) ? d.suspect_files : [];
+            const proposal = data.proposal;
+            let proposalHtml = "";
+            if (proposal && proposal.status === "pending") {
+              proposalHtml =
+                "<h2>Proposta em andamento</h2>" +
+                '<div class="msg">Gerando diff… Atualize em 30–90s.</div>';
+            } else if (proposal && proposal.status === "failed") {
+              proposalHtml =
+                "<h2>Proposta falhou</h2>" +
+                '<div class="msg">' +
+                escapeHtml(proposal.error_message || "") +
+                "</div>" +
+                '<button data-propose="' +
+                viewId +
+                '">Tentar de novo</button>';
+            } else if (proposal && proposal.files) {
+              const pfiles = proposal.files || [];
+              proposalHtml =
+                "<h2>Proposta de correção</h2>" +
+                "<div><strong>" +
+                escapeHtml(proposal.summary || "") +
+                "</strong></div>" +
+                '<div class="msg">status ' +
+                escapeHtml(proposal.status) +
+                " · risk " +
+                escapeHtml(proposal.risk_tier || "") +
+                "/" +
+                escapeHtml(proposal.risk_level || "") +
+                " · policy " +
+                escapeHtml(proposal.policy_mode || "") +
+                " · conf " +
+                Math.round(Number(proposal.confidence || 0) * 100) +
+                "% · " +
+                escapeHtml(proposal.model || "") +
+                "</div>" +
+                "<div><strong>Motivo</strong><div class='msg'>" +
+                escapeHtml(proposal.rationale || "") +
+                "</div></div>" +
+                "<div><strong>Plano de testes</strong><ul>" +
+                (Array.isArray(proposal.test_plan)
+                  ? proposal.test_plan
+                      .map((t) => "<li>" + escapeHtml(t) + "</li>")
+                      .join("")
+                  : "") +
+                "</ul></div>" +
+                "<div><strong>Arquivos / diffs</strong>" +
+                (pfiles.length
+                  ? pfiles
+                      .map(
+                        (f) =>
+                          "<div style='margin-top:8px'><div class='msg'>" +
+                          escapeHtml(f.risk_tier || "") +
+                          " · " +
+                          escapeHtml(f.path) +
+                          "</div><pre style='white-space:pre-wrap;font-size:12px;background:#111827;padding:8px;border-radius:6px;overflow:auto;max-height:220px'>" +
+                          escapeHtml(f.diff_unified || "") +
+                          "</pre></div>"
+                      )
+                      .join("")
+                  : "<div class='msg'>Nenhum arquivo (pode ser incidente sintético)</div>") +
+                "</div>" +
+                (proposal.status === "awaiting_approval"
+                  ? '<div class="actions">' +
+                    '<button data-approve="' +
+                    proposal.id +
+                    '">Aprovar e abrir PR</button> ' +
+                    '<button class="secondary" data-reject="' +
+                    proposal.id +
+                    '">Rejeitar</button></div>' +
+                    '<div class="msg">Approve enfileira PR (Cursor cloud). Sem merge automático.</div>'
+                  : proposal.status === "approved"
+                    ? renderPrBlock(proposal)
+                    : "");
+            } else {
+              proposalHtml =
+                '<div class="actions"><button data-propose="' +
+                viewId +
+                '">Gerar proposta de correção</button></div>';
+            }
+
+            detail.innerHTML =
+              "<h2>Diagnóstico</h2>" +
+              "<div><strong>" +
+              escapeHtml(d.hypothesis || "") +
+              "</strong></div>" +
+              '<div class="msg">confidence ' +
+              Math.round(Number(d.confidence || 0) * 100) +
+              "% · " +
+              escapeHtml(d.root_cause_category || "unknown") +
+              " · model " +
+              escapeHtml(d.model || "—") +
+              " · status " +
+              escapeHtml(d.status) +
+              "</div>" +
+              "<div><strong>Evidências</strong><ul>" +
+              evidence.map((e) => "<li>" + escapeHtml(e) + "</li>").join("") +
+              "</ul></div>" +
+              "<div><strong>Arquivos suspeitos</strong><ul>" +
+              (files.length
+                ? files
+                    .map(
+                      (f) =>
+                        "<li>" +
+                        escapeHtml(f.path || f) +
+                        (f.reason
+                          ? ' — <span class="msg">' +
+                            escapeHtml(f.reason) +
+                            "</span>"
+                          : "") +
+                        "</li>"
+                    )
+                    .join("")
+                : "<li class='msg'>nenhum</li>") +
+              "</ul></div>" +
+              "<div><strong>Próximos passos</strong><ul>" +
+              steps.map((s) => "<li>" + escapeHtml(s) + "</li>").join("") +
+              "</ul></div>" +
+              proposalHtml +
+              '<div class="actions">' +
+              '<button data-rediag="' +
+              viewId +
+              '">Re-diagnosticar</button> ' +
+              '<button class="secondary" id="closeDetail">Fechar</button>' +
+              "</div>";
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        if (!resolveId) return;
+        try {
+          await fetch("/api/v1/incidents/" + resolveId, {
+            method: "PATCH",
+            headers: authHeaders(),
+            body: JSON.stringify({ status: "resolved" }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              throw new Error(body.error || "Falha ao resolver");
+            }
+          });
+          await refresh();
+        } catch (err) {
+          showError(err.message);
+        }
+      });
+
+      document.body.addEventListener("click", async (ev) => {
+        if (ev.target.id === "closeDetail") {
+          document.getElementById("detail").style.display = "none";
+          return;
+        }
+        const proposeId = ev.target.getAttribute("data-propose");
+        if (proposeId) {
+          try {
+            const res = await fetch(
+              "/api/v1/incidents/" + proposeId + "/propose",
+              { method: "POST", headers: authHeaders() }
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Falha ao propor");
+            showError(
+              body.queued
+                ? "Proposta enfileirada. Atualize em 30–90s e clique Ver."
+                : "Proposta gerada."
+            );
+            setTimeout(refresh, body.queued ? 3000 : 400);
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        const approveId = ev.target.getAttribute("data-approve");
+        if (approveId) {
+          try {
+            const res = await fetch(
+              "/api/v1/proposals/" + approveId + "/approve",
+              {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({ comment: "approved via panel" }),
+              }
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Falha ao aprovar");
+            showError(
+              body.note ||
+                (body.pr && body.pr.queued
+                  ? "Aprovado — PR enfileirada."
+                  : "Aprovado.")
+            );
+            setTimeout(refresh, 400);
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        const rejectId = ev.target.getAttribute("data-reject");
+        if (rejectId) {
+          try {
+            const res = await fetch(
+              "/api/v1/proposals/" + rejectId + "/reject",
+              {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({ comment: "rejected via panel" }),
+              }
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Falha ao rejeitar");
+            showError("Proposta rejeitada.");
+            setTimeout(refresh, 400);
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        const openPrId = ev.target.getAttribute("data-openpr");
+        if (openPrId) {
+          try {
+            const res = await fetch(
+              "/api/v1/proposals/" + openPrId + "/open-pr",
+              { method: "POST", headers: authHeaders() }
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Falha ao abrir PR");
+            showError(
+              body.queued
+                ? "PR enfileirada. Atualize em 1–3 min."
+                : body.skipped
+                  ? "PR omitida (sem diffs ou desabilitada)."
+                  : "PR processada."
+            );
+            setTimeout(refresh, body.queued ? 3000 : 400);
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        const refreshCiId = ev.target.getAttribute("data-refreshci");
+        if (refreshCiId) {
+          try {
+            const res = await fetch(
+              "/api/v1/proposals/" + refreshCiId + "/refresh-ci",
+              { method: "POST", headers: authHeaders() }
+            );
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error || "Falha ao atualizar CI");
+            showError("CI: " + (body.ci && body.ci.status));
+            setTimeout(refresh, 400);
+          } catch (err) {
+            showError(err.message);
+          }
+          return;
+        }
+        const id = ev.target.getAttribute("data-rediag");
+        if (!id) return;
+        try {
+          const res = await fetch("/api/v1/incidents/" + id + "/diagnose", {
+            method: "POST",
+            headers: authHeaders(),
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(body.error || "Falha no diagnóstico");
+          if (body.queued) {
+            showError("Diagnóstico enfileirado. Atualize em alguns segundos.");
+          }
+          setTimeout(refresh, body.queued ? 2500 : 200);
+        } catch (err) {
+          showError(err.message);
+        }
+      });
+
+      if (tokenEl.value) refresh();
+    </script>
+  </body>
+</html>

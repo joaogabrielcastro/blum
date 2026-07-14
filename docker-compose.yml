@@ -5,6 +5,7 @@
 #   (veja env.production.example e blum_backend/.env.example)
 #
 # Abra no PC: http://localhost:8080
+# Control Plane (Fase 2): http://localhost:3020
 # No telefone (mesma rede Wi‑Fi): http://<IP_DO_PC>:8080  (ex.: ipconfig / ifconfig)
 # A API é servida pelo mesmo host (/api/v2 via Nginx → backend), não use localhost:3011 no build.
 #
@@ -59,6 +60,45 @@ services:
       TENANT_SUBDOMAIN_ENABLED: "false"
       REDIS_URL: redis://redis:6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  control-plane:
+    build:
+      context: ./control_plane
+      dockerfile: Dockerfile
+    ports:
+      - "3020:3020"
+    env_file:
+      - ./control_plane/.env
+    environment:
+      NODE_ENV: development
+      PORT: "3020"
+      DATABASE_URL: postgresql://blum:blum_docker_dev@postgres:5432/agent_control
+      REDIS_URL: redis://redis:6379
+      # Admin token vem de control_plane/.env (env_file) — não sobrescrever pelo shell
+      SEED_PROJECT_SLUG: blum
+      SEED_PROJECT_NAME: Blum
+      SEED_PROJECT_REPO: joaogabrielcastro/blum
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # Prefer values from env_file; root .env also used for ${} interpolation
+      CURSOR_API_KEY: ${CURSOR_API_KEY}
+      CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
+      CURSOR_RUNTIME: ${CURSOR_RUNTIME:-cloud}
+      CURSOR_REPO_URL: ${CURSOR_REPO_URL:-}
+      DIAGNOSIS_PROVIDER: ${DIAGNOSIS_PROVIDER:-auto}
+      DIAGNOSIS_COOLDOWN_MINUTES: ${DIAGNOSIS_COOLDOWN_MINUTES:-30}
+      # Telegram: só via control_plane/.env (env_file) — não sobrescrever com vazio
+      CONTROL_PLANE_PUBLIC_URL: ${CONTROL_PLANE_PUBLIC_URL:-http://localhost:3020}
     depends_on:
       postgres:
         condition: service_healthy

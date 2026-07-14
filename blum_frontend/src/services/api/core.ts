@@ -6,6 +6,7 @@ import {
 import { getStoredTenantSlug } from "../../constants/tenantStorage";
 import { refreshAccessToken } from "../auth/refreshSession";
 import type { ApiErrorBody, SubscriptionSummary } from "../../types/api";
+import { isSentryConfigured, Sentry } from "../../observability/sentry";
 
 export const API_URL =
   process.env.REACT_APP_API_URL || "/api/v2";
@@ -16,6 +17,7 @@ export interface ApiRequestError extends Error {
   details?: unknown;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
+  requestId?: string | null;
 }
 
 interface RequestInternal {
@@ -23,6 +25,13 @@ interface RequestInternal {
 }
 
 type AuthHeaders = Record<string, string>;
+
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export const getAuthHeaders = (): AuthHeaders => {
   const token = localStorage.getItem("token");
@@ -38,6 +47,7 @@ export const getAuthHeaders = (): AuthHeaders => {
   }
   return {
     "Content-Type": "application/json",
+    "x-request-id": createRequestId(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantSlug ? { "x-tenant-slug": tenantSlug } : {}),
   };
@@ -100,6 +110,9 @@ const formatValidationDetails = (details: unknown): string => {
 };
 
 async function parseErrorResponse(response: Response): Promise<never> {
+  const requestId =
+    response.headers.get("x-request-id") ||
+    response.headers.get("X-Request-Id");
   const rawText = await response.text();
   let error: ApiErrorBody = {};
   try {
@@ -119,13 +132,28 @@ async function parseErrorResponse(response: Response): Promise<never> {
       ? error.details.trim()
       : "";
 
+  const attachMeta = (customError: ApiRequestError) => {
+    customError.status = response.status;
+    customError.requestId =
+      requestId ||
+      (typeof error.requestId === "string" ? error.requestId : null);
+    if (isSentryConfigured() && response.status >= 500) {
+      Sentry.captureException(customError, {
+        tags: {
+          request_id: customError.requestId || "unknown",
+          http_status: String(response.status),
+        },
+      });
+    }
+    return customError;
+  };
+
   if (error.details && Array.isArray(error.details) && error.details.length) {
     const customError = new Error(
       detailText || serverText || `Erro: ${response.status}`,
     ) as ApiRequestError;
     customError.details = error.details;
-    customError.status = response.status;
-    throw customError;
+    throw attachMeta(customError);
   }
 
   const messageWithDetails =
@@ -143,11 +171,10 @@ async function parseErrorResponse(response: Response): Promise<never> {
         : null) ||
       `Erro HTTP ${response.status}`,
   ) as ApiRequestError;
-  customError.status = response.status;
   customError.code = error.code;
   customError.subscription = error.subscription;
   customError.stockWarnings = error.stockWarnings;
-  throw customError;
+  throw attachMeta(customError);
 }
 
 async function handleUnauthorized<T>(
@@ -216,6 +243,7 @@ function getUploadHeaders(): AuthHeaders {
     /* ignore */
   }
   return {
+    "x-request-id": createRequestId(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(tenantSlug ? { "x-tenant-slug": tenantSlug } : {}),
   };

@@ -4,9 +4,10 @@
   "description": "![Status](https://img.shields.io/badge/status-active-success.svg)\r ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)\r ![License](https://img.shields.io/badge/license-MIT-blue.svg)",
   "main": "index.js",
   "scripts": {
-    "test": "npm test --prefix blum_backend && npm run test:ci --prefix blum_frontend",
+    "test": "npm test --prefix blum_backend && npm run test:ci --prefix blum_frontend && npm test --prefix control_plane",
     "test:backend": "npm test --prefix blum_backend",
     "test:frontend": "npm run test:ci --prefix blum_frontend",
+    "test:control-plane": "npm test --prefix control_plane",
     "test:e2e": "npm run test:e2e --prefix blum_frontend",
     "test:integration": "npm run test:integration --prefix blum_backend",
     "build:frontend": "npm run build --prefix blum_frontend"

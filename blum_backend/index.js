@@ -2,14 +2,23 @@ require("dotenv").config({ override: false });
 const { assertProductionConfig } = require("./src/config/env");
 assertProductionConfig();
 
-const { createApp } = require("./src/createApp");
-const { runMigrations } = require("./src/db/migrate");
-const { seedDefaultUsers } = require("./src/bootstrap/seedDefaultUsers");
+/**
+ * Observabilidade ANTES do Express:
+ * Sentry (e OTel, se ativo) precisam registrar instrumentação
+ * antes de carregar http/express via createApp.
+ */
+const {
+  initSentry,
+  startOpenTelemetry,
+} = require("./src/observability/instrumentCompat");
 
-const app = createApp();
-const port = process.env.PORT || 3011;
+initSentry();
+
+let app = null;
 
 const setupDatabase = async () => {
+  const { runMigrations } = require("./src/db/migrate");
+  const { seedDefaultUsers } = require("./src/bootstrap/seedDefaultUsers");
   try {
     console.log("Conectando ao banco de dados PostgreSQL...");
     await runMigrations();
@@ -23,6 +32,23 @@ const setupDatabase = async () => {
 
 const startApp = async () => {
   try {
+    try {
+      await startOpenTelemetry();
+    } catch (otelErr) {
+      // Observabilidade é opcional — não derruba a API.
+      console.error(
+        JSON.stringify({
+          level: "error",
+          message: "otel_start_failed",
+          error: otelErr.message,
+        }),
+      );
+    }
+
+    const { createApp } = require("./src/createApp");
+    app = createApp();
+    const port = process.env.PORT || 3011;
+
     await setupDatabase();
 
     app.listen(port, "0.0.0.0", () => {
@@ -37,4 +63,16 @@ const startApp = async () => {
 
 startApp();
 
-module.exports = app;
+module.exports = new Proxy(
+  {},
+  {
+    get(_target, prop) {
+      if (prop === "then" || prop === "catch" || prop === "finally") {
+        return undefined;
+      }
+      if (!app) return undefined;
+      const value = app[prop];
+      return typeof value === "function" ? value.bind(app) : value;
+    },
+  },
+);
