@@ -27,6 +27,7 @@ Copie variáveis de [`env.production.example`](../env.production.example) e [`bl
 | `PLATFORM_ADMIN_EMAILS` | E-mails super-admin |
 | `TENANT_SIGNUP_ENABLED` | `true` |
 | `RESEND_API_KEY` + `EMAIL_FROM` | Opcional (e-mails transacionais) |
+| `SENTRY_DSN` / `OTEL_*` | Opcional — ver [OBSERVABILITY.md](./OBSERVABILITY.md) |
 
 Validar: `GET https://api-blum.jwsoftware.com.br/api/v2/status`
 

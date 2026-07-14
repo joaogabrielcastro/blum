@@ -37,6 +37,7 @@ export interface ApiErrorBody {
   code?: string;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
+  requestId?: string;
 }
 
 export interface ClientRecord {
