@@ -3,6 +3,9 @@ const {
   sendEmail,
   sendWelcomeEmail,
   sendPaymentFailedEmail,
+  sendSubscriptionActivatedEmail,
+  sendSubscriptionCanceledEmail,
+  sendTrialEndingEmail,
 } = require("./emailService");
 
 describe("emailService", () => {
@@ -75,6 +78,36 @@ describe("emailService", () => {
     await sendPaymentFailedEmail({ to: "a@test.com", companyName: "Acme" });
     const output = log.mock.calls.map((c) => c.join(" ")).join(" ");
     expect(output).toMatch(/falha/i);
+    log.mockRestore();
+  });
+
+  test("sendSubscriptionActivatedEmail monta assunto", async () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+    await sendSubscriptionActivatedEmail({
+      to: "a@test.com",
+      companyName: "Acme",
+      planName: "Starter",
+    });
+    const output = log.mock.calls.map((c) => c.join(" ")).join(" ");
+    expect(output).toMatch(/assinatura ativa/i);
+    log.mockRestore();
+  });
+
+  test("sendSubscriptionCanceledEmail e trialEnding", async () => {
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
+    await sendSubscriptionCanceledEmail({
+      to: "a@test.com",
+      companyName: "Acme",
+      endsAtLabel: "15 de julho de 2026",
+    });
+    await sendTrialEndingEmail({
+      to: "a@test.com",
+      companyName: "Acme",
+      trialEndsAtLabel: "20 de julho de 2026",
+    });
+    const output = log.mock.calls.map((c) => c.join(" ")).join(" ");
+    expect(output).toMatch(/cancelada/i);
+    expect(output).toMatch(/teste/i);
     log.mockRestore();
   });
 });

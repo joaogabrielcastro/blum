@@ -75,5 +75,17 @@ describe("subscriptionAccess", () => {
     });
     expect(summary.accessBlocked).toBe(true);
     expect(summary.hasAccess).toBe(false);
+    expect(summary.features).toEqual([]);
+  });
+
+  it("mapSubscriptionSummary inclui features do plano", () => {
+    process.env.BILLING_ENFORCE = "true";
+    const starter = mapSubscriptionSummary(activeTenant);
+    expect(starter.features).toEqual([]);
+    const pro = mapSubscriptionSummary({
+      ...activeTenant,
+      plan_slug: "professional",
+    });
+    expect(pro.features).toContain("product-import");
   });
 });

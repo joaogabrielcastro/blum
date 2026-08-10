@@ -13,10 +13,14 @@ import SignupPage from "./Pages/SignupPage";
 import { verifyToken, logout as apiLogout } from "./services/apiService";
 import { useToast } from "./context/ToastContext";
 import { AppDataProvider, useAppData } from "./context/AppDataProvider";
+import PlanUpgradePrompt from "./components/billing/PlanUpgradePrompt";
+import StarterUpgradeBanner from "./components/billing/StarterUpgradeBanner";
+import { PLAN_FEATURE_REQUIRED_EVENT } from "./utils/planFeatures";
 
 const ProductsPage = lazy(() => import("./Pages/ProductsPage"));
 const ClientsPage = lazy(() => import("./Pages/ClientsPage"));
 const OrdersPage = lazy(() => import("./Pages/OrdersPage"));
+const OrderFormPage = lazy(() => import("./Pages/OrderFormPage"));
 const PurchasesPage = lazy(() => import("./Pages/PurchasesPage"));
 const ReportsPage = lazy(() => import("./Pages/ReportsPage"));
 const ClientHistoryPage = lazy(() => import("./Pages/ClientHistoryPage"));
@@ -38,8 +42,8 @@ const PAGE_PATH = {
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[40vh]">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+    <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-edge border-t-brand" />
     </div>
   );
 }
@@ -60,60 +64,72 @@ function AuthenticatedApp({
   const { clientsMap, brands } = useAppData();
 
   return (
-    <div className="font-sans text-gray-800 antialiased bg-gray-50 min-h-screen">
-      <div className="relative flex flex-col md:flex-row h-screen overflow-hidden bg-gray-100">
+    <div className="min-h-screen bg-surface-page font-sans text-ink antialiased">
+      <div className="relative flex h-screen flex-col overflow-hidden md:flex-row">
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           onLogout={onLogout}
           userRole={userRole}
           isPlatformAdmin={isPlatformAdmin}
+          username={username}
+          displayName={user?.name || username}
         />
 
         {isSidebarOpen && (
           <div
             role="presentation"
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 z-30 bg-black bg-opacity-50 md:hidden"
+            className="fixed inset-0 z-30 bg-zinc-900/40 md:hidden dark:bg-black/50"
           />
         )}
 
-        <div className="flex flex-1 flex-col overflow-y-auto w-full max-w-full">
-          <button
-            type="button"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-4 text-gray-500 hover:text-gray-600 md:hidden z-20"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <div className="flex w-full max-w-full flex-1 flex-col overflow-y-auto">
+          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-edge bg-surface/95 px-3 py-2 backdrop-blur md:hidden">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-xl text-ink-muted hover:bg-surface-muted hover:text-ink"
+              aria-label={isSidebarOpen ? "Fechar menu" : "Abrir menu"}
+              aria-expanded={isSidebarOpen}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 6h16M4 12h16m-7 6h7"
-              />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16m-7 6h7"
+                />
+              </svg>
+            </button>
+            <span className="text-sm font-semibold tracking-tight text-ink">
+              Blum
+            </span>
+          </header>
 
-          {!isOnline && (
-            <div className="bg-yellow-500 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base leading-snug">
+          {!isOnline ? (
+            <div className="bg-amber-500 px-3 py-2.5 text-center text-sm font-semibold leading-snug text-white sm:text-base">
               Sem internet — modo campo ativo. Use Orçamentos para criar vendas
               offline; os dados serão enviados ao voltar online.
             </div>
-          )}
+          ) : null}
 
-          {subscription?.accessBlocked && userRole !== "admin" && (
-            <div className="bg-red-600 text-white text-center font-semibold py-2.5 px-3 shadow-md text-sm sm:text-base">
+          {subscription?.accessBlocked && userRole !== "admin" ? (
+            <div className="bg-red-600 px-3 py-2.5 text-center text-sm font-semibold text-white sm:text-base">
               A assinatura da empresa está inativa. Contacte o administrador.
             </div>
-          )}
+          ) : null}
 
-          <main className="flex-1 p-2 sm:p-4 md:p-6 max-w-full">
+          <StarterUpgradeBanner subscription={subscription} />
+
+          <main className="max-w-full flex-1 bg-surface-page p-3 pb-24 sm:p-4 sm:pb-6 md:p-6">
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route
@@ -127,6 +143,28 @@ function AuthenticatedApp({
                       onNavigate={onNavigate}
                       userId={userId}
                       userRole={userRole}
+                    />
+                  }
+                />
+                <Route
+                  path="/orders/new"
+                  element={
+                    <OrderFormPage
+                      userId={userId}
+                      userRole={userRole}
+                      brands={brands}
+                      isOnline={isOnline}
+                    />
+                  }
+                />
+                <Route
+                  path="/orders/:orderId/edit"
+                  element={
+                    <OrderFormPage
+                      userId={userId}
+                      userRole={userRole}
+                      brands={brands}
+                      isOnline={isOnline}
                     />
                   }
                 />
@@ -145,7 +183,7 @@ function AuthenticatedApp({
                   path="/purchases"
                   element={
                     userRole === "admin" ? (
-                      <PurchasesPage />
+                      <PurchasesPage subscription={subscription} />
                     ) : (
                       <Navigate to="/dashboard" replace />
                     )
@@ -181,12 +219,21 @@ function AuthenticatedApp({
                 />
                 <Route
                   path="/products"
-                  element={<ProductsPage userRole={userRole} />}
+                  element={
+                    <ProductsPage
+                      userRole={userRole}
+                      subscription={subscription}
+                    />
+                  }
                 />
                 <Route
                   path="/reports"
                   element={
-                    <ReportsPage userRole={userRole} userId={userId} />
+                    <ReportsPage
+                      userRole={userRole}
+                      userId={userId}
+                      subscription={subscription}
+                    />
                   }
                 />
                 <Route
@@ -201,9 +248,9 @@ function AuthenticatedApp({
             </Suspense>
           </main>
 
-          <footer className="bg-white border-t border-gray-200 py-4 px-6 mt-auto">
-            <div className="text-center text-sm text-gray-500">
-              Sistema de Gestão © {new Date().getFullYear()}
+          <footer className="mt-auto border-t border-edge bg-surface px-6 py-4">
+            <div className="text-center text-sm text-ink-muted">
+              Blum © {new Date().getFullYear()}
             </div>
           </footer>
         </div>
@@ -220,6 +267,7 @@ function AppShell() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [planUpgrade, setPlanUpgrade] = useState(null);
 
   const isLoggedIn = !!user;
   const userRole = user?.role;
@@ -246,6 +294,9 @@ function AppShell() {
       isPlatformAdmin: Boolean(userData.isPlatformAdmin),
     };
     setUser(userInfo);
+    const displayName =
+      String(userData.name || userData.username || "").trim() || "utilizador";
+    toast.success(`Bem-vindo, ${displayName}!`);
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect");
     navigate(redirect || "/dashboard", { replace: true });
@@ -306,12 +357,29 @@ function AppShell() {
     };
   }, []);
 
+  useEffect(() => {
+    const onPlanFeature = (event) => {
+      const detail = event?.detail || {};
+      setPlanUpgrade({
+        feature: detail.feature,
+        requiredPlan: detail.requiredPlan || "professional",
+      });
+      toast.warning?.(
+        detail.message ||
+          "Este recurso está disponível no plano Profissional.",
+      );
+    };
+    window.addEventListener(PLAN_FEATURE_REQUIRED_EVENT, onPlanFeature);
+    return () =>
+      window.removeEventListener(PLAN_FEATURE_REQUIRED_EVENT, onPlanFeature);
+  }, [toast]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-surface-page">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Carregando...</p>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-edge border-t-brand" />
+          <p className="text-ink-muted">Carregando...</p>
         </div>
       </div>
     );
@@ -341,6 +409,12 @@ function AppShell() {
         subscription={subscription}
         onLogout={handleLogout}
         onNavigate={navigateByPage}
+      />
+      <PlanUpgradePrompt
+        open={Boolean(planUpgrade)}
+        feature={planUpgrade?.feature}
+        requiredPlan={planUpgrade?.requiredPlan}
+        onClose={() => setPlanUpgrade(null)}
       />
     </AppDataProvider>
   );

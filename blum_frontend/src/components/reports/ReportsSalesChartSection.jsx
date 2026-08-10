@@ -8,6 +8,8 @@ const ReportsSalesChartSection = ({
   previousMonth,
   sellerFilterKey,
   selectedSellerLabel,
+  brandFilterKey,
+  selectedBrandLabel,
   userRole,
   previousMonthTotal,
   suggestedTarget,
@@ -19,79 +21,88 @@ const ReportsSalesChartSection = ({
   salesTarget,
   chartData,
   totalSales,
-}) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
-    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-4">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-800 mb-1">
-          Evolução das Vendas — {formatMonthYearLabel(selectedYear, selectedMonth)}
-          {sellerFilterKey && selectedSellerLabel
-            ? ` — ${selectedSellerLabel}`
-            : ""}
-        </h2>
-        <p className="text-sm text-gray-600">
-          Linha cinza: acumulado de{" "}
-          {formatMonthYearLabel(previousMonth.year, previousMonth.month)}.
-        </p>
-      </div>
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 min-w-[260px]">
-        <h3 className="text-sm font-bold text-gray-800 mb-3">
-          Meta do mês
-          {userRole === "admin" && !sellerFilterKey ? " (empresa)" : ""}
-        </h3>
-        <p className="text-xs text-gray-600 mb-1">
-          Mês anterior: {formatCurrency(previousMonthTotal)}
-        </p>
-        {suggestedTarget != null ? (
-          <p className="text-xs text-gray-600 mb-3">
-            Sugestão (+10%): {formatCurrency(suggestedTarget)}
+}) => {
+  const scopeParts = [
+    sellerFilterKey && selectedSellerLabel ? selectedSellerLabel : null,
+    brandFilterKey && selectedBrandLabel ? selectedBrandLabel : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mb-8 rounded-2xl border border-edge bg-surface p-6 shadow-soft">
+      <div className="mb-4 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="mb-1 text-xl font-semibold text-ink">
+            Evolução das Vendas —{" "}
+            {formatMonthYearLabel(selectedYear, selectedMonth)}
+            {scopeParts.length ? ` — ${scopeParts.join(" · ")}` : ""}
+          </h2>
+          <p className="text-sm text-ink-muted">
+            Linha cinza: acumulado de{" "}
+            {formatMonthYearLabel(previousMonth.year, previousMonth.month)}.
+            {brandFilterKey
+              ? " Valores da representada selecionada (pedidos multi-marca são rateados)."
+              : ""}
           </p>
-        ) : null}
-        <div className="flex gap-2 mb-2">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={targetDraft}
-            onChange={(e) => onTargetDraftChange(e.target.value)}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Valor da meta"
-          />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="min-w-[260px] rounded-xl border border-edge bg-surface-muted p-4">
+          <h3 className="mb-3 text-sm font-bold text-ink">
+            Meta do mês
+            {userRole === "admin" && !sellerFilterKey ? " (empresa)" : ""}
+          </h3>
+          <p className="mb-1 text-xs text-ink-muted">
+            Mês anterior: {formatCurrency(previousMonthTotal)}
+          </p>
           {suggestedTarget != null ? (
+            <p className="mb-3 text-xs text-ink-muted">
+              Sugestão (+10%): {formatCurrency(suggestedTarget)}
+            </p>
+          ) : null}
+          <div className="mb-2 flex gap-2">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={targetDraft}
+              onChange={(e) => onTargetDraftChange(e.target.value)}
+              className="flex-1 rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-ink"
+              placeholder="Valor da meta"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestedTarget != null ? (
+              <button
+                type="button"
+                onClick={onApplySuggestedTarget}
+                className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-200"
+              >
+                Usar sugestão
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={onApplySuggestedTarget}
-              className="text-xs px-3 py-1.5 rounded-lg bg-indigo-100 text-indigo-800 font-semibold hover:bg-indigo-200"
+              onClick={onSaveTarget}
+              disabled={savingTarget}
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
             >
-              Usar sugestão
+              {savingTarget ? "Salvando..." : "Salvar meta"}
             </button>
+          </div>
+          {salesTarget != null && salesTarget > 0 ? (
+            <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+              Meta salva: {formatCurrency(salesTarget)}
+            </p>
           ) : null}
-          <button
-            type="button"
-            onClick={onSaveTarget}
-            disabled={savingTarget}
-            className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
-          >
-            {savingTarget ? "Salvando..." : "Salvar meta"}
-          </button>
         </div>
-        {salesTarget != null && salesTarget > 0 ? (
-          <p className="text-xs text-green-700 mt-2 font-medium">
-            Meta salva: {formatCurrency(salesTarget)}
-          </p>
-        ) : null}
       </div>
+      <SalesChart
+        data={chartData}
+        monthlyTarget={salesTarget}
+        filterPeriod="monthly"
+        totalSales={totalSales}
+        showComparison
+      />
     </div>
-    <SalesChart
-      data={chartData}
-      monthlyTarget={salesTarget}
-      filterPeriod="monthly"
-      totalSales={totalSales}
-      showComparison
-    />
-  </div>
-);
+  );
+};
 
 export default ReportsSalesChartSection;

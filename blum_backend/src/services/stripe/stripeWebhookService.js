@@ -85,6 +85,29 @@ async function syncSubscriptionToTenant(subscription, options = {}) {
   return tenant.id;
 }
 
+async function resolveTenantBillingEmail(tenantId, tenantRow = null) {
+  const tenant = tenantRow || (await tenantRepository.findBillingById(tenantId));
+  if (!tenant) return { tenant: null, to: null };
+  const to =
+    tenant.billing_email ||
+    (await tenantRepository.findAdminEmailForTenant(tenantId));
+  return { tenant, to };
+}
+
+function formatDatePt(isoOrUnix) {
+  if (isoOrUnix == null) return null;
+  const d =
+    typeof isoOrUnix === "number"
+      ? new Date(isoOrUnix * 1000)
+      : new Date(isoOrUnix);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 async function handleCheckoutSessionCompleted(session) {
   const tenantId = Number(
     session.metadata?.tenant_id || session.client_reference_id,
@@ -118,11 +141,71 @@ async function handleCheckoutSessionCompleted(session) {
     await syncSubscriptionToTenant(subscription, {
       auditAction: "billing.webhook.checkout_completed",
     });
+
+    const status = String(subscription.status || "").toLowerCase();
+    if (status === "active" || status === "trialing") {
+      const { sendSubscriptionActivatedEmail } = require("../emailService");
+      const { getPlanBySlug } = require("../../config/plans");
+      const { tenant, to } = await resolveTenantBillingEmail(tenantId);
+      const planSlug =
+        subscription.metadata?.plan_slug || tenant?.plan_slug;
+      const planName = getPlanBySlug(planSlug)?.name || planSlug;
+      if (to && tenant?.name) {
+        sendSubscriptionActivatedEmail({
+          to,
+          companyName: tenant.name,
+          planName,
+        }).catch((err) =>
+          console.warn("[email] subscription_activated:", err.message),
+        );
+      }
+    }
   }
 }
 
 async function handleSubscriptionEvent(subscription, auditAction) {
-  await syncSubscriptionToTenant(subscription, { auditAction });
+  const tenantId = await syncSubscriptionToTenant(subscription, { auditAction });
+
+  if (auditAction === "billing.webhook.subscription_deleted" && tenantId) {
+    const { sendSubscriptionCanceledEmail } = require("../emailService");
+    const { tenant, to } = await resolveTenantBillingEmail(tenantId);
+    if (to && tenant?.name) {
+      sendSubscriptionCanceledEmail({
+        to,
+        companyName: tenant.name,
+        endsAtLabel: formatDatePt(
+          subscription.canceled_at || subscription.ended_at,
+        ),
+      }).catch((err) =>
+        console.warn("[email] subscription_canceled:", err.message),
+      );
+    }
+  }
+}
+
+async function handleTrialWillEnd(subscription) {
+  const tenant = await resolveTenantFromSubscription(subscription);
+  if (!tenant) return;
+
+  await logAuditEvent({
+    tenantId: tenant.id,
+    action: "billing.webhook.trial_will_end",
+    resourceType: "subscription",
+    resourceId: subscription.id,
+    metadata: {
+      trialEnd: subscription.trial_end,
+    },
+  });
+
+  const { sendTrialEndingEmail } = require("../emailService");
+  const { to } = await resolveTenantBillingEmail(tenant.id, tenant);
+  if (to && tenant.name) {
+    sendTrialEndingEmail({
+      to,
+      companyName: tenant.name,
+      trialEndsAtLabel: formatDatePt(subscription.trial_end),
+    }).catch((err) => console.warn("[email] trial_ending:", err.message));
+  }
 }
 
 async function handleInvoicePaid(invoice) {
@@ -158,10 +241,7 @@ async function handleInvoicePaymentFailed(invoice) {
 
   if (tenantId) {
     const { sendPaymentFailedEmail } = require("../emailService");
-    const tenant = await tenantRepository.findBillingById(tenantId);
-    const to =
-      tenant?.billing_email ||
-      (await tenantRepository.findAdminEmailForTenant(tenantId));
+    const { tenant, to } = await resolveTenantBillingEmail(tenantId);
     if (to && tenant?.name) {
       sendPaymentFailedEmail({ to, companyName: tenant.name }).catch((err) =>
         console.warn("[email] payment_failed:", err.message),
@@ -214,6 +294,7 @@ const EVENT_HANDLERS = {
     handleSubscriptionEvent(sub, "billing.webhook.subscription_updated"),
   "customer.subscription.deleted": (sub) =>
     handleSubscriptionEvent(sub, "billing.webhook.subscription_deleted"),
+  "customer.subscription.trial_will_end": handleTrialWillEnd,
   "invoice.paid": handleInvoicePaid,
   "invoice.payment_failed": handleInvoicePaymentFailed,
   "invoice.finalized": handleInvoiceFinalized,

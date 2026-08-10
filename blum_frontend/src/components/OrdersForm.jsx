@@ -22,6 +22,8 @@ import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
 import OrderFormProductStaging from "./orders/OrderFormProductStaging";
 import OrderFormTotals from "./orders/OrderFormTotals";
+import OrderFormStepper from "./orders/OrderFormStepper";
+import OrderFormSummaryCard from "./orders/OrderFormSummaryCard";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
 import { findClientOptionByTypedValue } from "../utils/clients";
 import { getStockWarningLines } from "../utils/orderStockWarnings";
@@ -29,6 +31,14 @@ import {
   OrderMobileClientPicker,
   OrderMobileProductPicker,
 } from "./orders/OrderMobilePickers";
+import {
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+} from "./ui/Surface";
+
+const LAST_BRAND_KEY = "blum.lastOrderBrandId";
 
 const OrdersForm = ({
   userId,
@@ -41,6 +51,10 @@ const OrdersForm = ({
   editingOrder,
 }) => {
   const toast = useToast();
+  const [step, setStep] = useState(1);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const {
     clientId,
     setClientId,
@@ -139,22 +153,37 @@ const OrdersForm = ({
       }
       setPaymentMethod(editingOrder.paymentMethod || "");
       setOrderDateTime(toDateTimeLocalValue(editingOrder.createdAt));
+      setStep(1);
+      setShowAdvanced(Boolean(editingOrder.description));
     } else {
       setClientId("");
       setClientSearchTerm("");
       setDescription("");
       setItems([]);
       setDiscount(0);
-      setSelectedBrand("");
-      setSelectedBrandId("");
       setTotalPrice(0);
       setProductSearch("");
       setSearchResults([]);
       setPaymentMethod("");
       setOrderDateTime(toDateTimeLocalValue(new Date()));
+      setStep(1);
+      setShowAdvanced(false);
+
+      let remembered = "";
+      try {
+        remembered = localStorage.getItem(LAST_BRAND_KEY) || "";
+      } catch {
+        remembered = "";
+      }
+      if (remembered && findBrandById(brands, remembered)) {
+        const brand = findBrandById(brands, remembered);
+        setSelectedBrandId(String(brand.id));
+        setSelectedBrand(brand.name || "");
+      } else {
+        setSelectedBrand("");
+        setSelectedBrandId("");
+      }
     }
-    // Apenas editingOrder deve resetar o formulário; mudanças de referência
-    // em brands/clients (re-render do pai) não podem apagar o que foi digitado.
   }, [editingOrder]);
 
   useEffect(() => {
@@ -164,7 +193,6 @@ const OrdersForm = ({
   useOrderEditHydration(apiService, editingOrder, items, setItems);
 
   useEffect(() => {
-    // Atualiza o total sempre que items ou discount mudar
     setTotalPrice(netTotal);
   }, [items, discount, netTotal]);
 
@@ -208,6 +236,13 @@ const OrdersForm = ({
     setSelectedBrand(brand?.name || "");
     setProductSearch("");
     clearSearch();
+    if (brandId) {
+      try {
+        localStorage.setItem(LAST_BRAND_KEY, String(brandId));
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
   const handlePaymentMethodChange = (nextMethod) => {
@@ -227,6 +262,53 @@ const OrdersForm = ({
       );
     }
   };
+
+  const clientLabel =
+    clientOptions.find((opt) => opt.id === String(clientId))?.label ||
+    clients[String(clientId)] ||
+    "";
+
+  const validateStep = (targetStep) => {
+    if (targetStep >= 2) {
+      if (!clientId) {
+        toast.warning("Selecione um cliente para continuar.");
+        return false;
+      }
+      if (!selectedBrandId && !selectedBrand) {
+        toast.warning("Selecione uma representada para continuar.");
+        return false;
+      }
+    }
+    if (targetStep >= 3) {
+      if (items.length === 0) {
+        toast.warning("Adicione pelo menos um item ao pedido.");
+        return false;
+      }
+      if (items.some((item) => !item.productName || !item.price)) {
+        toast.warning("Preencha todos os campos dos produtos.");
+        return false;
+      }
+      const missingQty = items.some((item) => {
+        const q = parseQuantityByBrand(item.quantity, item.brand);
+        return !q || q <= 0;
+      });
+      if (missingQty) {
+        toast.warning(
+          "Informe a quantidade de cada produto (maior que zero).",
+        );
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const goNext = () => {
+    const next = Math.min(3, step + 1);
+    if (!validateStep(next)) return;
+    setStep(next);
+  };
+
+  const goBack = () => setStep((s) => Math.max(1, s - 1));
 
   const saveOrder = async ({ confirmStockWarning = false } = {}) => {
     const originalSellerId =
@@ -272,13 +354,9 @@ const OrdersForm = ({
         );
         return;
       }
-      const clientLabel =
-        clientOptions.find((opt) => opt.id === String(clientId))?.label ||
-        clients[String(clientId)] ||
-        "Cliente";
       await enqueuePendingOrder({
         payload: orderData,
-        clientLabel,
+        clientLabel: clientLabel || "Cliente",
         totalPrice: netTotal,
       });
       toast.success(
@@ -309,36 +387,12 @@ const OrdersForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!clientId) {
-      toast.warning("Por favor, selecione um cliente.");
+    if (step < 3) {
+      goNext();
       return;
     }
+    if (!validateStep(3)) return;
 
-    if (!selectedBrand) {
-      toast.warning("Por favor, selecione uma representada.");
-      return;
-    }
-
-    if (items.length === 0) {
-      toast.warning("Adicione pelo menos um item ao pedido.");
-      return;
-    }
-
-    if (items.some((item) => !item.productName || !item.price)) {
-      toast.warning("Por favor, preencha todos os campos dos produtos.");
-      return;
-    }
-
-    const missingQty = items.some((item) => {
-      const q = parseQuantityByBrand(item.quantity, item.brand);
-      return !q || q <= 0;
-    });
-    if (missingQty) {
-      toast.warning(
-        "Informe a quantidade de cada produto (maior que zero) antes de guardar.",
-      );
-      return;
-    }
     const discountValue = parseFloat(discount) || 0;
     if (!canApplyGeneralDiscount && discountValue > 0) {
       toast.warning(
@@ -347,17 +401,20 @@ const OrdersForm = ({
       return;
     }
     if (canApplyGeneralDiscount && discountValue > 2) {
-      toast.warning("Para PIX ou dinheiro, o desconto geral máximo permitido é 2%.");
+      toast.warning(
+        "Para PIX ou dinheiro, o desconto geral máximo permitido é 2%.",
+      );
       return;
     }
     if (!userId) {
       toast.warning(
-        "ID do usuário não disponível. Por favor, tente fazer login novamente.",
+        "Sessão inválida. Faça login novamente para guardar o pedido.",
       );
       return;
     }
     if (!orderDateTime || Number.isNaN(new Date(orderDateTime).getTime())) {
       toast.warning("Informe uma data/hora válida para o pedido.");
+      setShowAdvanced(true);
       return;
     }
 
@@ -367,15 +424,13 @@ const OrdersForm = ({
     }
 
     try {
+      setSaving(true);
       await saveOrder();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-
-      // Mostra detalhes de validação se disponíveis
-      let errorMessage = `Falha ao ${
+      let errorMessage = `Não foi possível ${
         editingOrder ? "atualizar" : "criar"
       } o pedido.`;
-
       if (error.details && Array.isArray(error.details)) {
         const fieldErrors = error.details
           .map(
@@ -383,196 +438,268 @@ const OrdersForm = ({
               `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
-        errorMessage += `\n\nErros de validação:\n${fieldErrors}`;
+        errorMessage += `\n\n${fieldErrors}`;
       } else if (error.message) {
         errorMessage += `\n${error.message}`;
       }
-
       toast.error(errorMessage);
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleConfirmStockWarningSave = async () => {
     try {
+      setSaving(true);
       await saveOrder({
         confirmStockWarning: documentType === "pedido",
       });
       setStockWarningModalOpen(false);
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
-      toast.error(error?.message || "Falha ao salvar o pedido.");
+      toast.error(
+        error?.message ||
+          "Não foi possível salvar. Verifique os dados e tente novamente.",
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
+  const title = editingOrder
+    ? editingOrder.documentType === "orcamento"
+      ? "Editar orçamento"
+      : "Editar pedido"
+    : "Novo orçamento";
+
+  const metaProps = {
+    brands,
+    clientId,
+    clientOptions,
+    clientSearchTerm,
+    onClientSearchTermChange: handleClientSearchTermChange,
+    onOpenMobileClientPicker: () => setMobileClientPickerOpen(true),
+    onResetClient: resetClient,
+    mobileClientPickerOpen,
+    desktopClientListOpen,
+    onDesktopClientListOpen: setDesktopClientListOpen,
+    filteredClientOptions,
+    onSelectClient: selectClientOption,
+    selectedBrandId,
+    onBrandChange: handleBrandChange,
+    paymentMethod,
+    onPaymentMethodChange: handlePaymentMethodChange,
+    orderDateTime,
+    onOrderDateTimeChange: setOrderDateTime,
+    description,
+    onDescriptionChange: setDescription,
+    discount,
+    onDiscountChange: setDiscount,
+    canApplyGeneralDiscount,
+    showAdvanced,
+    onToggleAdvanced: () => setShowAdvanced((v) => !v),
+  };
+
+  const summary = (
+    <OrderFormSummaryCard
+      documentType={documentType}
+      clientLabel={clientLabel}
+      brandLabel={selectedBrand}
+      itemCount={items.length}
+      subtotalAfterLineDiscounts={subtotalAfterLineDiscounts}
+      discount={discount}
+      discountAmount={discountAmount}
+      totalPrice={totalPrice}
+    />
+  );
+
+  const actionButtons = (
+    <>
+      {step > 1 ? (
+        <SecondaryButton
+          type="button"
+          onClick={goBack}
+          disabled={saving}
+          className="w-full md:w-auto"
+        >
+          Voltar
+        </SecondaryButton>
+      ) : (
+        <GhostButton
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="w-full md:w-auto"
+        >
+          Cancelar
+        </GhostButton>
+      )}
+      {step < 3 ? (
+        <PrimaryButton
+          type="button"
+          onClick={goNext}
+          className="w-full md:w-auto"
+        >
+          Continuar
+        </PrimaryButton>
+      ) : (
+        <PrimaryButton
+          type="submit"
+          form="order-form-main"
+          disabled={saving}
+          className="w-full md:w-auto"
+        >
+          {saving
+            ? "A guardar…"
+            : editingOrder
+              ? "Guardar alterações"
+              : "Criar orçamento"}
+        </PrimaryButton>
+      )}
+    </>
+  );
+
   return (
     <>
-      <div className="w-full min-w-0 max-w-none">
-        <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 mb-3 sm:mb-5 pt-0.5">
-          {editingOrder
-            ? editingOrder.documentType === "orcamento"
-              ? "Editar orçamento"
-              : "Editar pedido"
-            : "Novo orçamento"}
-        </h2>
+      <div className="w-full min-w-0 max-w-none pb-28 md:pb-8">
+        <PageHeader
+          title={title}
+          description="Três passos: cliente, itens e condições."
+          actions={
+            <GhostButton type="button" onClick={onCancel} className="hidden sm:inline-flex">
+              Voltar à lista
+            </GhostButton>
+          }
+        />
+
+        <OrderFormStepper step={step} />
+
         {editingOrder?.status === "Entregue" ? (
-          <div className="mb-4 sm:mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 sm:px-4 py-3 text-amber-900">
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
             <p className="text-sm font-semibold">Pedido entregue em edição</p>
             <p className="mt-1 text-sm">
-              Ao salvar este pedido, o sistema ajusta o estoque automaticamente
-              conforme os itens adicionados, removidos ou alterados.
+              Ao salvar, o estoque é ajustado conforme os itens alterados.
             </p>
           </div>
         ) : null}
         {hasLiveStockWarnings ? (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 sm:px-4 py-3 text-amber-950">
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
             <p className="text-sm font-semibold">
               Atenção: {stockWarningLines.length} item(ns) sem estoque suficiente
             </p>
             <p className="mt-1 text-sm text-amber-900/90">
               {documentType === "pedido"
-                ? "Ao salvar o pedido será necessária confirmação explícita. A entrega continuará bloqueada até haver estoque."
-                : "Você pode salvar o orçamento; o aviso ficará registrado para o admin."}
+                ? "Ao salvar o pedido será necessária confirmação. A entrega fica bloqueada até haver estoque."
+                : "Você pode salvar o orçamento; o aviso ficará registrado."}
             </p>
           </div>
         ) : null}
-        <div className="w-full">
-          <form
-            id="order-form-main"
-            onSubmit={handleSubmit}
-            className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 md:p-5 lg:p-6 space-y-5 sm:space-y-7 w-full min-w-0 overflow-hidden pb-28 md:pb-8"
-          >
-          <OrderFormMetaSection
-            brands={brands}
-            clientId={clientId}
-            clientOptions={clientOptions}
-            clientSearchTerm={clientSearchTerm}
-            onClientSearchTermChange={handleClientSearchTermChange}
-            onOpenMobileClientPicker={() => setMobileClientPickerOpen(true)}
-            onResetClient={resetClient}
-            mobileClientPickerOpen={mobileClientPickerOpen}
-            desktopClientListOpen={desktopClientListOpen}
-            onDesktopClientListOpen={setDesktopClientListOpen}
-            filteredClientOptions={filteredClientOptions}
-            onSelectClient={selectClientOption}
-            selectedBrandId={selectedBrandId}
-            onBrandChange={handleBrandChange}
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={handlePaymentMethodChange}
-            orderDateTime={orderDateTime}
-            onOrderDateTimeChange={setOrderDateTime}
-            description={description}
-            onDescriptionChange={setDescription}
-            discount={discount}
-            onDiscountChange={setDiscount}
-            canApplyGeneralDiscount={canApplyGeneralDiscount}
-          />
 
-          {/* --- Seção de Produtos (mobile: tela cheia; desktop: dropdown) --- */}
-          <section className="rounded-xl border border-gray-200 bg-white p-3 sm:p-4 md:p-5 space-y-4 sm:space-y-5 min-w-0">
-            <div>
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-                Produtos do pedido
-              </h3>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Busque o produto, informe a quantidade no painel abaixo e adicione
-                ao pedido — sem precisar rolar a página a cada item.
-              </p>
-            </div>
-          <OrderFormProductSearch
-            selectedBrand={selectedBrand}
-            productSearch={productSearch}
-            onProductSearchChange={setProductSearch}
-            isSearching={isSearching}
-            searchResults={searchResults}
-            onResetSearch={resetProductSearch}
-            onOpenMobilePicker={() => setMobileProductPickerOpen(true)}
-            onProductSelect={handleProductSelect}
-          />
-
-          <OrderFormProductStaging
-            stagingItem={stagingItem}
-            clientId={clientId}
-            canEditUnitPrice={canEditUnitPrice}
-            onFieldChange={updateStagingField}
-            onConfirm={confirmStaging}
-            onCancel={cancelStaging}
-            onOpenFullHistory={() => {
-              if (stagingItem) {
-                setHistoryModalItem({
-                  productId: stagingItem.productId,
-                  productName: stagingItem.productName,
-                  productcode: stagingItem.productcode,
-                });
-              }
-            }}
-          />
-
-          <OrderFormLineItems
-            items={items}
-            clientId={clientId}
-            canEditUnitPrice={canEditUnitPrice}
-            activeItemIndex={
-              stagingItem?.mode === "edit" ? stagingItem.editIndex : null
-            }
-            onItemChange={handleItemChange}
-            onRemoveItem={removeItem}
-            onSelectItem={selectLineItemForStaging}
-            onOpenHistory={setHistoryModalItem}
-          />
-
-          </section>
-
-          <OrderFormTotals
-            subtotalAfterLineDiscounts={subtotalAfterLineDiscounts}
-            discount={discount}
-            discountAmount={discountAmount}
-            totalPrice={totalPrice}
-          />
-
-          {/* --- Ações (desktop) --- */}
-          <div className="hidden md:flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="w-full sm:w-auto min-h-11 px-6 py-2.5 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition"
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+          <div className="min-w-0 lg:col-span-2">
+            <form
+              id="order-form-main"
+              onSubmit={handleSubmit}
+              className="min-w-0 space-y-5 overflow-hidden rounded-2xl border border-edge bg-surface p-3 shadow-soft sm:space-y-6 sm:p-4 md:p-6"
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="w-full sm:w-auto min-h-11 px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-            >
-              {editingOrder ? "Atualizar Pedido" : "Criar Pedido"}
-            </button>
+              {step === 1 ? (
+                <OrderFormMetaSection variant="basics" {...metaProps} />
+              ) : null}
+
+              {step === 2 ? (
+                <section className="min-w-0 space-y-4 sm:space-y-5">
+                  <div>
+                    <h3 className="text-base font-semibold text-ink sm:text-lg">
+                      Produtos
+                    </h3>
+                    <p className="mt-1 text-xs text-ink-muted sm:text-sm">
+                      Busque, informe a quantidade e adicione ao pedido.
+                    </p>
+                    {!selectedBrand ? (
+                      <p className="mt-2 text-sm text-amber-700">
+                        Selecione a representada no passo anterior para buscar
+                        produtos.
+                      </p>
+                    ) : null}
+                  </div>
+                  <OrderFormProductSearch
+                    selectedBrand={selectedBrand}
+                    productSearch={productSearch}
+                    onProductSearchChange={setProductSearch}
+                    isSearching={isSearching}
+                    searchResults={searchResults}
+                    onResetSearch={resetProductSearch}
+                    onOpenMobilePicker={() => setMobileProductPickerOpen(true)}
+                    onProductSelect={handleProductSelect}
+                  />
+                  <OrderFormProductStaging
+                    stagingItem={stagingItem}
+                    clientId={clientId}
+                    canEditUnitPrice={canEditUnitPrice}
+                    onFieldChange={updateStagingField}
+                    onConfirm={confirmStaging}
+                    onCancel={cancelStaging}
+                    onOpenFullHistory={() => {
+                      if (stagingItem) {
+                        setHistoryModalItem({
+                          productId: stagingItem.productId,
+                          productName: stagingItem.productName,
+                          productcode: stagingItem.productcode,
+                        });
+                      }
+                    }}
+                  />
+                  <OrderFormLineItems
+                    items={items}
+                    clientId={clientId}
+                    canEditUnitPrice={canEditUnitPrice}
+                    activeItemIndex={
+                      stagingItem?.mode === "edit"
+                        ? stagingItem.editIndex
+                        : null
+                    }
+                    onItemChange={handleItemChange}
+                    onRemoveItem={removeItem}
+                    onSelectItem={selectLineItemForStaging}
+                    onOpenHistory={setHistoryModalItem}
+                  />
+                </section>
+              ) : null}
+
+              {step === 3 ? (
+                <>
+                  <OrderFormMetaSection variant="conditions" {...metaProps} />
+                  <OrderFormTotals
+                    subtotalAfterLineDiscounts={subtotalAfterLineDiscounts}
+                    discount={discount}
+                    discountAmount={discountAmount}
+                    totalPrice={totalPrice}
+                  />
+                </>
+              ) : null}
+
+              <div className="hidden justify-end gap-3 border-t border-edge pt-4 md:flex">
+                {actionButtons}
+              </div>
+            </form>
           </div>
-        </form>
+
+          <div className="hidden lg:block">
+            <div className="sticky top-4 space-y-3">{summary}</div>
+          </div>
+        </div>
+
+        <div className="mt-4 lg:hidden">{summary}</div>
       </div>
 
-      {/* Barra fixa: acoes no mobile */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur-sm px-3 pt-3 md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-edge bg-surface/95 px-3 pt-3 backdrop-blur-sm md:hidden"
         style={{
           paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="w-full flex flex-col-reverse gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full min-h-11 px-6 py-2.5 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            form="order-form-main"
-            className="w-full min-h-12 px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-          >
-            {editingOrder ? "Atualizar Pedido" : "Criar Pedido"}
-          </button>
-        </div>
+        <div className="flex flex-col-reverse gap-2">{actionButtons}</div>
       </div>
-    </div>
 
       <OrderMobileProductPicker
         open={mobileProductPickerOpen}

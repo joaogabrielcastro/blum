@@ -2,10 +2,12 @@ import {
   AUTH_NOTICE_FORBIDDEN,
   AUTH_NOTICE_KEY,
   AUTH_NOTICE_SESSION_EXPIRED,
+  AUTH_NOTICE_SUBSCRIPTION_REQUIRED,
 } from "../../constants/authNotice";
 import { getStoredTenantSlug } from "../../constants/tenantStorage";
 import { refreshAccessToken } from "../auth/refreshSession";
 import type { ApiErrorBody, SubscriptionSummary } from "../../types/api";
+import { PLAN_FEATURE_REQUIRED_EVENT } from "../../utils/planFeatures";
 import { isSentryConfigured, Sentry } from "../../observability/sentry";
 
 export const API_URL =
@@ -14,6 +16,8 @@ export const API_URL =
 export interface ApiRequestError extends Error {
   status?: number;
   code?: string;
+  feature?: string;
+  requiredPlan?: string;
   details?: unknown;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
@@ -172,9 +176,51 @@ async function parseErrorResponse(response: Response): Promise<never> {
       `Erro HTTP ${response.status}`,
   ) as ApiRequestError;
   customError.code = error.code;
+  customError.feature = error.feature;
+  customError.requiredPlan = error.requiredPlan;
   customError.subscription = error.subscription;
   customError.stockWarnings = error.stockWarnings;
   throw attachMeta(customError);
+}
+
+function emitPlanFeatureRequired(error: ApiRequestError): void {
+  if (error.code !== "PLAN_FEATURE_REQUIRED") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(PLAN_FEATURE_REQUIRED_EVENT, {
+        detail: {
+          feature: error.feature,
+          requiredPlan: error.requiredPlan || "professional",
+          message: error.message,
+        },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function redirectAdminToSubscription(): void {
+  try {
+    sessionStorage.setItem(
+      AUTH_NOTICE_KEY,
+      AUTH_NOTICE_SUBSCRIPTION_REQUIRED,
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    const saved = localStorage.getItem("user");
+    const parsed = saved ? (JSON.parse(saved) as { role?: string }) : null;
+    if (
+      parsed?.role === "admin" &&
+      !window.location.pathname.startsWith("/subscription")
+    ) {
+      window.location.href = "/subscription";
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 async function handleUnauthorized<T>(
@@ -221,10 +267,23 @@ export const apiRequest = async <T = unknown>(
         apiRequest<T>(url, options, { ...internal, _authRetried: true }),
       internal);
     }
-    if (response.status === 403) {
-      forceLogout(403);
+    try {
+      await parseErrorResponse(response);
+    } catch (err) {
+      const apiErr = err as ApiRequestError;
+      if (response.status === 402) {
+        redirectAdminToSubscription();
+        throw apiErr;
+      }
+      if (response.status === 403) {
+        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
+          emitPlanFeatureRequired(apiErr);
+          throw apiErr;
+        }
+        forceLogout(403);
+      }
+      throw apiErr;
     }
-    return parseErrorResponse(response);
   }
 
   return response.json() as Promise<T>;
@@ -267,11 +326,23 @@ export const apiUpload = async <T = unknown>(
         apiUpload<T>(url, formData, { ...internal, _authRetried: true }),
       internal);
     }
-    if (response.status === 403) forceLogout(403);
-    const errorData = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    throw new Error(errorData.error || `Erro ${response.status}`);
+    try {
+      await parseErrorResponse(response);
+    } catch (err) {
+      const apiErr = err as ApiRequestError;
+      if (response.status === 402) {
+        redirectAdminToSubscription();
+        throw apiErr;
+      }
+      if (response.status === 403) {
+        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
+          emitPlanFeatureRequired(apiErr);
+          throw apiErr;
+        }
+        forceLogout(403);
+      }
+      throw apiErr;
+    }
   }
 
   return response.json() as Promise<T>;
@@ -289,11 +360,23 @@ export const apiDownloadBlob = async (
         apiDownloadBlob(url, { ...internal, _authRetried: true }),
       internal);
     }
-    if (response.status === 403) forceLogout(403);
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    throw new Error(payload.error || "Erro ao baixar arquivo");
+    try {
+      await parseErrorResponse(response);
+    } catch (err) {
+      const apiErr = err as ApiRequestError;
+      if (response.status === 402) {
+        redirectAdminToSubscription();
+        throw apiErr;
+      }
+      if (response.status === 403) {
+        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
+          emitPlanFeatureRequired(apiErr);
+          throw apiErr;
+        }
+        forceLogout(403);
+      }
+      throw apiErr;
+    }
   }
 
   return response.blob();

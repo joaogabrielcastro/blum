@@ -68,21 +68,23 @@ export function useOfflineSync({ api, brands, isOnline, isLoggedIn, toast }) {
   }, [isLoggedIn, isOnline, syncQueuedOrders, toast]);
 
   // Com internet: atualiza catálogo local se estiver desatualizado (>24h).
+  // Não incluir `syncing` nas deps — senão o cleanup cancela o finally e o botão
+  // fica preso em "A sincronizar…" para sempre.
   useEffect(() => {
-    if (!isLoggedIn || !isOnline || !brands?.length || syncing) return;
+    if (!isLoggedIn || !isOnline || !brands?.length) return;
     if (autoRefreshAttemptedRef.current) return;
     autoRefreshAttemptedRef.current = true;
 
     let cancelled = false;
     (async () => {
-      const catalogMeta = await getOfflineCatalogMeta();
-      if (!catalogMeta.catalogSyncedAt || cancelled) return;
-
-      const age =
-        Date.now() - new Date(catalogMeta.catalogSyncedAt).getTime();
-      if (age < CATALOG_AUTO_REFRESH_MS) return;
-
       try {
+        const catalogMeta = await getOfflineCatalogMeta();
+        if (!catalogMeta.catalogSyncedAt || cancelled) return;
+
+        const age =
+          Date.now() - new Date(catalogMeta.catalogSyncedAt).getTime();
+        if (age < CATALOG_AUTO_REFRESH_MS) return;
+
         setSyncing(true);
         await syncOfflineCatalog(api, brands);
         if (!cancelled) {
@@ -92,14 +94,15 @@ export function useOfflineSync({ api, brands, isOnline, isLoggedIn, toast }) {
       } catch (error) {
         console.warn("Atualização automática offline:", error);
       } finally {
-        if (!cancelled) setSyncing(false);
+        // Sempre limpa o estado visual, mesmo se o efeito foi limpo no meio.
+        setSyncing(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [isLoggedIn, isOnline, brands, api, refreshStatus, syncing, toast]);
+  }, [isLoggedIn, isOnline, brands, api, refreshStatus, toast]);
 
   const downloadCatalogForOffline = useCallback(
     async (onProgress) => {

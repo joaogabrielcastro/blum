@@ -14,6 +14,8 @@ const ReportsCommissionsTable = ({
   onExportSalesExcel,
   onExportAllCommissionsPdf,
   onExportRepCommissionPdf,
+  canExcel = true,
+  canCommissionPdf = true,
 }) => (
   <section
     className="mb-8"
@@ -42,16 +44,28 @@ const ReportsCommissionsTable = ({
             onClick={onExportSalesExcel}
             disabled={exportingExcel || exportingPdf != null}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-60"
+            title={canExcel ? undefined : "Disponível no plano Profissional"}
           >
-            {exportingExcel ? "Gerando Excel…" : "Exportar Excel"}
+            {exportingExcel
+              ? "Gerando Excel…"
+              : canExcel
+                ? "Exportar Excel"
+                : "Exportar Excel · Pro"}
           </button>
           <button
             type="button"
             onClick={onExportAllCommissionsPdf}
             disabled={exportingPdf != null || exportingExcel}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+            title={
+              canCommissionPdf ? undefined : "Disponível no plano Profissional"
+            }
           >
-            {exportingPdf === "all" ? "Gerando PDF…" : "Exportar PDF (todos)"}
+            {exportingPdf === "all"
+              ? "Gerando PDF…"
+              : canCommissionPdf
+                ? "Exportar PDF (todos)"
+                : "Exportar PDF · Pro"}
           </button>
         </div>
       ) : showRepresentantesSummaryTable ? (
@@ -60,8 +74,15 @@ const ReportsCommissionsTable = ({
           onClick={onExportAllCommissionsPdf}
           disabled={exportingPdf != null}
           className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+          title={
+            canCommissionPdf ? undefined : "Disponível no plano Profissional"
+          }
         >
-          {exportingPdf === "all" ? "Gerando PDF…" : "Exportar PDF (todos)"}
+          {exportingPdf === "all"
+            ? "Gerando PDF…"
+            : canCommissionPdf
+              ? "Exportar PDF (todos)"
+              : "Exportar PDF · Pro"}
         </button>
       ) : null}
     </div>

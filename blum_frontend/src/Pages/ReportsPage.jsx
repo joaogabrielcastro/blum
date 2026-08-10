@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
 import ReportsMonthFilter from "../components/reports/ReportsMonthFilter";
 import ReportsSummaryCards from "../components/reports/ReportsSummaryCards";
@@ -7,6 +8,9 @@ import ReportsMonthlyHistoryTable from "../components/reports/ReportsMonthlyHist
 import ReportsBrandComparison from "../components/reports/ReportsBrandComparison";
 import ReportsOrdersTable from "../components/reports/ReportsOrdersTable";
 import ReportsCommissionsTable from "../components/reports/ReportsCommissionsTable";
+import Tabs, { TabPanel } from "../components/ui/Tabs";
+import Surface, { PageHeader } from "../components/ui/Surface";
+import ListPageSkeleton from "../components/ListPageSkeleton";
 import {
   orderSellerUserKey,
   formatOrderDateLabel,
@@ -24,11 +28,33 @@ import { buildPdfFile, downloadPdfFile } from "../utils/pdfDownload";
 import { useToast } from "../context/ToastContext";
 import { useReportsData, defaultMonthKey } from "../hooks/useReportsData";
 import { useReportsMetrics } from "../hooks/useReportsMetrics";
+import {
+  canUseFeature,
+  PLAN_FEATURE_REQUIRED_EVENT,
+} from "../utils/planFeatures";
 
-const ReportsPage = ({ userRole, userId }) => {
+const TAB_SUMMARY = "resumo";
+const TAB_ORDERS = "pedidos";
+const TAB_COMMISSIONS = "comissoes";
+const TAB_BRANDS = "comparativos";
+
+const ReportsPage = ({ userRole, userId, subscription }) => {
   const toast = useToast();
+  const [activeTab, setActiveTab] = useState(TAB_SUMMARY);
   const [exportingPdf, setExportingPdf] = useState(null);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [brandFilterKey, setBrandFilterKey] = useState("");
+  const canExcel = canUseFeature(subscription, "excel-export");
+  const canCommissionPdf = canUseFeature(subscription, "commission-pdf");
+  const canBrandCompare = canUseFeature(subscription, "brand-comparison");
+
+  const requestUpgrade = (feature) => {
+    window.dispatchEvent(
+      new CustomEvent(PLAN_FEATURE_REQUIRED_EVENT, {
+        detail: { feature, requiredPlan: "professional" },
+      }),
+    );
+  };
 
   const data = useReportsData({ userRole, userId });
   const {
@@ -54,6 +80,7 @@ const ReportsPage = ({ userRole, userId }) => {
   const {
     monthOptions,
     sellerOptions,
+    brandOptions,
     ordersToDisplay,
     chartData,
     totalSales,
@@ -73,6 +100,7 @@ const ReportsPage = ({ userRole, userId }) => {
     selectedMonth,
     previousMonth,
     sellerFilterKey,
+    brandFilterKey,
     userRole,
     userId,
     usersById,
@@ -80,6 +108,17 @@ const ReportsPage = ({ userRole, userId }) => {
 
   const selectedSellerLabel =
     sellerOptions.find((o) => o.key === sellerFilterKey)?.label ?? "";
+  const selectedBrandLabel =
+    brandOptions.find((o) => o.key === brandFilterKey)?.label ?? "";
+
+  useEffect(() => {
+    if (
+      brandFilterKey &&
+      !brandOptions.some((o) => o.key === brandFilterKey)
+    ) {
+      setBrandFilterKey("");
+    }
+  }, [brandFilterKey, brandOptions]);
 
   const formatRepLabel = (sale) => {
     if (!sale) return "N/A";
@@ -95,6 +134,10 @@ const ReportsPage = ({ userRole, userId }) => {
 
   const handleExportSalesExcel = async () => {
     if (userRole !== "admin") return;
+    if (!canExcel) {
+      requestUpgrade("excel-export");
+      return;
+    }
     try {
       setExportingExcel(true);
       const blob = await apiService.downloadSalesByRepExcel();
@@ -107,13 +150,21 @@ const ReportsPage = ({ userRole, userId }) => {
       toast.success("Excel exportado.");
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível exportar Excel.");
+      toast.error(
+        error?.code === "PLAN_FEATURE_REQUIRED"
+          ? error.message
+          : "Não foi possível exportar o Excel. Tente novamente.",
+      );
     } finally {
       setExportingExcel(false);
     }
   };
 
   const handleExportAllCommissionsPdf = async () => {
+    if (!canCommissionPdf) {
+      requestUpgrade("commission-pdf");
+      return;
+    }
     if (!commissionsByRep.length) {
       toast.warning("Não há comissões para exportar neste período.");
       return;
@@ -141,13 +192,17 @@ const ReportsPage = ({ userRole, userId }) => {
       toast.success("PDF de comissões gerado.");
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível gerar o PDF.");
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
     } finally {
       setExportingPdf(null);
     }
   };
 
   const handleExportRepCommissionPdf = async (sale) => {
+    if (!canCommissionPdf) {
+      requestUpgrade("commission-pdf");
+      return;
+    }
     const repOrders = ordersToDisplay.filter(
       (order) => orderSellerUserKey(order) === sale.userId,
     );
@@ -173,7 +228,7 @@ const ReportsPage = ({ userRole, userId }) => {
       toast.success(`PDF de ${sale.displayName} gerado.`);
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível gerar o PDF.");
+      toast.error("Não foi possível gerar o PDF. Tente novamente.");
     } finally {
       setExportingPdf(null);
     }
@@ -206,88 +261,144 @@ const ReportsPage = ({ userRole, userId }) => {
     setTargetDraft(String(suggestedTarget));
   };
 
-  if (loading)
+  const tabs = [
+    { id: TAB_SUMMARY, label: "Resumo" },
+    { id: TAB_ORDERS, label: "Pedidos", badge: ordersToDisplay.length },
+    {
+      id: TAB_COMMISSIONS,
+      label: "Comissões",
+      badge: commissionsByRep.length || undefined,
+    },
+    { id: TAB_BRANDS, label: "Comparativos" },
+  ];
+
+  if (loading) {
     return (
-      <div className="p-8 text-center text-gray-500">
-        Carregando relatórios...
+      <div className="p-4 sm:p-6 md:p-8">
+        <ListPageSkeleton variant="list" />
       </div>
     );
+  }
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        Relatórios de Vendas e Comissões
-      </h1>
-
-      <ReportsMonthFilter
-        selectedMonthKey={selectedMonthKey}
-        onMonthChange={setSelectedMonthKey}
-        monthOptions={monthOptions}
-        previousMonth={previousMonth}
-        onGoToPreviousMonth={goToPreviousMonth}
-        onGoToCurrentMonth={goToCurrentMonth}
-        userRole={userRole}
-        sellerFilterKey={sellerFilterKey}
-        onSellerFilterChange={setSellerFilterKey}
-        sellerOptions={sellerOptions}
-        selectedSellerLabel={selectedSellerLabel}
+    <div className="p-4 sm:p-6 md:p-8">
+      <PageHeader
+        title="Relatórios"
+        description={`Período: ${periodLabel}`}
       />
 
-      <ReportsSummaryCards
-        orderCount={ordersToDisplay.length}
-        totalSales={totalSales}
-        totalCommissions={totalCommissions}
+      <Surface className="mb-5" padded>
+        <ReportsMonthFilter
+          selectedMonthKey={selectedMonthKey}
+          onMonthChange={setSelectedMonthKey}
+          monthOptions={monthOptions}
+          onGoToPreviousMonth={goToPreviousMonth}
+          onGoToCurrentMonth={goToCurrentMonth}
+          userRole={userRole}
+          sellerFilterKey={sellerFilterKey}
+          onSellerFilterChange={(value) => {
+            setSellerFilterKey(value);
+            setBrandFilterKey("");
+          }}
+          sellerOptions={sellerOptions}
+          selectedSellerLabel={selectedSellerLabel}
+          brandFilterKey={brandFilterKey}
+          onBrandFilterChange={setBrandFilterKey}
+          brandOptions={brandOptions}
+          selectedBrandLabel={selectedBrandLabel}
+        />
+      </Surface>
+
+      <Tabs
+        tabs={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        className="mb-5"
       />
 
-      <ReportsSalesChartSection
-        selectedYear={selectedYear}
-        selectedMonth={selectedMonth}
-        previousMonth={previousMonth}
-        sellerFilterKey={sellerFilterKey}
-        selectedSellerLabel={selectedSellerLabel}
-        userRole={userRole}
-        previousMonthTotal={previousMonthTotal}
-        suggestedTarget={suggestedTarget}
-        targetDraft={targetDraft}
-        onTargetDraftChange={setTargetDraft}
-        onApplySuggestedTarget={applySuggestedTarget}
-        onSaveTarget={handleSaveTarget}
-        savingTarget={savingTarget}
-        salesTarget={salesTarget}
-        chartData={chartData}
-        totalSales={totalSales}
-      />
+      <TabPanel id={TAB_SUMMARY} activeId={activeTab} className="space-y-6">
+        <ReportsSummaryCards
+          orderCount={ordersToDisplay.length}
+          totalSales={totalSales}
+          totalCommissions={totalCommissions}
+        />
+        <ReportsSalesChartSection
+          selectedYear={selectedYear}
+          selectedMonth={selectedMonth}
+          previousMonth={previousMonth}
+          sellerFilterKey={sellerFilterKey}
+          selectedSellerLabel={selectedSellerLabel}
+          brandFilterKey={brandFilterKey}
+          selectedBrandLabel={selectedBrandLabel}
+          userRole={userRole}
+          previousMonthTotal={previousMonthTotal}
+          suggestedTarget={suggestedTarget}
+          targetDraft={targetDraft}
+          onTargetDraftChange={setTargetDraft}
+          onApplySuggestedTarget={applySuggestedTarget}
+          onSaveTarget={handleSaveTarget}
+          savingTarget={savingTarget}
+          salesTarget={salesTarget}
+          chartData={chartData}
+          totalSales={totalSales}
+        />
+        <ReportsMonthlyHistoryTable monthlySummaries={monthlySummaries} />
+      </TabPanel>
 
-      <ReportsMonthlyHistoryTable monthlySummaries={monthlySummaries} />
+      <TabPanel id={TAB_ORDERS} activeId={activeTab}>
+        <ReportsOrdersTable
+          ordersToDisplay={ordersToDisplay}
+          clients={clients}
+          usersById={usersById}
+          sellerFilterKey={sellerFilterKey}
+        />
+      </TabPanel>
 
-      <ReportsBrandComparison
-        brandBars={brandBars}
-        totalSales={totalSales}
-        mediaPorRepresentada={mediaPorRepresentada}
-      />
+      <TabPanel id={TAB_COMMISSIONS} activeId={activeTab}>
+        <ReportsCommissionsTable
+          userRole={userRole}
+          periodLabel={periodLabel}
+          showRepresentantesSummaryTable={showRepresentantesSummaryTable}
+          commissionsByRep={commissionsByRep}
+          ordersToDisplay={ordersToDisplay}
+          totalSales={totalSales}
+          totalCommissions={totalCommissions}
+          exportingExcel={exportingExcel}
+          exportingPdf={exportingPdf}
+          formatRepLabel={formatRepLabel}
+          onExportSalesExcel={handleExportSalesExcel}
+          onExportAllCommissionsPdf={handleExportAllCommissionsPdf}
+          onExportRepCommissionPdf={handleExportRepCommissionPdf}
+          canExcel={canExcel}
+          canCommissionPdf={canCommissionPdf}
+        />
+      </TabPanel>
 
-      <ReportsOrdersTable
-        ordersToDisplay={ordersToDisplay}
-        clients={clients}
-        usersById={usersById}
-        sellerFilterKey={sellerFilterKey}
-      />
-
-      <ReportsCommissionsTable
-        userRole={userRole}
-        periodLabel={periodLabel}
-        showRepresentantesSummaryTable={showRepresentantesSummaryTable}
-        commissionsByRep={commissionsByRep}
-        ordersToDisplay={ordersToDisplay}
-        totalSales={totalSales}
-        totalCommissions={totalCommissions}
-        exportingExcel={exportingExcel}
-        exportingPdf={exportingPdf}
-        formatRepLabel={formatRepLabel}
-        onExportSalesExcel={handleExportSalesExcel}
-        onExportAllCommissionsPdf={handleExportAllCommissionsPdf}
-        onExportRepCommissionPdf={handleExportRepCommissionPdf}
-      />
+      <TabPanel id={TAB_BRANDS} activeId={activeTab}>
+        {canBrandCompare ? (
+          <ReportsBrandComparison
+            brandBars={brandBars}
+            totalSales={totalSales}
+            mediaPorRepresentada={mediaPorRepresentada}
+          />
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-950">
+            <h2 className="text-lg font-semibold">
+              Comparativo entre representadas
+            </h2>
+            <p className="mt-1 text-sm">
+              Disponível no plano Profissional. Compare vendas por marca e
+              identifique o mix da operação.
+            </p>
+            <Link
+              to="/subscription"
+              className="mt-3 inline-block text-sm font-semibold text-brand underline underline-offset-2"
+            >
+              Ver planos
+            </Link>
+          </div>
+        )}
+      </TabPanel>
     </div>
   );
 };

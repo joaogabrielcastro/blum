@@ -63,7 +63,7 @@ export default function OrderFormProductSearch({
           </div>
 
           {searchResults.length > 0 ? (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            <div className="absolute z-10 w-full mt-1 bg-surface border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {searchResults.map((product) => (
                 <OrderProductResultRow
                   key={product.id}
@@ -75,7 +75,7 @@ export default function OrderFormProductSearch({
           ) : null}
 
           {productSearch && searchResults.length === 0 && !isSearching ? (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+            <div className="absolute z-10 w-full mt-1 bg-surface border border-gray-300 rounded-lg shadow-lg p-4">
               <div className="text-center text-gray-500">
                 Nenhum produto encontrado para &quot;{productSearch}&quot;
               </div>

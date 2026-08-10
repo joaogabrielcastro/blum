@@ -6,7 +6,6 @@ import {
   orderSellerUserKey,
   orderSellerName,
   orderSellerUsername,
-  orderRepresentadas,
   filterOrdersByCalendarMonth,
   prepareMonthlyCumulativeChartData,
   mergeMonthlyComparisonChart,
@@ -14,6 +13,9 @@ import {
   monthYearKey,
   accumulateSalesByRepresentada,
   brandBarsFromSalesMap,
+  orderMatchesBrandFilter,
+  orderAmountForBrandFilter,
+  buildBrandOptionsFromOrders,
 } from "../utils/orderApiFields";
 import { defaultMonthKey, parseMonthKey } from "./useReportsData";
 
@@ -26,6 +28,7 @@ export function useReportsMetrics({
   selectedMonth,
   previousMonth,
   sellerFilterKey,
+  brandFilterKey = "",
   userRole,
   userId,
   usersById,
@@ -58,24 +61,42 @@ export function useReportsMetrics({
     return allOrders.filter((o) => orderSellerUserKey(o) === sellerFilterKey);
   }, [allOrders, sellerFilterKey, userRole, userId]);
 
+  const scopedOrders = useMemo(() => {
+    if (!brandFilterKey) return sellerScopedOrders;
+    return sellerScopedOrders.filter((o) =>
+      orderMatchesBrandFilter(o, brandFilterKey),
+    );
+  }, [sellerScopedOrders, brandFilterKey]);
+
+  const amountForScope = useMemo(() => {
+    if (!brandFilterKey) return orderTotalPrice;
+    return (order) => orderAmountForBrandFilter(order, brandFilterKey);
+  }, [brandFilterKey]);
+
+  const commissionForScope = useMemo(() => {
+    if (!brandFilterKey) return orderTotalCommission;
+    return (order) =>
+      orderAmountForBrandFilter(order, brandFilterKey, orderTotalCommission);
+  }, [brandFilterKey]);
+
   const periodFilteredOrders = useMemo(
-    () => filterOrdersByCalendarMonth(sellerScopedOrders, selectedYear, selectedMonth),
-    [sellerScopedOrders, selectedYear, selectedMonth],
+    () => filterOrdersByCalendarMonth(scopedOrders, selectedYear, selectedMonth),
+    [scopedOrders, selectedYear, selectedMonth],
   );
 
   const previousMonthOrders = useMemo(
     () =>
       filterOrdersByCalendarMonth(
-        sellerScopedOrders,
+        scopedOrders,
         previousMonth.year,
         previousMonth.month,
       ),
-    [sellerScopedOrders, previousMonth.year, previousMonth.month],
+    [scopedOrders, previousMonth.year, previousMonth.month],
   );
 
   const previousMonthTotal = useMemo(
-    () => previousMonthOrders.reduce((acc, o) => acc + orderTotalPrice(o), 0),
-    [previousMonthOrders],
+    () => previousMonthOrders.reduce((acc, o) => acc + amountForScope(o), 0),
+    [previousMonthOrders, amountForScope],
   );
 
   const suggestedTarget = useMemo(() => {
@@ -111,11 +132,39 @@ export function useReportsMetrics({
     );
   }, [allOrders, selectedYear, selectedMonth, usersById]);
 
+  const brandOptions = useMemo(() => {
+    const base =
+      userRole === "salesperson"
+        ? allOrders.filter((o) => orderSellerUserKey(o) === String(userId))
+        : sellerFilterKey
+          ? allOrders.filter((o) => orderSellerUserKey(o) === sellerFilterKey)
+          : allOrders;
+    const monthOrders = filterOrdersByCalendarMonth(
+      base,
+      selectedYear,
+      selectedMonth,
+    );
+    return buildBrandOptionsFromOrders(monthOrders);
+  }, [
+    allOrders,
+    selectedYear,
+    selectedMonth,
+    sellerFilterKey,
+    userRole,
+    userId,
+  ]);
+
   const ordersToDisplay = periodFilteredOrders;
 
   const currentMonthChart = useMemo(
-    () => prepareMonthlyCumulativeChartData(periodFilteredOrders, selectedYear, selectedMonth),
-    [periodFilteredOrders, selectedYear, selectedMonth],
+    () =>
+      prepareMonthlyCumulativeChartData(
+        periodFilteredOrders,
+        selectedYear,
+        selectedMonth,
+        amountForScope,
+      ),
+    [periodFilteredOrders, selectedYear, selectedMonth, amountForScope],
   );
 
   const previousMonthChart = useMemo(
@@ -124,8 +173,9 @@ export function useReportsMetrics({
         previousMonthOrders,
         previousMonth.year,
         previousMonth.month,
+        amountForScope,
       ),
-    [previousMonthOrders, previousMonth.year, previousMonth.month],
+    [previousMonthOrders, previousMonth.year, previousMonth.month, amountForScope],
   );
 
   const chartData = useMemo(
@@ -134,12 +184,12 @@ export function useReportsMetrics({
   );
 
   const totalSales = ordersToDisplay.reduce(
-    (acc, order) => acc + orderTotalPrice(order),
+    (acc, order) => acc + amountForScope(order),
     0,
   );
 
   const totalCommissions = ordersToDisplay.reduce(
-    (acc, order) => acc + orderTotalCommission(order),
+    (acc, order) => acc + commissionForScope(order),
     0,
   );
 
@@ -164,8 +214,8 @@ export function useReportsMetrics({
       if (!agg[repId]) {
         agg[repId] = { totalSales: 0, totalCommission: 0, orderCount: 0 };
       }
-      agg[repId].totalSales += orderTotalPrice(order);
-      agg[repId].totalCommission += orderTotalCommission(order);
+      agg[repId].totalSales += amountForScope(order);
+      agg[repId].totalCommission += commissionForScope(order);
       agg[repId].orderCount += 1;
     }
 
@@ -201,13 +251,14 @@ export function useReportsMetrics({
 
     rows.sort((a, b) => b.totalSales - a.totalSales);
     return rows;
-  }, [ordersToDisplay, usersById]);
+  }, [ordersToDisplay, usersById, amountForScope, commissionForScope]);
 
   const periodLabel = formatMonthYearLabel(selectedYear, selectedMonth);
 
   return {
     monthOptions,
     sellerOptions,
+    brandOptions,
     ordersToDisplay,
     chartData,
     totalSales,

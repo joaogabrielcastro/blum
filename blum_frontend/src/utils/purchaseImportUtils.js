@@ -107,25 +107,13 @@ export async function buildVerificationCatalog(
   return { items: fromImport.items, catalogProducts: [...byId.values()] };
 }
 
-const DUPLICATE_CONFIRM_MSG =
-  "Unificar automaticamente?\n" +
-  "• Soma as quantidades\n" +
-  "• Preço unitário = média ponderada\n" +
-  "• Usa o produto do catálogo da primeira linha de cada código";
-
+/** Prefer ConfirmationModal in UI before calling. Merges when duplicates exist. */
 export async function maybeMergeDuplicateProductCodes(rows, setRows) {
   const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
   if (!duplicateProductCodes.length) return rows;
 
-  const ok = window.confirm(
-    `Códigos de produto repetidos na lista: ${duplicateProductCodes.join(", ")}.\n\n` +
-      `${DUPLICATE_CONFIRM_MSG}\n\n` +
-      "Cancelar = interrompe a importação.",
-  );
-  if (!ok) return null;
-
   const merged = mergePurchaseItemsByProductCode(rows);
-  setRows(merged);
+  setRows?.(merged);
   return merged;
 }
 

@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import FormField, { inputClassName } from "./ui/FormField";
+import { PrimaryButton, SecondaryButton } from "./ui/Surface";
 
 const BrandForm = ({ onSubmit, onCancel, initialData }) => {
   const [formData, setFormData] = useState({
@@ -14,46 +16,39 @@ const BrandForm = ({ onSubmit, onCancel, initialData }) => {
       setFormData({
         name: initialData.name || "",
         commission_rate: initialData.commission_rate?.toString() || "0",
-        logo_url: initialData.logo_url != null ? String(initialData.logo_url) : "",
+        logo_url:
+          initialData.logo_url != null ? String(initialData.logo_url) : "",
       });
     }
   }, [initialData]);
 
   const validateForm = () => {
     const newErrors = {};
-
     if (!formData.name.trim()) {
-      newErrors.name = "Nome da Representada é obrigatório";
+      newErrors.name = "Nome da representada é obrigatório";
     }
-
     if (formData.commission_rate === "" || formData.commission_rate === null) {
       newErrors.commission_rate = "Taxa de comissão é obrigatória";
     } else {
       const commission = parseFloat(formData.commission_rate);
-      if (isNaN(commission) || commission < 0 || commission > 100) {
+      if (Number.isNaN(commission) || commission < 0 || commission > 100) {
         newErrors.commission_rate = "Taxa deve ser entre 0% e 100%";
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
-
     setIsSubmitting(true);
-
     try {
-      const brandData = {
+      await onSubmit({
         name: formData.name.trim(),
         commission_rate: parseFloat(formData.commission_rate),
         logo_url: formData.logo_url.trim() || null,
-      };
-
-      await onSubmit(brandData);
+      });
     } catch (error) {
       console.error("Erro no formulário:", error);
     } finally {
@@ -64,112 +59,72 @@ const BrandForm = ({ onSubmit, onCancel, initialData }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Limpar erro do campo quando usuário começar a digitar
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-4">
-        {initialData ? "Editar Representada" : "Adicionar Nova Representada"}
-      </h2>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <FormField label="Nome da representada" required error={errors.name}>
+        <input
+          type="text"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.name))}
+          placeholder="Nome da marca / fornecedor"
+        />
+      </FormField>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-gray-700 mb-2">
-            Nome da Representada:
-          </label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-              errors.name ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Digite o nome da Representada"
-          />
-          {errors.name && (
-            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-          )}
-        </div>
+      <FormField
+        label="Taxa de comissão (%)"
+        required
+        error={errors.commission_rate}
+        hint="Percentual aplicado aos produtos desta representada"
+      >
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          name="commission_rate"
+          value={formData.commission_rate}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.commission_rate))}
+          placeholder="0"
+        />
+      </FormField>
 
-        <div>
-          <label className="block text-gray-700 mb-2">
-            Taxa de Comissão (%):
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              name="commission_rate"
-              value={formData.commission_rate}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-                errors.commission_rate ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="0.00"
-            />
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <span className="text-gray-500">%</span>
-            </div>
-          </div>
-          {errors.commission_rate && (
-            <p className="text-red-500 text-xs mt-1">
-              {errors.commission_rate}
-            </p>
-          )}
-          <p className="text-gray-600 text-xs mt-1">
-            Percentual de comissão que será aplicado aos produtos desta
-            Representada
-          </p>
-        </div>
+      <FormField
+        label="URL do logo"
+        hint="Opcional — PNG, JPG ou SVG público"
+      >
+        <input
+          type="url"
+          name="logo_url"
+          value={formData.logo_url}
+          onChange={handleChange}
+          className={inputClassName()}
+          placeholder="https://exemplo.com/logo.png"
+        />
+      </FormField>
 
-        <div>
-          <label className="block text-gray-700 mb-2">
-            URL do logo (opcional)
-          </label>
-          <input
-            type="url"
-            name="logo_url"
-            value={formData.logo_url}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            placeholder="https://exemplo.com/logo.png"
-          />
-          <p className="text-gray-600 text-xs mt-1">
-            Imagem exibida na lista de representadas (PNG, JPG ou SVG público).
-          </p>
-        </div>
-
-        <div className="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50"
-            disabled={isSubmitting}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting
-              ? "Salvando..."
-              : initialData
+      <div className="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+        <SecondaryButton
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </SecondaryButton>
+        <PrimaryButton type="submit" disabled={isSubmitting}>
+          {isSubmitting
+            ? "A guardar…"
+            : initialData
               ? "Atualizar"
               : "Adicionar"}
-          </button>
-        </div>
-      </form>
-    </div>
+        </PrimaryButton>
+      </div>
+    </form>
   );
 };
 

@@ -24,6 +24,7 @@ const WEBHOOK_EVENTS = [
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
+  "customer.subscription.trial_will_end",
   "invoice.paid",
   "invoice.payment_failed",
   "invoice.finalized",

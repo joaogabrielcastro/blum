@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const reportController = require("../controllers/reportController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { requirePlanFeature } = require("../middleware/planFeatureMiddleware");
 
 // Todas as rotas requerem autenticação
 router.get("/stats", authenticate, reportController.getReportStats);
@@ -22,6 +23,7 @@ router.get(
   "/sales-by-rep/export.xlsx",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("excel-export"),
   reportController.exportSalesByRepExcel
 );
 router.get("/commissions", authenticate, reportController.getCommissionReport);
@@ -29,6 +31,7 @@ router.get(
   "/commissions/by-brand",
   authenticate,
   authorize("admin"),
+  requirePlanFeature("brand-comparison"),
   reportController.getCommissionByBrand
 );
 

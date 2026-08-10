@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "../context/ToastContext";
+import FormField, { inputClassName } from "./ui/FormField";
+import { PrimaryButton, SecondaryButton } from "./ui/Surface";
 
 const ProductsForm = ({
   product,
@@ -18,12 +20,10 @@ const ProductsForm = ({
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const toast = useToast();
 
-  // ✅ CORREÇÃO: Use useEffect para inicializar os dados quando o produto mudar
   useEffect(() => {
     if (product) {
-      // Modo edição - preenche com dados do produto
       setFormData({
         name: product.name || "",
         productcode: product.productcode || "",
@@ -33,7 +33,6 @@ const ProductsForm = ({
         minstock: product.minstock?.toString() || "0",
       });
     } else {
-      // Modo adição — representada atual do catálogo quando houver
       setFormData({
         name: "",
         productcode: "",
@@ -47,48 +46,42 @@ const ProductsForm = ({
 
   const validateForm = () => {
     const newErrors = {};
-
     if (!formData.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!formData.productcode.trim())
       newErrors.productcode = "Código é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
-    if (!formData.stock || parseInt(formData.stock) < 0)
+    if (formData.stock === "" || parseInt(formData.stock, 10) < 0)
       newErrors.stock = "Estoque não pode ser negativo";
-    if (!formData.minstock || parseInt(formData.minstock) < 0)
+    if (formData.minstock === "" || parseInt(formData.minstock, 10) < 0)
       newErrors.minstock = "Estoque mínimo não pode ser negativo";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      toast.warning("Corrija os campos assinalados.");
+      return;
+    }
 
     setIsSubmitting(true);
-
     try {
       const productData = {
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
-        price: parseFloat(formData.price.replace(",", ".")) || 0,
+        price: parseFloat(String(formData.price).replace(",", ".")) || 0,
         brand: formData.brand,
-        stock: parseInt(formData.stock) || 0,
-        minstock: parseInt(formData.minstock) || 0,
+        stock: parseInt(formData.stock, 10) || 0,
+        minstock: parseInt(formData.minstock, 10) || 0,
       };
-
-      console.log("Enviando dados do produto:", productData); // Para debug
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
+      let errorMessage = "Não foi possível guardar o produto. Tente novamente.";
 
-      // Mostra detalhes de validação se disponíveis
-      let errorMessage = "";
-
-      // Verifica se é erro de duplicação
       if (
         error.message &&
         (error.message.includes("Já existe") ||
@@ -102,11 +95,9 @@ const ProductsForm = ({
               `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
-        errorMessage = `Erro ao salvar produto.\n\nErros:\n${fieldErrors}`;
+        errorMessage = `Não foi possível guardar o produto.\n${fieldErrors}`;
       } else if (error.message) {
-        errorMessage = `Erro ao salvar produto.\n${error.message}`;
-      } else {
-        errorMessage = "Erro ao salvar produto. Tente novamente.";
+        errorMessage = error.message;
       }
 
       toast.error(errorMessage);
@@ -118,14 +109,9 @@ const ProductsForm = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    // Limpar erro do campo quando usuário começar a digitar
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // Função para extrair o nome da Representada (se for objeto ou string)
   const getBrandName = (brand) => {
     if (typeof brand === "object" && brand !== null) {
       return brand.name || brand;
@@ -133,7 +119,6 @@ const ProductsForm = ({
     return brand;
   };
 
-  // Função para extrair o valor da Representada (se for objeto ou string)
   const getBrandValue = (brand) => {
     if (typeof brand === "object" && brand !== null) {
       return brand.name || brand;
@@ -142,177 +127,115 @@ const ProductsForm = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md p-2 sm:p-4 md:p-6 max-w-lg mx-auto w-full">
-      <h2 className="text-xl font-bold mb-4">
-        {product ? "Editar Produto" : "Adicionar Novo Produto"}
-      </h2>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <FormField label="Nome do produto" required error={errors.name}>
+        <input
+          type="text"
+          name="name"
+          value={formData.name}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.name))}
+          placeholder="Nome do produto"
+        />
+      </FormField>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-gray-700 mb-2">Nome do Produto:</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.name ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Digite o nome do produto"
-          />
-          {errors.name && (
-            <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-          )}
-        </div>
+      <FormField
+        label="Código"
+        required
+        error={errors.productcode}
+        hint="Código do fabricante (único no catálogo)"
+      >
+        <input
+          type="text"
+          name="productcode"
+          value={formData.productcode}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.productcode))}
+          placeholder="Ex.: SKU-001"
+        />
+      </FormField>
 
-        <div>
-          <label className="block text-gray-700 mb-2">Código do Produto:</label>
-          <input
-            type="text"
-            name="productcode"
-            value={formData.productcode}
-            onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.productcode ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Código do fabricante (único no catálogo)"
-          />
-          {errors.productcode && (
-            <p className="text-red-500 text-xs mt-1">{errors.productcode}</p>
-          )}
-        </div>
+      <FormField label="Preço" required error={errors.price}>
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          name="price"
+          value={formData.price}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.price))}
+          placeholder="0,00"
+        />
+      </FormField>
 
-        <div>
-          <label className="block text-gray-700 mb-2">Preço:</label>
+      <FormField label="Representada" required error={errors.brand}>
+        <select
+          name="brand"
+          value={formData.brand}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.brand))}
+          disabled={!brands || brands.length === 0}
+        >
+          <option value="">Selecione uma representada</option>
+          {brands &&
+            brands.map((brand, index) => (
+              <option key={index} value={getBrandValue(brand)}>
+                {getBrandName(brand)}
+              </option>
+            ))}
+        </select>
+        {(!brands || brands.length === 0) && (
+          <p className="mt-1 text-xs text-amber-700">
+            Cadastre uma representada antes de adicionar produtos.
+          </p>
+        )}
+      </FormField>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Estoque" required error={errors.stock}>
           <input
             type="number"
-            step="0.01"
             min="0"
-            name="price"
-            value={formData.price}
+            name="stock"
+            value={formData.stock}
             onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.price ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Digite o preço do produto"
+            className={inputClassName(Boolean(errors.stock))}
+            placeholder="0"
           />
-          {errors.price && (
-            <p className="text-red-500 text-xs mt-1">{errors.price}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-gray-700 mb-2">Representada:</label>
-          <select
-            name="brand"
-            value={formData.brand}
+        </FormField>
+        <FormField label="Estoque mínimo" required error={errors.minstock}>
+          <input
+            type="number"
+            min="0"
+            name="minstock"
+            value={formData.minstock}
             onChange={handleChange}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.brand ? "border-red-500" : "border-gray-300"
-            }`}
-            disabled={!brands || brands.length === 0}
-          >
-            <option value="">Selecione uma Representada</option>
-            {brands &&
-              brands.map((brand, index) => (
-                <option key={index} value={getBrandValue(brand)}>
-                  {getBrandName(brand)}
-                </option>
-              ))}
-          </select>
-          {errors.brand && (
-            <p className="text-red-500 text-xs mt-1">{errors.brand}</p>
-          )}
-          {(!brands || brands.length === 0) && (
-            <p className="text-red-500 text-xs mt-1">
-              Você precisa adicionar uma Representada primeiro
-            </p>
-          )}
-        </div>
+            className={inputClassName(Boolean(errors.minstock))}
+            placeholder="0"
+          />
+        </FormField>
+      </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-gray-700 mb-2">Estoque:</label>
-            <input
-              type="number"
-              min="0"
-              name="stock"
-              value={formData.stock}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.stock ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Quantidade em estoque"
-            />
-            {errors.stock && (
-              <p className="text-red-500 text-xs mt-1">{errors.stock}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-gray-700 mb-2">Estoque Mínimo:</label>
-            <input
-              type="number"
-              min="0"
-              name="minstock"
-              value={formData.minstock}
-              onChange={handleChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.minstock ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Estoque mínimo"
-            />
-            {errors.minstock && (
-              <p className="text-red-500 text-xs mt-1">{errors.minstock}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-            disabled={isSubmitting}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting || !brands || brands.length === 0}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            {isSubmitting ? (
-              <div className="flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                A guardar...
-              </div>
-            ) : product ? (
-              "Atualizar Produto"
-            ) : (
-              "Adicionar Produto"
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
+      <div className="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+        <SecondaryButton
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </SecondaryButton>
+        <PrimaryButton
+          type="submit"
+          disabled={isSubmitting || !brands || brands.length === 0}
+        >
+          {isSubmitting
+            ? "A guardar…"
+            : product
+              ? "Atualizar produto"
+              : "Adicionar produto"}
+        </PrimaryButton>
+      </div>
+    </form>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
 import LoadingSpinner from "../components/LoadingSpinner";
 import VerificationTable from "../components/common/VerificationTable";
@@ -8,6 +9,8 @@ import PurchaseDateSection from "../components/purchases/PurchaseDateSection";
 import PurchaseActions from "../components/purchases/PurchaseActions";
 import PurchaseInlineNotice from "../components/purchases/PurchaseInlineNotice";
 import CsvImportSection from "../components/purchases/CsvImportSection";
+import ConfirmationModal from "../components/ConfirmationModal";
+import Surface, { PageHeader } from "../components/ui/Surface";
 import { usePurchaseLogic } from "../hooks/usePurchaseLogic";
 import {
   buildVerificationCatalog,
@@ -15,13 +18,16 @@ import {
   buildFinalizePurchasePayload,
   getDuplicateProductCodesFromItems,
   mergePurchaseItemsByProductCode,
-  maybeMergeDuplicateProductCodes,
   validatePurchaseImportRows,
 } from "../utils/purchaseImportUtils";
+import { canUseFeature } from "../utils/planFeatures";
 
-const PurchasesPage = () => {
+const PurchasesPage = ({ subscription }) => {
   const purchaseLogic = usePurchaseLogic();
   const [activeTab, setActiveTab] = useState("pdf");
+  const [createConfirm, setCreateConfirm] = useState(null);
+  const [mergeConfirm, setMergeConfirm] = useState(null);
+  const canImportPurchases = canUseFeature(subscription, "purchase-import");
 
   const {
     selectedFile,
@@ -68,11 +74,11 @@ const PurchasesPage = () => {
 
   const handlePdfUpload = async () => {
     if (!selectedFile) {
-      setError("Por favor, selecione um arquivo PDF.");
+      setError("Selecione um arquivo PDF.");
       return;
     }
     if (!selectedBrandId) {
-      setError("Por favor, selecione uma Representada para os produtos.");
+      setError("Selecione uma representada para os produtos.");
       return;
     }
 
@@ -103,27 +109,53 @@ const PurchasesPage = () => {
     } catch (err) {
       console.error("Erro ao processar PDF:", err);
       setError(
-        "Falha ao processar o PDF. Verifique o arquivo e tente novamente.",
+        "Não foi possível processar o PDF. Verifique o arquivo e tente novamente.",
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePdfConfirm = async () => {
-    setError(null);
-    setSuccessMessage(null);
+  const finalizePdfRows = async (rows) => {
+    const selectedBrand = brands.find(
+      (b) => String(b.id) === String(selectedBrandId),
+    );
+    const mergedRows = mergePurchaseItemsByProductCode(rows);
+    setParsedItems(mergedRows);
+    setIsLoading(true);
+    setCreateConfirm(null);
 
-    if (!selectedBrandId) {
-      setError("Selecione uma representada para os produtos.");
-      return;
+    try {
+      const result = await apiService.finalizePurchaseFromPdf(
+        buildFinalizePurchasePayload(
+          selectedBrandId,
+          purchaseDate,
+          mergedRows,
+        ),
+      );
+      setSuccessMessage(
+        buildImportSuccessSummary(
+          result,
+          selectedBrand,
+          purchaseDate,
+          mergedRows.length,
+        ),
+      );
+      setParsedItems([]);
+      setSelectedFile(null);
+      setUserProducts([]);
+    } catch (err) {
+      console.error("Erro ao processar PDF:", err);
+      setError(
+        err.message ||
+          "Não foi possível finalizar a compra. Tente novamente.",
+      );
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    let rows = [...parsedItems];
-    const merged = await maybeMergeDuplicateProductCodes(rows, setParsedItems);
-    if (merged === null) return;
-    rows = merged;
-
+  const continueAfterRowsReady = async (rows) => {
     const validation = validatePurchaseImportRows(rows);
     if (!validation.ok) {
       setError(validation.error);
@@ -136,150 +168,196 @@ const PurchasesPage = () => {
     const newProductsCount = rows.filter((item) => item.isNewProduct).length;
 
     if (newProductsCount > 0) {
-      const confirmMessage =
-        `⚠️ ATENÇÃO!\n\n` +
-        `${newProductsCount} produtos NÃO EXISTEM no seu catálogo e serão CRIADOS AUTOMATICAMENTE.\n\n` +
-        `• Produtos existentes: ${rows.length - newProductsCount}\n` +
-        `• Novos produtos: ${newProductsCount}\n` +
-        `• Representada: ${selectedBrand?.name || "Não selecionada"}\n` +
-        `• Data da compra: ${purchaseDate}\n\n` +
-        `Deseja continuar?`;
-      if (!window.confirm(confirmMessage)) return;
+      setCreateConfirm({
+        rows,
+        newProductsCount,
+        existingCount: rows.length - newProductsCount,
+        brandName: selectedBrand?.name || "Não selecionada",
+      });
+      return;
     }
 
-    rows = mergePurchaseItemsByProductCode(rows);
-    setParsedItems(rows);
-    setIsLoading(true);
+    await finalizePdfRows(rows);
+  };
 
-    try {
-      const result = await apiService.finalizePurchaseFromPdf(
-        buildFinalizePurchasePayload(selectedBrandId, purchaseDate, rows),
-      );
-      setSuccessMessage(
-        buildImportSuccessSummary(
-          result,
-          selectedBrand,
-          purchaseDate,
-          rows.length,
-        ),
-      );
-      setParsedItems([]);
-      setSelectedFile(null);
-      setUserProducts([]);
-    } catch (err) {
-      console.error("Erro ao processar PDF:", err);
-      setError(err.message || "Ocorreu um erro ao processar o PDF.");
-    } finally {
-      setIsLoading(false);
+  const handlePdfConfirm = async () => {
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!selectedBrandId) {
+      setError("Selecione uma representada para os produtos.");
+      return;
     }
+
+    const rows = [...parsedItems];
+    const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
+    if (duplicateProductCodes.length > 0) {
+      setMergeConfirm({ rows, codes: duplicateProductCodes });
+      return;
+    }
+
+    await continueAfterRowsReady(rows);
+  };
+
+  const handleMergeConfirm = async () => {
+    if (!mergeConfirm?.rows) return;
+    const merged = mergePurchaseItemsByProductCode(mergeConfirm.rows);
+    setParsedItems(merged);
+    setMergeConfirm(null);
+    await continueAfterRowsReady(merged);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center">
-            <span className="mr-3">🛒</span>
-            Gestão de Compras
-          </h1>
-          <p className="text-gray-600">
-            Importe e gerencie suas compras de forma eficiente
-          </p>
-        </div>
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl">
+        <PageHeader
+          title="Compras"
+          description="Importe notas em PDF ou CSV para atualizar estoque e custos."
+        />
 
-        <PurchaseTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-        {isLoading ? (
-          <div className="flex justify-center items-center py-16">
-            <div className="text-center">
-              <LoadingSpinner />
-              <p className="mt-4 text-gray-600">
-                Processando sua solicitação...
-              </p>
-            </div>
-          </div>
-        ) : activeTab === "csv" ? (
-          <CsvImportSection purchaseLogic={purchaseLogic} />
-        ) : parsedItems.length === 0 ? (
-          <>
-            <PurchaseInlineNotice
-              variant="success"
-              message={successMessage}
-              onDismiss={() => setSuccessMessage(null)}
-            />
-            <UploadSection
-              onFileChange={(e) => {
-                setSuccessMessage(null);
-                setSelectedFile(e.target.files[0]);
-              }}
-              selectedFile={selectedFile}
-              onUpload={handlePdfUpload}
-              isLoading={isLoading}
-              error={error}
-              brands={brands}
-              selectedBrandId={selectedBrandId}
-              onBrandChange={(e) => setSelectedBrandId(e.target.value)}
-            />
-          </>
+        {!canImportPurchases ? (
+          <Surface>
+            <h2 className="text-lg font-semibold text-ink">
+              Importação no plano Profissional
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-ink-muted">
+              No Starter você continua com catálogo e orçamentos. A importação
+              de compras por CSV/PDF está disponível a partir do Profissional.
+            </p>
+            <Link
+              to="/subscription"
+              className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-brand-600"
+            >
+              Ver planos e fazer upgrade
+            </Link>
+          </Surface>
         ) : (
           <>
-            <PurchaseInlineNotice
-              message={error}
-              onDismiss={() => setError(null)}
-            />
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
-              <h3 className="text-green-800 font-bold text-lg">
-                ✅ PDF Processado com Sucesso!
-              </h3>
-              <p className="text-green-700">
-                {parsedItems.length} itens encontrados. Verifique e confirme os
-                dados abaixo.
-              </p>
-              {pdfDuplicateProductCodes.length > 0 && (
-                <p className="text-amber-800 text-sm mt-2 font-medium">
-                  Há códigos repetidos. Use «Unificar códigos duplicados» ou
-                  confirme — será perguntado se deseja agrupar.
-                </p>
-              )}
-            </div>
+            <PurchaseTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-            <PurchaseDateSection
-              date={purchaseDate}
-              onDateChange={setPurchaseDate}
-            />
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center">
+                  <LoadingSpinner message="A processar…" />
+                </div>
+              </div>
+            ) : activeTab === "csv" ? (
+              <CsvImportSection purchaseLogic={purchaseLogic} />
+            ) : parsedItems.length === 0 ? (
+              <>
+                <PurchaseInlineNotice
+                  variant="success"
+                  message={successMessage}
+                  onDismiss={() => setSuccessMessage(null)}
+                />
+                <UploadSection
+                  title="Importar PDF da nota"
+                  description="Envie o PDF da compra e selecione a representada correspondente."
+                  accept=".pdf,application/pdf"
+                  fileType="pdf"
+                  onFileChange={(e) => {
+                    setSuccessMessage(null);
+                    setSelectedFile(e.target.files[0]);
+                  }}
+                  selectedFile={selectedFile}
+                  onUpload={handlePdfUpload}
+                  isLoading={isLoading}
+                  error={error}
+                  brands={brands}
+                  selectedBrandId={selectedBrandId}
+                  onBrandChange={(e) => setSelectedBrandId(e.target.value)}
+                />
+              </>
+            ) : (
+              <>
+                <PurchaseInlineNotice
+                  message={error}
+                  onDismiss={() => setError(null)}
+                />
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <h3 className="text-base font-semibold text-emerald-900">
+                    PDF processado
+                  </h3>
+                  <p className="mt-1 text-sm text-emerald-800">
+                    {parsedItems.length} itens encontrados. Verifique e
+                    confirme os dados abaixo.
+                  </p>
+                  {pdfDuplicateProductCodes.length > 0 ? (
+                    <p className="mt-2 text-sm font-medium text-amber-900">
+                      Há códigos repetidos. Use «Unificar códigos duplicados»
+                      ou confirme — será perguntado se deseja agrupar.
+                    </p>
+                  ) : null}
+                </div>
 
-            <VerificationTable
-              items={parsedItems}
-              onItemChange={handleItemChange}
-              userProducts={userProducts}
-            />
+                <PurchaseDateSection
+                  date={purchaseDate}
+                  onDateChange={setPurchaseDate}
+                />
 
-            <PurchaseActions
-              onCancel={() => {
-                setParsedItems([]);
-                setSuccessMessage(null);
-              }}
-              onConfirm={handlePdfConfirm}
-              isLoading={isLoading}
-              confirmLabel="Confirmar e Atualizar Estoque"
-              secondaryAction={
-                pdfDuplicateProductCodes.length > 0
-                  ? {
-                      label: "Unificar códigos duplicados",
-                      onClick: () => {
-                        setError(null);
-                        setSuccessMessage(null);
-                        setParsedItems(
-                          mergePurchaseItemsByProductCode(parsedItems),
-                        );
-                      },
-                    }
-                  : undefined
-              }
-            />
+                <VerificationTable
+                  items={parsedItems}
+                  onItemChange={handleItemChange}
+                  userProducts={userProducts}
+                />
+
+                <PurchaseActions
+                  onCancel={() => {
+                    setParsedItems([]);
+                    setSuccessMessage(null);
+                  }}
+                  onConfirm={handlePdfConfirm}
+                  isLoading={isLoading}
+                  confirmLabel="Confirmar e atualizar estoque"
+                  secondaryAction={
+                    pdfDuplicateProductCodes.length > 0
+                      ? {
+                          label: "Unificar códigos duplicados",
+                          onClick: () => {
+                            setError(null);
+                            setSuccessMessage(null);
+                            setParsedItems(
+                              mergePurchaseItemsByProductCode(parsedItems),
+                            );
+                          },
+                        }
+                      : undefined
+                  }
+                />
+              </>
+            )}
           </>
         )}
       </div>
+
+      <ConfirmationModal
+        show={!!mergeConfirm}
+        title="Unificar códigos duplicados?"
+        tone="primary"
+        confirmText="Unificar e continuar"
+        message={
+          mergeConfirm
+            ? `Códigos repetidos: ${mergeConfirm.codes.join(", ")}. Vamos somar quantidades e usar média ponderada de preço. Cancelar interrompe a importação.`
+            : ""
+        }
+        onConfirm={handleMergeConfirm}
+        onCancel={() => setMergeConfirm(null)}
+      />
+      <ConfirmationModal
+        show={!!createConfirm}
+        title="Criar produtos novos?"
+        tone="primary"
+        confirmText="Continuar"
+        message={
+          createConfirm
+            ? `${createConfirm.newProductsCount} produto(s) não existem no catálogo e serão criados automaticamente. Existentes: ${createConfirm.existingCount}. Representada: ${createConfirm.brandName}. Data: ${purchaseDate}.`
+            : ""
+        }
+        onConfirm={() =>
+          createConfirm?.rows && finalizePdfRows(createConfirm.rows)
+        }
+        onCancel={() => setCreateConfirm(null)}
+      />
     </div>
   );
 };
