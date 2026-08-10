@@ -114,14 +114,14 @@ const ClientsPage = () => {
   };
 
   return (
-    <div className="flex min-h-full flex-col bg-zinc-50/70">
-      <div className="flex-shrink-0 border-b border-zinc-200/80 bg-white/70 px-4 py-4 backdrop-blur-md sm:px-6">
+    <div className="flex min-h-full flex-col bg-surface-muted/70">
+      <div className="flex-shrink-0 border-b border-edge bg-surface/70 px-4 py-4 backdrop-blur-md sm:px-6">
         <PageHeader
           title="Clientes"
           description="Cadastro e contacto das empresas da sua operação"
           meta={
             !loading && filteredClients.length > 0 ? (
-              <span className="inline-flex items-center rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1 text-xs font-medium text-zinc-600">
+              <span className="inline-flex items-center rounded-lg border border-edge bg-surface-muted/80 px-2.5 py-1 text-xs font-medium text-ink-muted">
                 {filteredClients.length} cliente
                 {filteredClients.length === 1 ? "" : "s"}
                 {searchTerm ? " encontrado" : ""}
@@ -199,8 +199,8 @@ const ClientsPage = () => {
               <Surface padded={false} className="hidden overflow-hidden md:block">
                 <div className="max-h-[calc(100vh-13rem)] overflow-auto">
                   <table className="min-w-full text-left text-sm">
-                    <thead className="sticky top-0 z-10 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-                      <tr className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90 backdrop-blur-md">
+                      <tr className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         <th className="px-5 py-3.5 font-semibold">Cliente</th>
                         <th className="px-4 py-3.5 font-semibold">Contacto</th>
                         <th className="px-4 py-3.5 font-semibold">Telefone</th>
@@ -210,22 +210,22 @@ const ClientsPage = () => {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-100">
+                    <tbody className="divide-y divide-edge">
                       {filteredClients.map((client) => {
                         const name = getClientDisplayName(client) || "—";
                         return (
                           <tr
                             key={client.id}
-                            className="transition-colors duration-200 ease-in-out hover:bg-zinc-50/50"
+                            className="transition-colors duration-200 ease-in-out hover:bg-surface-muted/50"
                           >
                             <td className="px-5 py-3.5">
                               <div className="flex items-center gap-3">
                                 <Avatar name={name} size="md" />
                                 <div className="min-w-0">
-                                  <p className="truncate font-semibold text-zinc-900">
+                                  <p className="truncate font-semibold text-ink">
                                     {name}
                                   </p>
-                                  <p className="truncate font-mono text-xs text-zinc-400">
+                                  <p className="truncate font-mono text-xs text-ink-muted">
                                     {client.cnpj
                                       ? formatCNPJ(client.cnpj)
                                       : "CNPJ não informado"}
@@ -234,19 +234,19 @@ const ClientsPage = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3.5">
-                              <p className="truncate text-zinc-700">
+                              <p className="truncate text-ink">
                                 {client.contactPerson || "—"}
                               </p>
-                              <p className="truncate text-xs text-zinc-400">
+                              <p className="truncate text-xs text-ink-muted">
                                 {client.email || "Sem e-mail"}
                               </p>
                             </td>
-                            <td className="px-4 py-3.5 tabular-nums text-zinc-600">
+                            <td className="px-4 py-3.5 tabular-nums text-ink-muted">
                               {client.phone
                                 ? formatPhone(client.phone)
                                 : "—"}
                             </td>
-                            <td className="px-4 py-3.5 text-zinc-600">
+                            <td className="px-4 py-3.5 text-ink-muted">
                               {client.region || "—"}
                             </td>
                             <td className="px-3 py-3.5 text-right">
@@ -293,8 +293,8 @@ const ClientsPage = () => {
                         <div className="flex min-w-0 items-center gap-3">
                           <Avatar name={name} />
                           <div className="min-w-0">
-                            <p className="font-semibold text-zinc-900">{name}</p>
-                            <p className="font-mono text-xs text-zinc-400">
+                            <p className="font-semibold text-ink">{name}</p>
+                            <p className="font-mono text-xs text-ink-muted">
                               {client.cnpj
                                 ? formatCNPJ(client.cnpj)
                                 : "Sem CNPJ"}
@@ -325,20 +325,20 @@ const ClientsPage = () => {
                       </div>
                       <dl className="mt-4 space-y-1.5 text-sm">
                         <div className="flex justify-between gap-2">
-                          <dt className="text-zinc-400">Contacto</dt>
-                          <dd className="truncate text-zinc-700">
+                          <dt className="text-ink-muted">Contacto</dt>
+                          <dd className="truncate text-ink">
                             {client.contactPerson || "—"}
                           </dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-zinc-400">Telefone</dt>
-                          <dd className="tabular-nums text-zinc-700">
+                          <dt className="text-ink-muted">Telefone</dt>
+                          <dd className="tabular-nums text-ink">
                             {client.phone ? formatPhone(client.phone) : "—"}
                           </dd>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <dt className="text-zinc-400">Região</dt>
-                          <dd className="text-zinc-700">{client.region || "—"}</dd>
+                          <dt className="text-ink-muted">Região</dt>
+                          <dd className="text-ink">{client.region || "—"}</dd>
                         </div>
                       </dl>
                     </Surface>
@@ -371,13 +371,13 @@ const ClientsPage = () => {
 
       {deleteConfirm ? (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white/95 p-6 shadow-glass backdrop-blur-md animate-fade-in">
-            <h3 className="text-lg font-semibold text-zinc-900">
+          <div className="w-full max-w-md rounded-2xl border border-edge bg-surface/95 p-6 shadow-glass backdrop-blur-md animate-fade-in">
+            <h3 className="text-lg font-semibold text-ink">
               Excluir cliente?
             </h3>
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-2 text-sm text-ink-muted">
               Tem certeza que deseja excluir{" "}
-              <strong className="font-semibold text-zinc-800">
+              <strong className="font-semibold text-ink">
                 {getClientDisplayName(deleteConfirm)}
               </strong>
               {deleteConfirm.cnpj
@@ -390,7 +390,7 @@ const ClientsPage = () => {
                 type="button"
                 onClick={closeDeleteConfirm}
                 disabled={deleting}
-                className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-50"
+                className="rounded-xl border border-edge px-4 py-2 text-sm font-semibold text-ink transition-all duration-200 hover:bg-surface-muted active:scale-[0.98] disabled:opacity-50"
               >
                 Cancelar
               </button>

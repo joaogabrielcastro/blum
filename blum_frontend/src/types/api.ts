@@ -106,6 +106,12 @@ export interface CnpjLookupResult {
   telefone: string;
   uf: string;
   email: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  zipcode?: string;
+  complement?: string;
 }
 
 export type OrderQueryParams = Record<string, string | number | boolean | undefined>;

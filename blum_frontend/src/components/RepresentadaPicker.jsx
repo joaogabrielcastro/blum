@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { normalizeBrand } from "../utils/brandUtils";
+import FormField, { inputClassName } from "./ui/FormField";
+import {
+  PrimaryButton,
+  SecondaryButton,
+  DangerButton,
+  GhostButton,
+} from "./ui/Surface";
+import EmptyState from "./EmptyState";
+import ListPageSkeleton from "./ListPageSkeleton";
 
-const BuildingIcon = ({ className = "h-7 w-7" }) => (
+const BuildingIcon = ({ className = "h-6 w-6" }) => (
   <svg
     className={className}
     xmlns="http://www.w3.org/2000/svg"
@@ -14,13 +23,13 @@ const BuildingIcon = ({ className = "h-7 w-7" }) => (
     <path
       strokeLinecap="round"
       strokeLinejoin="round"
-      d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008V11.25m0 3h.008v.008h-.008V15.75m0 3h.008v.008h-.008V19.5M4.5 19.5h15A2.25 2.25 0 0021.75 17.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
+      d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"
     />
   </svg>
 );
 
 /**
- * Primeira etapa: lista de representadas (estilo gestão) → ao entrar, abre o catálogo.
+ * Lista de representadas → ao entrar, abre o catálogo.
  */
 const RepresentadaPicker = ({
   brands = [],
@@ -65,10 +74,7 @@ const RepresentadaPicker = ({
     setEditingBrandId(brand.id);
     setEditCommission(String(brand.commission ?? ""));
     setEditLogoUrl(
-      brand.logoUrl ||
-        brand.raw?.logo_url ||
-        brand.raw?.logoUrl ||
-        "",
+      brand.logoUrl || brand.raw?.logo_url || brand.raw?.logoUrl || "",
     );
   };
 
@@ -98,76 +104,60 @@ const RepresentadaPicker = ({
 
   const handleCommissionChange = (e) => {
     const value = e.target.value;
-    const normalized = value.replace(",", ".");
+    const normalizedValue = value.replace(",", ".");
     if (
       /^\d*[.,]?\d*$/.test(value) &&
-      (value === "" || parseFloat(normalized) <= 100)
+      (value === "" || parseFloat(normalizedValue) <= 100)
     ) {
       setEditCommission(value);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center py-24">
-        <div className="animate-pulse text-gray-500">
-          Carregando representadas…
-        </div>
-      </div>
-    );
+    return <ListPageSkeleton variant="list" rows={4} />;
   }
 
   if (normalized.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-600">
-        <p className="text-lg font-medium text-gray-800">
-          Nenhuma representada cadastrada
-        </p>
-        <p className="mt-2 text-sm">
-          Cadastre uma representada para começar a usar o catálogo de produtos.
-        </p>
-        {isAdmin && onCadastrar && (
-          <button
-            type="button"
-            onClick={onCadastrar}
-            className="mt-6 inline-flex items-center gap-2 bg-purple-600 text-white font-semibold px-5 py-2.5 rounded-lg hover:bg-purple-700"
-          >
-            + Cadastrar representada
-          </button>
-        )}
+      <div className="rounded-2xl border border-edge bg-surface p-8 text-center shadow-soft">
+        <EmptyState
+          title="Nenhuma representada cadastrada"
+          message="Cadastre uma representada para começar a usar o catálogo."
+          actionLabel={isAdmin && onCadastrar ? "Cadastrar representada" : undefined}
+          onAction={isAdmin ? onCadastrar : undefined}
+        />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/80">
+    <div className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-soft">
+      <div className="border-b border-edge bg-surface-muted/80 p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="shrink-0 text-purple-600">
-              <BuildingIcon className="h-8 w-8" />
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand">
+              <BuildingIcon />
             </span>
             <div className="min-w-0">
-              <h2 className="text-xl font-bold tracking-tight text-gray-900 uppercase">
+              <h2 className="text-base font-semibold tracking-tight text-ink sm:text-lg">
                 Representadas
               </h2>
+              <p className="text-xs text-ink-muted">
+                Escolha uma marca para abrir o catálogo
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end flex-1 lg:max-w-2xl">
-            {isAdmin && onCadastrar && (
-              <button
-                type="button"
-                onClick={onCadastrar}
-                className="shrink-0 inline-flex items-center justify-center gap-2 bg-purple-600 text-white font-semibold px-4 py-2.5 rounded-lg hover:bg-purple-700 text-sm sm:text-base"
-              >
-                + Cadastrar representada
-              </button>
-            )}
-            <div className="relative flex-1 min-w-[160px] max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end lg:max-w-2xl">
+            {isAdmin && onCadastrar ? (
+              <PrimaryButton type="button" onClick={onCadastrar} className="shrink-0">
+                Nova representada
+              </PrimaryButton>
+            ) : null}
+            <div className="relative min-w-[160px] max-w-md flex-1">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <svg
-                  className="h-4 w-4 text-gray-400"
+                  className="h-4 w-4 text-ink-muted"
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
@@ -186,7 +176,7 @@ const RepresentadaPicker = ({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Filtrar…"
                 aria-label="Filtrar representadas"
-                className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 text-sm bg-white"
+                className="block w-full rounded-xl border border-edge bg-surface py-2.5 pl-9 pr-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
                 autoComplete="off"
               />
             </div>
@@ -194,180 +184,138 @@ const RepresentadaPicker = ({
         </div>
       </div>
 
-      {isAdmin && confirmDelete && deleteType === "brand" && (
-        <div className="mx-4 sm:mx-5 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-          <p className="text-amber-900 font-medium">
-            Confirmar exclusão da representada &quot;{confirmDelete}&quot;?
+      {isAdmin && confirmDelete && deleteType === "brand" ? (
+        <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:mx-5">
+          <p className="font-semibold text-amber-950">
+            Excluir representada &quot;{confirmDelete}&quot;?
           </p>
-          <p className="text-amber-800 text-xs mt-1">
+          <p className="mt-1 text-xs text-amber-900/90">
             Produtos vinculados a esta representada podem ser afetados.
           </p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button
-              type="button"
-              onClick={onConfirmDelete}
-              className="bg-red-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-red-700"
-            >
+          <div className="mt-3 flex flex-wrap gap-2">
+            <DangerButton type="button" onClick={onConfirmDelete} className="!py-2 !text-sm">
               Confirmar exclusão
-            </button>
-            <button
-              type="button"
-              onClick={onCancelDelete}
-              className="bg-gray-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-gray-700"
-            >
+            </DangerButton>
+            <SecondaryButton type="button" onClick={onCancelDelete} className="!py-2 !text-sm">
               Cancelar
-            </button>
+            </SecondaryButton>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-edge">
         {filtered.length === 0 ? (
-          <li className="px-5 py-12 text-center text-gray-500 text-sm">
+          <li className="px-5 py-12 text-center text-sm text-ink-muted">
             Nenhuma representada encontrada para &quot;{query.trim()}&quot;.
           </li>
         ) : (
           filtered.map((brand) => (
             <li
               key={brand.id}
-              className="relative px-4 sm:px-5 py-4 hover:bg-gray-50/80 transition-colors"
+              className="relative px-4 py-4 transition-colors hover:bg-surface-muted/80 sm:px-5"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
                   {brand.logoUrl ? (
-                    <div className="shrink-0 w-14 h-14 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-edge bg-surface">
                       <img
                         src={brand.logoUrl}
                         alt=""
-                        className="max-w-full max-h-full object-contain"
+                        className="max-h-full max-w-full object-contain"
                       />
                     </div>
                   ) : (
-                    <div className="shrink-0 w-14 h-14 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 flex items-center justify-center text-purple-700 font-bold text-lg">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-edge bg-brand-50 text-base font-semibold text-brand">
                       {(brand.displayName || "?").charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-purple-700 text-base truncate">
+                    <p className="truncate text-base font-semibold text-ink">
                       {brand.displayName}
                     </p>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <p className="mt-0.5 text-sm text-ink-muted">
                       Comissão {brand.commission}%
-                      {brand.raw?.id != null && (
-                        <span className="text-gray-400">
-                          {" "}
-                          · ID {brand.raw.id}
-                        </span>
-                      )}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:shrink-0">
-                  <button
+                <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+                  <PrimaryButton
                     type="button"
                     onClick={() => onSelect(brand)}
-                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm"
+                    className="!px-4 !py-2 !text-sm"
                   >
                     Abrir catálogo
-                  </button>
-                  {isAdmin && (
+                  </PrimaryButton>
+                  {isAdmin ? (
                     <>
-                      <button
+                      <SecondaryButton
                         type="button"
                         onClick={(e) => handleEditClick(brand, e)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-white"
+                        className="!px-3 !py-2 !text-sm"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                          />
-                        </svg>
                         Alterar
-                      </button>
-                      <button
+                      </SecondaryButton>
+                      <SecondaryButton
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onRequestDeleteBrand(brand.displayName);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50"
+                        className="!border-red-200 !px-3 !py-2 !text-sm !text-red-700 hover:!bg-red-50"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
                         Excluir
-                      </button>
+                      </SecondaryButton>
                     </>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
-              {isAdmin && editingBrandId === brand.id && (
-                <div className="mt-4 p-3 bg-white border border-gray-200 rounded-lg shadow-md max-w-sm">
-                  <h4 className="font-semibold text-sm text-gray-800 mb-2">
-                    Editar representada — {brand.displayName}
+              {isAdmin && editingBrandId === brand.id ? (
+                <div className="mt-4 max-w-sm rounded-xl border border-edge bg-surface p-4 shadow-soft">
+                  <h4 className="mb-3 text-sm font-semibold text-ink">
+                    Editar — {brand.displayName}
                   </h4>
-                  <label className="block text-xs text-gray-600 mb-1">
-                    URL do logo (imagem)
-                  </label>
-                  <input
-                    type="url"
-                    value={editLogoUrl}
-                    onChange={(e) => setEditLogoUrl(e.target.value)}
-                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm mb-3"
-                    placeholder="https://…"
-                  />
-                  <div className="flex items-center gap-2 mb-3">
+                  <FormField label="URL do logo" className="mb-3">
+                    <input
+                      type="url"
+                      value={editLogoUrl}
+                      onChange={(e) => setEditLogoUrl(e.target.value)}
+                      className={inputClassName()}
+                      placeholder="https://…"
+                    />
+                  </FormField>
+                  <FormField label="Comissão (%)" className="mb-3">
                     <input
                       type="text"
                       value={editCommission}
                       onChange={handleCommissionChange}
-                      className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm"
+                      className={inputClassName()}
                       placeholder="0"
                     />
-                    <span className="text-gray-600 text-sm">%</span>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
+                  </FormField>
+                  <div className="flex justify-end gap-2">
+                    <GhostButton
                       type="button"
                       onClick={() => {
                         setEditingBrandId(null);
                         setEditCommission("");
                         setEditLogoUrl("");
                       }}
-                      className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
+                      className="!py-2 !text-sm"
                     >
                       Cancelar
-                    </button>
-                    <button
+                    </GhostButton>
+                    <PrimaryButton
                       type="button"
                       onClick={(e) => handleSaveEdit(brand.id, e)}
-                      className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                      className="!py-2 !text-sm"
                     >
                       Salvar
-                    </button>
+                    </PrimaryButton>
                   </div>
                 </div>
-              )}
+              ) : null}
             </li>
           ))
         )}

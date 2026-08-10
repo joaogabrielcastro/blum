@@ -1,6 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import ErrorMessage from "../components/ErrorMessage";
+import ConfirmationModal from "../components/ConfirmationModal";
+import ListPageSkeleton from "../components/ListPageSkeleton";
+import StatusBadge from "../components/ui/StatusBadge";
+import FormField, { inputClassName } from "../components/ui/FormField";
+import Surface, {
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+} from "../components/ui/Surface";
 import { useToast } from "../context/ToastContext";
 import { useAppData } from "../context/AppDataProvider";
 
@@ -30,7 +40,7 @@ const TeamPage = () => {
       const u = await apiService.getUsers();
       setUsers(Array.isArray(u) ? u : []);
     } catch (e) {
-      const msg = e.message || "Erro ao carregar equipe";
+      const msg = e.message || "Não foi possível carregar a equipe.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -51,7 +61,8 @@ const TeamPage = () => {
       const { brandIds } = await apiService.getUserAllowedBrands(user.id);
       setSelectedBrandIds(new Set(brandIds || []));
     } catch (e) {
-      const msg = e.message || "Erro ao carregar representadas do vendedor";
+      const msg =
+        e.message || "Não foi possível carregar as representadas do vendedor.";
       setError(msg);
       toast.error(msg);
     }
@@ -78,7 +89,7 @@ const TeamPage = () => {
       toast.success("Representadas atualizadas.");
       setBrandModalUser(null);
     } catch (e) {
-      const msg = e.message || "Erro ao salvar";
+      const msg = e.message || "Não foi possível guardar as representadas.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -88,7 +99,8 @@ const TeamPage = () => {
 
   const savePassword = async () => {
     if (!pwdModalUser || newPwd.length < 6) {
-      setError("Senha deve ter no mínimo 6 caracteres");
+      setError("A senha deve ter no mínimo 6 caracteres.");
+      toast.warning("A senha deve ter no mínimo 6 caracteres.");
       return;
     }
     setSavingPwd(true);
@@ -99,7 +111,7 @@ const TeamPage = () => {
       setPwdModalUser(null);
       setNewPwd("");
     } catch (e) {
-      const msg = e.message || "Erro ao redefinir senha";
+      const msg = e.message || "Não foi possível redefinir a senha.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -113,7 +125,9 @@ const TeamPage = () => {
     const p = newUser.password.trim();
     const n = newUser.name.trim() || u;
     if (u.length < 3 || p.length < 6) {
-      setError("Usuário (mín. 3) e senha (mín. 6) são obrigatórios.");
+      const msg = "Usuário (mín. 3) e senha (mín. 6) são obrigatórios.";
+      setError(msg);
+      toast.warning(msg);
       return;
     }
     setCreating(true);
@@ -129,7 +143,7 @@ const TeamPage = () => {
       setNewUser(emptyForm);
       await load();
     } catch (e) {
-      const msg = e.message || "Erro ao criar vendedor";
+      const msg = e.message || "Não foi possível criar o vendedor.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -150,7 +164,7 @@ const TeamPage = () => {
       if (brandModalUser?.id === removedId) setBrandModalUser(null);
       await load();
     } catch (e) {
-      const msg = e.message || "Erro ao excluir vendedor";
+      const msg = e.message || "Não foi possível excluir o vendedor.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -159,129 +173,127 @@ const TeamPage = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">Equipe</h1>
-      <p className="text-gray-600 text-sm mb-6">
-        Crie vendedores, redefina senhas e limite quais representadas cada um
-        acessa. Se nenhuma representada estiver marcada para o vendedor, ele
-        vê todas (comportamento padrão).
-      </p>
+    <div className="mx-auto max-w-5xl p-4 sm:p-6 md:p-8">
+      <PageHeader
+        title="Equipe"
+        description="Crie vendedores, redefina senhas e limite representadas. Sem marcações, o vendedor vê todas."
+      />
 
-      {error && (
+      {error ? (
         <ErrorMessage message={error} onClose={() => setError(null)} />
-      )}
+      ) : null}
 
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
+      <Surface className="mb-6">
+        <h2 className="mb-4 text-base font-semibold text-ink">
           Novo vendedor
         </h2>
         <form
           onSubmit={createSalesperson}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end"
+          className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"
         >
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Usuário
-            </label>
+          <FormField label="Usuário" required>
             <input
               value={newUser.username}
               onChange={(e) =>
                 setNewUser((s) => ({ ...s, username: e.target.value }))
               }
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className={inputClassName()}
               autoComplete="off"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Senha
-            </label>
+          </FormField>
+          <FormField label="Senha" required>
             <input
               type="password"
               value={newUser.password}
               onChange={(e) =>
                 setNewUser((s) => ({ ...s, password: e.target.value }))
               }
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className={inputClassName()}
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Nome exibido
-            </label>
+          </FormField>
+          <FormField label="Nome exibido">
             <input
               value={newUser.name}
               onChange={(e) =>
                 setNewUser((s) => ({ ...s, name: e.target.value }))
               }
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className={inputClassName()}
             />
-          </div>
-          <button
-            type="submit"
-            disabled={creating}
-            className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
-          >
+          </FormField>
+          <PrimaryButton type="submit" disabled={creating} className="w-full">
             {creating ? "A guardar…" : "Cadastrar vendedor"}
-          </button>
+          </PrimaryButton>
         </form>
-      </section>
+      </Surface>
 
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <h2 className="text-lg font-semibold text-gray-800 p-4 border-b border-gray-100">
-          Usuários
-        </h2>
+      <Surface padded={false} className="overflow-hidden">
+        <div className="border-b border-edge px-4 py-3 sm:px-5">
+          <h2 className="text-base font-semibold text-ink">Usuários</h2>
+        </div>
         {loading ? (
-          <p className="p-8 text-gray-500 text-center">Carregando…</p>
+          <div className="p-4">
+            <ListPageSkeleton variant="table" rows={4} />
+          </div>
+        ) : users.length === 0 ? (
+          <p className="p-8 text-center text-sm text-ink-muted">
+            Nenhum usuário encontrado.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-600">
+              <thead className="border-b border-edge bg-surface-muted/80 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 <tr>
-                  <th className="py-3 px-4">Usuário</th>
-                  <th className="py-3 px-4">Nome</th>
-                  <th className="py-3 px-4">Função</th>
-                  <th className="py-3 px-4 text-right">Ações</th>
+                  <th className="px-4 py-3">Usuário</th>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Função</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-edge">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50/80">
-                    <td className="py-3 px-4 font-medium">{u.username}</td>
-                    <td className="py-3 px-4">{u.name}</td>
-                    <td className="py-3 px-4">
-                      {u.role === "admin" ? "Administrador" : "Vendedor"}
+                  <tr key={u.id} className="hover:bg-surface-muted/60">
+                    <td className="px-4 py-3 font-medium text-ink">
+                      {u.username}
                     </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-                        {u.role === "salesperson" && (
-                          <button
+                    <td className="px-4 py-3 text-ink">{u.name}</td>
+                    <td className="px-4 py-3">
+                      <StatusBadge
+                        label={
+                          u.role === "admin" ? "Administrador" : "Vendedor"
+                        }
+                        tone={u.role === "admin" ? "info" : "neutral"}
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex flex-wrap items-center justify-end gap-1">
+                        {u.role === "salesperson" ? (
+                          <GhostButton
                             type="button"
                             onClick={() => openBrandModal(u)}
-                            className="text-purple-700 font-medium hover:underline"
+                            className="!px-2 !py-1.5 !text-sm text-brand"
                           >
                             Representadas
-                          </button>
-                        )}
-                        <button
+                          </GhostButton>
+                        ) : null}
+                        <GhostButton
                           type="button"
                           onClick={() => {
                             setPwdModalUser(u);
                             setNewPwd("");
                           }}
-                          className="text-blue-700 font-medium hover:underline"
+                          className="!px-2 !py-1.5 !text-sm"
                         >
                           Nova senha
-                        </button>
-                        {u.role === "salesperson" && (
-                          <button
+                        </GhostButton>
+                        {u.role === "salesperson" ? (
+                          <GhostButton
                             type="button"
                             onClick={() => setDeleteModalUser(u)}
-                            className="text-red-600 font-medium hover:underline"
+                            className="!px-2 !py-1.5 !text-sm !text-red-700"
                           >
                             Excluir
-                          </button>
-                        )}
+                          </GhostButton>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -290,30 +302,30 @@ const TeamPage = () => {
             </table>
           </div>
         )}
-      </section>
+      </Surface>
 
-      {brandModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-5">
-            <h3 className="font-semibold text-lg text-gray-900 mb-1">
+      {brandModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge bg-surface p-5 shadow-soft">
+            <h3 className="text-lg font-semibold text-ink">
               Representadas — {brandModalUser.username}
             </h3>
-            <p className="text-xs text-gray-600 mb-4">
+            <p className="mt-1 text-xs text-ink-muted">
               Marque as que este vendedor pode acessar. Nenhuma marcada = vê
               todas.
             </p>
-            <ul className="space-y-2 mb-6 max-h-64 overflow-y-auto border rounded-lg p-3">
+            <ul className="mt-4 mb-6 max-h-64 space-y-2 overflow-y-auto rounded-xl border border-edge p-3">
               {brands.map((b) => (
                 <li key={b.id}>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink">
                     <input
                       type="checkbox"
                       checked={selectedBrandIds.has(b.id)}
                       onChange={() => toggleBrand(b.id)}
-                      className="rounded border-gray-300"
+                      className="h-4 w-4 rounded border-zinc-300 text-brand focus:ring-brand/30"
                     />
                     <span>{b.name}</span>
-                    <span className="text-gray-400 text-xs">
+                    <span className="text-xs text-ink-muted">
                       ({b.commission_rate ?? 0}%)
                     </span>
                   </label>
@@ -321,92 +333,71 @@ const TeamPage = () => {
               ))}
             </ul>
             <div className="flex justify-end gap-2">
-              <button
+              <SecondaryButton
                 type="button"
                 onClick={() => setBrandModalUser(null)}
-                className="px-4 py-2 text-sm text-gray-700 border rounded-lg"
               >
                 Cancelar
-              </button>
-              <button
+              </SecondaryButton>
+              <PrimaryButton
                 type="button"
                 onClick={saveBrands}
                 disabled={savingBrands}
-                className="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
                 {savingBrands ? "A guardar…" : "Guardar"}
-              </button>
+              </PrimaryButton>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {deleteModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5">
-            <h3 className="font-semibold text-lg text-gray-900 mb-2">
-              Excluir vendedor
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Tem certeza que deseja excluir{" "}
-              <strong>{deleteModalUser.username}</strong>? Esta ação não pode ser
-              desfeita. Se este vendedor tiver pedidos no sistema, a exclusão
-              será bloqueada.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteModalUser(null)}
-                className="px-4 py-2 text-sm border rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteUser}
-                disabled={deletingUser}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {deletingUser ? "A excluir…" : "Excluir"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pwdModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5">
-            <h3 className="font-semibold text-lg text-gray-900 mb-3">
+      {pwdModalUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-edge bg-surface p-5 shadow-soft">
+            <h3 className="mb-3 text-lg font-semibold text-ink">
               Nova senha — {pwdModalUser.username}
             </h3>
-            <input
-              type="password"
-              value={newPwd}
-              onChange={(e) => setNewPwd(e.target.value)}
-              placeholder="Mínimo 6 caracteres"
-              className="w-full border rounded-lg px-3 py-2 text-sm mb-4"
-            />
-            <div className="flex justify-end gap-2">
-              <button
+            <FormField label="Nova senha" hint="Mínimo 6 caracteres">
+              <input
+                type="password"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                placeholder="••••••••"
+                className={inputClassName()}
+              />
+            </FormField>
+            <div className="mt-4 flex justify-end gap-2">
+              <SecondaryButton
                 type="button"
                 onClick={() => setPwdModalUser(null)}
-                className="px-4 py-2 text-sm border rounded-lg"
               >
                 Cancelar
-              </button>
-              <button
+              </SecondaryButton>
+              <PrimaryButton
                 type="button"
                 onClick={savePassword}
                 disabled={savingPwd}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-50"
               >
                 {savingPwd ? "A guardar…" : "Guardar"}
-              </button>
+              </PrimaryButton>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
+
+      <ConfirmationModal
+        show={!!deleteModalUser}
+        title="Excluir vendedor"
+        tone="danger"
+        confirmText={deletingUser ? "A excluir…" : "Excluir"}
+        message={
+          deleteModalUser
+            ? `Tem certeza que deseja excluir ${deleteModalUser.username}? Esta ação não pode ser desfeita. Se houver pedidos vinculados, a exclusão será bloqueada.`
+            : ""
+        }
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setDeleteModalUser(null)}
+      />
     </div>
   );
 };

@@ -1,10 +1,19 @@
 import { defaultMonthKey } from "../../hooks/useReportsData";
 
+const pillClass = (active) =>
+  `min-w-fit rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
+    active
+      ? "bg-brand text-white"
+      : "bg-surface-muted text-ink hover:bg-zinc-200 dark:hover:bg-zinc-700"
+  }`;
+
+const selectClass =
+  "min-h-10 w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-brand/30";
+
 const ReportsMonthFilter = ({
   selectedMonthKey,
   onMonthChange,
   monthOptions,
-  previousMonth,
   onGoToPreviousMonth,
   onGoToCurrentMonth,
   userRole,
@@ -12,34 +21,34 @@ const ReportsMonthFilter = ({
   onSellerFilterChange,
   sellerOptions,
   selectedSellerLabel,
+  brandFilterKey,
+  onBrandFilterChange,
+  brandOptions,
+  selectedBrandLabel,
 }) => (
-  <>
-    <div className="flex flex-col lg:flex-row lg:items-end gap-3 mb-8">
+  <div className="space-y-4">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div className="flex flex-col gap-2">
-        <span className="font-semibold text-gray-700">Mês calendário:</span>
+        <span className="text-sm font-medium text-ink">Período</span>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onGoToCurrentMonth}
-            className={`min-w-fit px-4 py-2 rounded-full text-sm font-semibold ${
-              selectedMonthKey === defaultMonthKey
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
+            className={pillClass(selectedMonthKey === defaultMonthKey)}
           >
             Mês atual
           </button>
           <button
             type="button"
             onClick={onGoToPreviousMonth}
-            className="min-w-fit px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300"
+            className={pillClass(false)}
           >
             Mês anterior
           </button>
           <select
             value={selectedMonthKey}
             onChange={(e) => onMonthChange(e.target.value)}
-            className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800"
+            className={`${selectClass} sm:w-auto`}
             aria-label="Selecionar mês"
           >
             {monthOptions.map((opt) => (
@@ -50,38 +59,74 @@ const ReportsMonthFilter = ({
           </select>
         </div>
       </div>
-    </div>
 
-    {userRole === "admin" ? (
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-8 flex-wrap">
-        <span className="font-semibold text-gray-700 shrink-0">
-          Representante:
-        </span>
-        <select
-          value={sellerFilterKey}
-          onChange={(e) => onSellerFilterChange(e.target.value)}
-          aria-label="Filtrar pedidos por representante"
-          className="w-full sm:w-auto min-w-[200px] max-w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
-          <option value="">Todos os representantes</option>
-          {sellerOptions.map((opt) => (
-            <option key={opt.key} value={opt.key}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {sellerFilterKey ? (
-          <span className="text-sm text-gray-600">
-            Exibindo apenas pedidos de{" "}
-            <span className="font-semibold text-gray-800">
-              {selectedSellerLabel}
-            </span>
-            .
-          </span>
+      <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:max-w-2xl">
+        {userRole === "admin" ? (
+          <div className="flex min-w-0 flex-col gap-2">
+            <label
+              htmlFor="reports-seller-filter"
+              className="text-sm font-medium text-ink"
+            >
+              Representante
+            </label>
+            <select
+              id="reports-seller-filter"
+              value={sellerFilterKey}
+              onChange={(e) => onSellerFilterChange(e.target.value)}
+              aria-label="Filtrar por representante"
+              className={selectClass}
+            >
+              <option value="">Todos os representantes</option>
+              {sellerOptions.map((opt) => (
+                <option key={opt.key} value={opt.key}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {sellerFilterKey ? (
+              <p className="text-xs text-ink-muted">
+                Pedidos de{" "}
+                <span className="font-semibold text-ink">
+                  {selectedSellerLabel}
+                </span>
+              </p>
+            ) : null}
+          </div>
         ) : null}
+
+        <div className="flex min-w-0 flex-col gap-2">
+          <label
+            htmlFor="reports-brand-filter"
+            className="text-sm font-medium text-ink"
+          >
+            Representada
+          </label>
+          <select
+            id="reports-brand-filter"
+            value={brandFilterKey}
+            onChange={(e) => onBrandFilterChange(e.target.value)}
+            aria-label="Filtrar por representada"
+            className={selectClass}
+          >
+            <option value="">Todas as representadas</option>
+            {brandOptions.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {brandFilterKey ? (
+            <p className="text-xs text-ink-muted">
+              Vendas de{" "}
+              <span className="font-semibold text-ink">
+                {selectedBrandLabel}
+              </span>
+            </p>
+          ) : null}
+        </div>
       </div>
-    ) : null}
-  </>
+    </div>
+  </div>
 );
 
 export default ReportsMonthFilter;

@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import App from "./App";
 import { ToastProvider } from "./context/ToastContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 jest.mock("./services/apiService", () => ({
   __esModule: true,
@@ -14,9 +15,11 @@ jest.mock("./services/apiService", () => ({
 describe("App", () => {
   it("renderiza tela de login quando não há sessão", async () => {
     render(
-      <ToastProvider>
-        <App />
-      </ToastProvider>,
+      <ThemeProvider>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ThemeProvider>,
     );
     expect(
       await screen.findByRole("heading", { name: "Entrar" }),

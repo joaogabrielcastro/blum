@@ -29,6 +29,80 @@ export function orderRepresentadas(order) {
   return order.representedBrands ?? order.representadas ?? "";
 }
 
+/** Lista de nomes de representadas no pedido */
+export function orderBrandList(order) {
+  return String(orderRepresentadas(order) || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+export function normalizeBrandFilterKey(name) {
+  return String(name || "")
+    .trim()
+    .toLowerCase();
+}
+
+/** Pedido inclui a representada do filtro (chave normalizada). */
+export function orderMatchesBrandFilter(order, brandFilterKey) {
+  if (!brandFilterKey) return true;
+  const key = normalizeBrandFilterKey(brandFilterKey);
+  const brands = orderBrandList(order);
+  if (brands.length === 0) return key === "sem marca definida";
+  return brands.some((b) => normalizeBrandFilterKey(b) === key);
+}
+
+/**
+ * Valor do pedido atribuído à representada filtrada.
+ * Pedidos multi-marca: reparte o total igualmente (igual accumulateSalesByRepresentada).
+ */
+export function orderAmountForBrandFilter(order, brandFilterKey, amountFn = orderTotalPrice) {
+  const total = amountFn(order);
+  if (!brandFilterKey) return total;
+  const key = normalizeBrandFilterKey(brandFilterKey);
+  const brands = orderBrandList(order);
+  if (brands.length === 0) {
+    return key === "sem marca definida" ? total : 0;
+  }
+  const matchCount = brands.filter(
+    (b) => normalizeBrandFilterKey(b) === key,
+  ).length;
+  if (matchCount === 0) return 0;
+  return (total / brands.length) * matchCount;
+}
+
+/** Opções de select a partir dos pedidos (chave = nome normalizado). */
+export function buildBrandOptionsFromOrders(orders) {
+  const byKey = new Map();
+  for (const order of orders || []) {
+    const brands = orderBrandList(order);
+    if (brands.length === 0) {
+      if (!byKey.has("sem marca definida")) {
+        byKey.set("sem marca definida", {
+          key: "sem marca definida",
+          label: "Sem marca definida",
+        });
+      }
+      continue;
+    }
+    for (const name of brands) {
+      const key = normalizeBrandFilterKey(name);
+      if (!byKey.has(key)) {
+        byKey.set(key, { key, label: name });
+      } else {
+        const cur = byKey.get(key);
+        byKey.set(key, {
+          key,
+          label: pickBetterBrandLabel(cur.label, name),
+        });
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) =>
+    a.label.localeCompare(b.label, "pt-BR"),
+  );
+}
+
 export function orderSellerName(order) {
   return order.sellerName ?? order.seller_name ?? "";
 }
@@ -174,7 +248,12 @@ export function filterOrdersByCalendarMonth(orders, year, month) {
 }
 
 /** Gráfico acumulado dia a dia de um mês calendário (todos os dias do mês). */
-export function prepareMonthlyCumulativeChartData(orders, year, month) {
+export function prepareMonthlyCumulativeChartData(
+  orders,
+  year,
+  month,
+  amountFn = orderTotalPrice,
+) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const salesByDay = {};
   for (let day = 1; day <= daysInMonth; day += 1) {
@@ -185,7 +264,7 @@ export function prepareMonthlyCumulativeChartData(orders, year, month) {
     if (!orderInCalendarMonth(order, year, month)) continue;
     const fin = orderFinishedAt(order);
     const day = new Date(fin).getDate();
-    salesByDay[day] = (salesByDay[day] || 0) + orderTotalPrice(order);
+    salesByDay[day] = (salesByDay[day] || 0) + amountFn(order);
   }
 
   let cumulative = 0;

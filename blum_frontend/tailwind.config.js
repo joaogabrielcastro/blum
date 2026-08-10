@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
@@ -12,10 +13,32 @@ module.exports = {
           600: "#1D4ED8",
           700: "#1E40AF",
         },
+        surface: {
+          DEFAULT: "var(--color-surface)",
+          muted: "var(--color-surface-muted)",
+          page: "var(--color-page)",
+          elevated: "var(--color-elevated)",
+        },
+        ink: {
+          DEFAULT: "var(--color-text)",
+          muted: "var(--color-text-muted)",
+        },
+        edge: "var(--color-border)",
+      },
+      fontFamily: {
+        sans: [
+          "Inter",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
       },
       boxShadow: {
         glass: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06)",
-        soft: "0 1px 3px rgba(15,23,42,0.06)",
+        soft: "var(--shadow-soft)",
       },
       animation: {
         "drawer-in": "drawerIn 0.22s ease-out",

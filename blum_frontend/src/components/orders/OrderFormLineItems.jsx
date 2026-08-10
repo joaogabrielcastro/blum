@@ -44,7 +44,7 @@ function OrderItemCard({
           onSelectItem?.(index);
         }
       }}
-      className={`rounded-lg p-3 sm:p-4 space-y-3 bg-white border cursor-pointer transition-shadow ${
+      className={`rounded-lg p-3 sm:p-4 space-y-3 bg-surface border cursor-pointer transition-shadow ${
         isActive
           ? "border-indigo-400 ring-2 ring-indigo-200 shadow-md"
           : hasShortfall
@@ -233,7 +233,7 @@ export default function OrderFormLineItems({
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-surface divide-y divide-gray-200">
             {items.map((item, index) => {
               const rowShortfall = computeItemStockShortfall(item) > 0;
               const isActive = activeItemIndex === index;

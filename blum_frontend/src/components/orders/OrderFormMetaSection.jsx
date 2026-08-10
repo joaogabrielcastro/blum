@@ -1,18 +1,20 @@
+import FormField, { inputClassName } from "../ui/FormField";
+
 function ClientOptionRow({ opt, onSelect }) {
   return (
     <button
       type="button"
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => onSelect(opt)}
-      className="flex w-full flex-col gap-1 border-b border-gray-100 bg-white px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-indigo-50 active:bg-indigo-100"
+      className="flex w-full flex-col gap-1 border-b border-edge bg-surface px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-brand-50 active:bg-brand-100"
     >
-      <span className="text-sm font-medium leading-snug text-gray-900">
+      <span className="text-sm font-medium leading-snug text-ink">
         {opt.primary}
       </span>
       {opt.secondary ? (
-        <span className="flex items-start gap-2 text-xs leading-snug text-gray-600">
+        <span className="flex items-start gap-2 text-xs leading-snug text-ink-muted">
           <svg
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-muted"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -37,8 +39,231 @@ function ClientOptionRow({ opt, onSelect }) {
   );
 }
 
-/** Cliente, representada, pagamento, data, descrição e desconto geral. */
+function ClientBrandFields({
+  brands,
+  clientId,
+  clientOptions,
+  clientSearchTerm,
+  onClientSearchTermChange,
+  onOpenMobileClientPicker,
+  onResetClient,
+  mobileClientPickerOpen,
+  desktopClientListOpen,
+  onDesktopClientListOpen,
+  filteredClientOptions,
+  onSelectClient,
+  selectedBrandId,
+  onBrandChange,
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
+      <FormField label="Cliente" required>
+        <div className="space-y-2 md:hidden">
+          <button
+            type="button"
+            aria-expanded={mobileClientPickerOpen}
+            aria-haspopup="dialog"
+            onClick={onOpenMobileClientPicker}
+            className={`${inputClassName()} min-h-12 text-left`}
+          >
+            <span
+              className={
+                clientId ? "line-clamp-2 text-ink" : "text-ink-muted"
+              }
+            >
+              {clientId
+                ? (clientOptions.find((o) => o.id === String(clientId))
+                    ?.label ?? "Cliente selecionado")
+                : "Toque para buscar cliente (nome ou CNPJ)"}
+            </span>
+          </button>
+          {clientId ? (
+            <button
+              type="button"
+              className="text-xs font-medium text-brand hover:underline"
+              onClick={onResetClient}
+            >
+              Limpar cliente
+            </button>
+          ) : null}
+        </div>
+
+        <div className="relative hidden md:block">
+          <input
+            type="text"
+            autoComplete="off"
+            value={clientSearchTerm}
+            onChange={(e) => onClientSearchTermChange(e.target.value)}
+            onFocus={() => onDesktopClientListOpen(true)}
+            onBlur={() => {
+              window.setTimeout(() => onDesktopClientListOpen(false), 180);
+            }}
+            placeholder="Nome, fantasia ou CNPJ…"
+            className={inputClassName()}
+          />
+          {desktopClientListOpen &&
+            clientSearchTerm.trim().length > 0 &&
+            filteredClientOptions.length > 0 && (
+              <div
+                className="absolute left-0 right-0 z-50 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-xl border border-edge bg-surface shadow-soft"
+                role="listbox"
+              >
+                {filteredClientOptions.map((opt) => (
+                  <ClientOptionRow
+                    key={opt.id}
+                    opt={opt}
+                    onSelect={onSelectClient}
+                  />
+                ))}
+              </div>
+            )}
+          {desktopClientListOpen &&
+            clientSearchTerm.trim().length > 0 &&
+            filteredClientOptions.length === 0 &&
+            clientOptions.length > 0 && (
+              <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl border border-edge bg-surface p-4 text-sm text-ink-muted shadow-soft">
+                Nenhum cliente encontrado. Ajuste nome ou CNPJ.
+              </div>
+            )}
+        </div>
+        {clientOptions.length === 0 ? (
+          <p className="mt-1 text-sm text-amber-700">
+            Nenhum cliente cadastrado. Cadastre em Clientes.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-ink-muted">
+            A lista mostra CNPJ e local quando estão no cadastro.
+          </p>
+        )}
+      </FormField>
+
+      <FormField label="Representada" required>
+        <select
+          value={selectedBrandId}
+          onChange={(e) => onBrandChange(e.target.value)}
+          className={inputClassName()}
+        >
+          <option value="">Selecione uma representada</option>
+          {Array.isArray(brands) &&
+            brands.map((brand) => (
+              <option key={brand.id ?? brand.name} value={String(brand.id)}>
+                {brand.name}
+              </option>
+            ))}
+        </select>
+        {Array.isArray(brands) && brands.length === 0 ? (
+          <p className="mt-1 text-sm text-amber-700">
+            Nenhuma representada cadastrada. Cadastre em Produtos.
+          </p>
+        ) : null}
+      </FormField>
+    </div>
+  );
+}
+
+function ConditionsFields({
+  paymentMethod,
+  onPaymentMethodChange,
+  orderDateTime,
+  onOrderDateTimeChange,
+  description,
+  onDescriptionChange,
+  discount,
+  onDiscountChange,
+  canApplyGeneralDiscount,
+  showAdvanced,
+  onToggleAdvanced,
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <FormField
+          label="Forma de pagamento"
+          hint="Desconto geral só é permitido em PIX ou dinheiro."
+        >
+          <select
+            value={paymentMethod}
+            onChange={(e) => onPaymentMethodChange(e.target.value)}
+            className={inputClassName()}
+          >
+            <option value="">Selecione (opcional)</option>
+            <option value="carteira">Carteira (não pago / em aberto)</option>
+            <option value="boleto">Pagamento em boleto</option>
+            <option value="pix">Pagamento via PIX</option>
+            <option value="cheque">Pagamento via cheque</option>
+            <option value="dinheiro">Pagamento em dinheiro</option>
+          </select>
+        </FormField>
+
+        <FormField
+          label="Desconto geral (%)"
+          hint={
+            canApplyGeneralDiscount
+              ? "Para PIX ou dinheiro, máximo 2%."
+              : "Para esta forma de pagamento, desconto geral deve ser 0%."
+          }
+        >
+          <input
+            type="number"
+            min="0"
+            max={canApplyGeneralDiscount ? "2" : "0"}
+            step="0.01"
+            value={discount}
+            onChange={(e) => {
+              const raw = parseFloat(e.target.value) || 0;
+              const capped = canApplyGeneralDiscount
+                ? Math.min(2, Math.max(0, raw))
+                : 0;
+              onDiscountChange(capped);
+            }}
+            className={inputClassName()}
+            disabled={!canApplyGeneralDiscount}
+          />
+        </FormField>
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={onToggleAdvanced}
+          className="text-sm font-medium text-brand hover:underline"
+        >
+          {showAdvanced ? "Ocultar opções avançadas" : "Mais opções"}
+        </button>
+        {showAdvanced ? (
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              label="Data do pedido"
+              hint="Use para lançar pedidos antigos."
+            >
+              <input
+                type="datetime-local"
+                value={orderDateTime}
+                onChange={(e) => onOrderDateTimeChange(e.target.value)}
+                className={inputClassName()}
+              />
+            </FormField>
+            <FormField label="Observação">
+              <textarea
+                value={description}
+                onChange={(e) => onDescriptionChange(e.target.value)}
+                rows={2}
+                className={inputClassName()}
+                placeholder="Opcional"
+              />
+            </FormField>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * @param {"basics"|"conditions"|"all"} variant
+ */
 export default function OrderFormMetaSection({
+  variant = "all",
   brands,
   clientId,
   clientOptions,
@@ -62,214 +287,68 @@ export default function OrderFormMetaSection({
   discount,
   onDiscountChange,
   canApplyGeneralDiscount,
+  showAdvanced = false,
+  onToggleAdvanced,
 }) {
+  const showBasics = variant === "basics" || variant === "all";
+  const showConditions = variant === "conditions" || variant === "all";
+
+  const title =
+    variant === "basics"
+      ? "Cliente e representada"
+      : variant === "conditions"
+        ? "Condições"
+        : "Dados do pedido";
+  const subtitle =
+    variant === "basics"
+      ? "Comece escolhendo para quem e qual marca."
+      : variant === "conditions"
+        ? "Pagamento, desconto e detalhes finais."
+        : "Preencha cliente, representada, pagamento e demais informações.";
+
   return (
-    <section className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 sm:p-4 md:p-5 space-y-5 sm:space-y-6 min-w-0">
+    <section className="min-w-0 space-y-5 rounded-2xl border border-edge bg-surface-muted/60 p-3 sm:space-y-6 sm:p-4 md:p-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-800">
-          Dados do pedido
+        <h3 className="text-base font-semibold text-ink sm:text-lg">
+          {title}
         </h3>
-        <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Preencha cliente, representada, pagamento e demais informações.
-        </p>
+        <p className="mt-1 text-xs text-ink-muted sm:text-sm">{subtitle}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cliente *
-          </label>
+      {showBasics ? (
+        <ClientBrandFields
+          brands={brands}
+          clientId={clientId}
+          clientOptions={clientOptions}
+          clientSearchTerm={clientSearchTerm}
+          onClientSearchTermChange={onClientSearchTermChange}
+          onOpenMobileClientPicker={onOpenMobileClientPicker}
+          onResetClient={onResetClient}
+          mobileClientPickerOpen={mobileClientPickerOpen}
+          desktopClientListOpen={desktopClientListOpen}
+          onDesktopClientListOpen={onDesktopClientListOpen}
+          filteredClientOptions={filteredClientOptions}
+          onSelectClient={onSelectClient}
+          selectedBrandId={selectedBrandId}
+          onBrandChange={onBrandChange}
+        />
+      ) : null}
 
-          <div className="md:hidden space-y-2">
-            <button
-              type="button"
-              aria-expanded={mobileClientPickerOpen}
-              aria-haspopup="dialog"
-              onClick={onOpenMobileClientPicker}
-              className="w-full min-h-12 p-3.5 border border-gray-300 rounded-lg text-base text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <span
-                className={
-                  clientId ? "text-gray-900 line-clamp-2" : "text-gray-400"
-                }
-              >
-                {clientId
-                  ? (clientOptions.find((o) => o.id === String(clientId))
-                      ?.label ?? "Cliente selecionado")
-                  : "Toque para buscar cliente (nome ou CNPJ)"}
-              </span>
-            </button>
-            {clientId ? (
-              <button
-                type="button"
-                className="text-xs font-medium text-blue-700 hover:underline"
-                onClick={onResetClient}
-              >
-                Limpar cliente
-              </button>
-            ) : null}
-          </div>
-
-          <div className="relative hidden md:block">
-            <input
-              type="text"
-              autoComplete="off"
-              value={clientSearchTerm}
-              onChange={(e) => onClientSearchTermChange(e.target.value)}
-              onFocus={() => onDesktopClientListOpen(true)}
-              onBlur={() => {
-                window.setTimeout(() => onDesktopClientListOpen(false), 180);
-              }}
-              placeholder="Nome, fantasia ou CNPJ..."
-              className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {desktopClientListOpen &&
-              clientSearchTerm.trim().length > 0 &&
-              filteredClientOptions.length > 0 && (
-                <div
-                  className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white shadow-xl"
-                  role="listbox"
-                >
-                  {filteredClientOptions.map((opt) => (
-                    <ClientOptionRow
-                      key={opt.id}
-                      opt={opt}
-                      onSelect={onSelectClient}
-                    />
-                  ))}
-                </div>
-              )}
-            {desktopClientListOpen &&
-              clientSearchTerm.trim().length > 0 &&
-              filteredClientOptions.length === 0 &&
-              clientOptions.length > 0 && (
-                <div className="absolute z-50 left-0 right-0 mt-1 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-500 shadow-lg">
-                  Nenhum cliente encontrado. Ajuste nome ou CNPJ.
-                </div>
-              )}
-          </div>
-
-          <p className="mt-1 text-xs text-gray-500">
-            {clientOptions.length > 0
-              ? "A lista mostra CNPJ e local (cidade/UF) quando estão no cadastro."
-              : null}
-          </p>
-          {clientOptions.length === 0 && (
-            <p className="mt-1 text-sm text-amber-700">
-              Nenhum cliente cadastrado. Cadastre clientes em Clientes.
-            </p>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Representada *
-          </label>
-          <select
-            value={selectedBrandId}
-            onChange={(e) => onBrandChange(e.target.value)}
-            className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Selecione uma representada</option>
-            {Array.isArray(brands) &&
-              brands.map((brand) => (
-                <option key={brand.id ?? brand.name} value={String(brand.id)}>
-                  {brand.name}
-                </option>
-              ))}
-          </select>
-          {Array.isArray(brands) && brands.length === 0 && (
-            <p className="mt-1 text-sm text-amber-700">
-              Nenhuma representada cadastrada. Cadastre em Produtos.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
-        <div className="min-w-0 md:col-span-2 xl:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Condição / forma de pagamento
-          </label>
-          <select
-            value={paymentMethod}
-            onChange={(e) => onPaymentMethodChange(e.target.value)}
-            className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Selecione (opcional)</option>
-            <option value="carteira">Carteira (não pago / em aberto)</option>
-            <option value="boleto">Pagamento em boleto</option>
-            <option value="pix">Pagamento via PIX</option>
-            <option value="cheque">Pagamento via cheque</option>
-            <option value="dinheiro">Pagamento em dinheiro</option>
-          </select>
-          <p className="mt-1 text-xs text-gray-500">
-            Desconto geral só é permitido em PIX ou dinheiro.
-          </p>
-        </div>
-
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Data do pedido
-          </label>
-          <input
-            type="datetime-local"
-            value={orderDateTime}
-            onChange={(e) => onOrderDateTimeChange(e.target.value)}
-            className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Use esta data para lançar pedidos antigos no sistema.
-          </p>
-        </div>
-
-        <div className="min-w-0 md:col-span-2 xl:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => onDescriptionChange(e.target.value)}
-            rows={2}
-            className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Descrição do pedido (opcional)"
-          />
-        </div>
-
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Desconto geral no pedido (%)
-          </label>
-          <input
-            type="number"
-            min="0"
-            max={canApplyGeneralDiscount ? "2" : "0"}
-            step="0.01"
-            value={discount}
-            onChange={(e) => {
-              const raw = parseFloat(e.target.value) || 0;
-              const capped = canApplyGeneralDiscount
-                ? Math.min(2, Math.max(0, raw))
-                : 0;
-              onDiscountChange(capped);
-            }}
-            className="w-full p-3.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
-            disabled={!canApplyGeneralDiscount}
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Aplicado sobre o subtotal já com descontos por item.
-          </p>
-          {canApplyGeneralDiscount ? (
-            <p className="mt-1 text-xs font-medium text-amber-700">
-              Para PIX ou dinheiro, desconto geral limitado a 2%.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs font-medium text-gray-500">
-              Para esta forma de pagamento, desconto geral deve ser 0%.
-            </p>
-          )}
-        </div>
-      </div>
+      {showConditions ? (
+        <ConditionsFields
+          paymentMethod={paymentMethod}
+          onPaymentMethodChange={onPaymentMethodChange}
+          orderDateTime={orderDateTime}
+          onOrderDateTimeChange={onOrderDateTimeChange}
+          description={description}
+          onDescriptionChange={onDescriptionChange}
+          discount={discount}
+          onDiscountChange={onDiscountChange}
+          canApplyGeneralDiscount={canApplyGeneralDiscount}
+          showAdvanced={showAdvanced}
+          onToggleAdvanced={onToggleAdvanced}
+        />
+      ) : null}
     </section>
   );
 }

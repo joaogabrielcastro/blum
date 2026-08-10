@@ -9,19 +9,19 @@ export default function PurchaseInlineNotice({
     <div
       className={
         isSuccess
-          ? "mb-4 p-4 rounded-lg border border-green-200 bg-green-50 text-green-900 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2"
-          : "mb-4 p-4 rounded-lg border border-red-200 bg-red-50 text-red-800 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2"
+          ? "mb-4 flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950 sm:flex-row sm:items-start sm:justify-between"
+          : "mb-4 flex flex-col gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 sm:flex-row sm:items-start sm:justify-between"
       }
       role={isSuccess ? "status" : "alert"}
     >
-      <span className="text-sm flex-1 whitespace-pre-wrap">{message}</span>
+      <span className="flex-1 whitespace-pre-wrap text-sm">{message}</span>
       <button
         type="button"
         onClick={onDismiss}
         className={
           isSuccess
-            ? "text-sm font-medium text-green-800 hover:text-green-950 shrink-0 self-end sm:self-start"
-            : "text-sm font-medium text-red-700 hover:text-red-900 shrink-0 self-end sm:self-start"
+            ? "shrink-0 self-end text-sm font-semibold text-emerald-800 hover:underline sm:self-start"
+            : "shrink-0 self-end text-sm font-semibold text-red-800 hover:underline sm:self-start"
         }
       >
         Fechar

@@ -42,17 +42,17 @@ const SalesChart = ({
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload;
       return (
-        <div className="bg-white p-3 border border-gray-300 rounded-lg shadow-lg">
-          <p className="font-semibold text-gray-800">{`Data: ${label}`}</p>
-          <p className="text-blue-600 font-semibold">
+        <div className="rounded-xl border border-edge bg-surface p-3 shadow-soft">
+          <p className="font-semibold text-ink">{`Data: ${label}`}</p>
+          <p className="font-semibold text-brand">
             {`Vendas Acumuladas: ${formatCurrency(dataPoint[cumulativeKey] || 0)}`}
           </p>
           {showComparison ? (
-            <p className="text-gray-600">
+            <p className="text-ink-muted">
               {`Mês anterior: ${formatCurrency(dataPoint[compareKey] || 0)}`}
             </p>
           ) : null}
-          <p className="text-green-600">
+          <p className="text-emerald-600 dark:text-emerald-400">
             {`Vendas do Dia: ${formatCurrency(dataPoint["Vendas do Dia"] || 0)}`}
           </p>
         </div>
@@ -137,10 +137,10 @@ const SalesChart = ({
 
         {/* Mensagem se não houver dados */}
         {data.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
-            <div className="text-center text-gray-500">
+          <div className="absolute inset-0 flex items-center justify-center bg-surface/80">
+            <div className="text-center text-ink-muted">
               <svg
-                className="w-12 h-12 mx-auto text-gray-400 mb-2"
+                className="mx-auto mb-2 h-12 w-12 text-ink-muted"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -247,10 +247,10 @@ const SalesChart = ({
 
       {/* Mensagem se não houver dados */}
       {data.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90">
-          <div className="text-center text-gray-500">
+        <div className="absolute inset-0 flex items-center justify-center bg-surface/90">
+          <div className="text-center text-ink-muted">
             <svg
-              className="w-16 h-16 mx-auto text-gray-400 mb-2"
+              className="mx-auto mb-2 h-16 w-16 text-ink-muted"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

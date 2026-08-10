@@ -1,31 +1,45 @@
-const ConfirmationModal = ({ 
-  show, 
-  onConfirm, 
-  onCancel, 
-  message, 
-  confirmText = "Confirmar", 
-  confirmColor = "bg-red-600 hover:bg-red-700" 
+import {
+  PrimaryButton,
+  SecondaryButton,
+  DangerButton,
+} from "./ui/Surface";
+
+const ConfirmationModal = ({
+  show,
+  onConfirm,
+  onCancel,
+  title = "Confirmação",
+  message,
+  confirmText = "Confirmar",
+  cancelText = "Cancelar",
+  tone = "danger",
 }) => {
   if (!show) return null;
 
+  const ConfirmBtn = tone === "danger" ? DangerButton : PrimaryButton;
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-      <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full mx-4 text-center">
-        <h3 className="text-xl font-bold mb-4">Confirmação</h3>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex justify-around space-x-4">
-          <button
-            onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors duration-200"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-6 py-2 text-white font-bold rounded-lg transition-colors duration-200 ${confirmColor}`}
-          >
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 dark:bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
+    >
+      <div className="w-full max-w-sm rounded-2xl border border-edge bg-surface p-6 shadow-soft">
+        <h3
+          id="confirm-modal-title"
+          className="text-lg font-semibold tracking-tight text-ink"
+        >
+          {title}
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">{message}</p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <SecondaryButton onClick={onCancel} className="w-full sm:w-auto">
+            {cancelText}
+          </SecondaryButton>
+          <ConfirmBtn onClick={onConfirm} className="w-full sm:w-auto">
             {confirmText}
-          </button>
+          </ConfirmBtn>
         </div>
       </div>
     </div>

@@ -23,7 +23,7 @@ export default function OrderStockWarningModal({
       aria-modal="true"
       aria-labelledby="stock-warning-title"
     >
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="w-full max-w-lg rounded-xl bg-surface shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 sm:px-5">
           <h3
             id="stock-warning-title"

@@ -1,3 +1,8 @@
+import {
+  PrimaryButton,
+  SecondaryButton,
+} from "../ui/Surface";
+
 const PurchaseActions = ({
   onCancel,
   onConfirm,
@@ -5,72 +10,23 @@ const PurchaseActions = ({
   confirmLabel = "Confirmar",
   secondaryAction,
 }) => (
-  <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:items-center gap-3 mt-6">
-    {secondaryAction && (
-      <button
+  <div className="mt-6 flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+    {secondaryAction ? (
+      <SecondaryButton
         type="button"
         onClick={secondaryAction.onClick}
         disabled={isLoading || secondaryAction.disabled}
-        className="px-5 py-2.5 border border-amber-400 text-amber-900 font-medium rounded-lg bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-sm sm:mr-auto"
+        className="sm:mr-auto !border-amber-200 !text-amber-900 hover:!bg-amber-50"
       >
         {secondaryAction.label}
-      </button>
-    )}
-    <button
-      type="button"
-      onClick={onCancel}
-      className="px-6 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-    >
+      </SecondaryButton>
+    ) : null}
+    <SecondaryButton type="button" onClick={onCancel}>
       Cancelar
-    </button>
-    <button
-      type="button"
-      onClick={onConfirm}
-      disabled={isLoading}
-      className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white font-medium rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 flex items-center"
-    >
-      {isLoading ? (
-        <>
-          <svg
-            className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          Processando...
-        </>
-      ) : (
-        <>
-          <svg
-            className="w-4 h-4 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          {confirmLabel}
-        </>
-      )}
-    </button>
+    </SecondaryButton>
+    <PrimaryButton type="button" onClick={onConfirm} disabled={isLoading}>
+      {isLoading ? "A processar…" : confirmLabel}
+    </PrimaryButton>
   </div>
 );
 

@@ -8,6 +8,12 @@ interface CnpjWsResponse {
     telefone2?: string;
     email?: string;
     estado?: { sigla?: string };
+    logradouro?: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    cep?: string;
+    cidade?: { nome?: string };
   };
 }
 
@@ -26,19 +32,23 @@ export const externalApi = {
     }
 
     const data = (await response.json()) as CnpjWsResponse;
+    const est = data.estabelecimento;
     const razaoSocial = data.razao_social || "";
-    const nomeFantasia = data.estabelecimento?.nome_fantasia || "";
+    const nomeFantasia = est?.nome_fantasia || "";
 
     return {
       nome: razaoSocial || nomeFantasia || "",
       razaoSocial,
       nomeFantasia,
-      telefone:
-        data.estabelecimento?.telefone1 ||
-        data.estabelecimento?.telefone2 ||
-        "",
-      uf: data.estabelecimento?.estado?.sigla || "",
-      email: data.estabelecimento?.email || "",
+      telefone: est?.telefone1 || est?.telefone2 || "",
+      uf: est?.estado?.sigla || "",
+      email: est?.email || "",
+      street: est?.logradouro || "",
+      number: est?.numero || "",
+      complement: est?.complemento || "",
+      neighborhood: est?.bairro || "",
+      city: est?.cidade?.nome || "",
+      zipcode: (est?.cep || "").replace(/\D/g, ""),
     };
   },
 };

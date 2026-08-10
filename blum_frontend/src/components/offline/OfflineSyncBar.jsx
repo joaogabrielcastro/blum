@@ -95,7 +95,7 @@ export default function OfflineSyncBar({  isOnline,
               type="button"
               disabled={!isOnline || syncing}
               onClick={onSyncAll}
-              className="min-h-10 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 disabled:opacity-50"
+              className="min-h-10 rounded-lg border border-blue-300 bg-surface px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-100 disabled:opacity-50"
             >
               Enviar pendentes ({pendingCount})
             </button>

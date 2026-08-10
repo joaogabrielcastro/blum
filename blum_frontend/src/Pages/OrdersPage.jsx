@@ -1,20 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import apiService from "../services/apiService";
 import ListPageSkeleton from "../components/ListPageSkeleton";
 import { useToast } from "../context/ToastContext";
-import OrdersForm from "../components/OrdersForm";
 import OrderStockWarningModal from "../components/orders/OrderStockWarningModal";
 import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import { formatOrderData } from "../utils/format";
 import PaymentMethodBadge from "../components/orders/PaymentMethodBadge";
+import StatusBadge from "../components/ui/StatusBadge";
 import OfflineSyncBar from "../components/offline/OfflineSyncBar";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { useAppData } from "../context/AppDataProvider";
 import { useOrdersList } from "../hooks/useOrdersList";
 import { formatOpenDays } from "../utils/ordersListUtils";
+import Surface, {
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+} from "../components/ui/Surface";
 
 const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
+  const navigate = useNavigate();
   const toast = useToast();
   const { clientsList: sharedClientsList } = useAppData();
   const {
@@ -36,9 +43,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     formatCurrency,
     clientsList,
   } = useOrdersList({ sharedClientsList, toast, userId, userRole });
-  const [editingLoading, setEditingLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingOrder, setEditingOrder] = useState(null);
   const [pdfOrder, setPdfOrder] = useState(null);
   const [pdfLoadingOrderId, setPdfLoadingOrderId] = useState(null);
   const [duplicatingOrderId, setDuplicatingOrderId] = useState(null);
@@ -46,6 +50,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   const [paymentDialogMethod, setPaymentDialogMethod] = useState("boleto");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
+  const [convertConfirmId, setConvertConfirmId] = useState(null);
   const [convertStockModal, setConvertStockModal] = useState({
     open: false,
     orderId: null,
@@ -130,19 +135,10 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   };
 
   const handleConvertToPedido = async (orderId, { confirmStockWarning = false } = {}) => {
-    if (!confirmStockWarning) {
-      if (
-        !window.confirm(
-          "Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega.",
-        )
-      ) {
-        return;
-      }
-    }
-
     try {
       await apiService.convertOrderToPedido(orderId, { confirmStockWarning });
       setConvertStockModal({ open: false, orderId: null, lines: [] });
+      setConvertConfirmId(null);
       await fetchData();
       toast.success(
         confirmStockWarning
@@ -157,6 +153,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
           available: row.availableStock ?? 0,
           shortfall: row.shortfall,
         }));
+        setConvertConfirmId(null);
         setConvertStockModal({ open: true, orderId, lines });
         return;
       }
@@ -166,21 +163,8 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     }
   };
 
-  const handleEditOrder = async (orderId) => {
-    try {
-      setEditingLoading(true);
-      const orderDetails = await apiService.getOrderById(orderId);
-      setEditingOrder(formatOrderData(orderDetails));
-      setShowForm(true);
-    } catch (error) {
-      console.error("Erro ao carregar pedido para edição:", error);
-      toast.error(
-        error?.message ||
-          "Não foi possível carregar os itens do pedido para edição.",
-      );
-    } finally {
-      setEditingLoading(false);
-    }
+  const handleEditOrder = (orderId) => {
+    navigate(`/orders/${orderId}/edit`);
   };
 
   const handleOpenPdf = async (order) => {
@@ -209,10 +193,10 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     try {
       setDuplicatingOrderId(orderId);
       const duplicated = await apiService.duplicateOrder(orderId);
-      setEditingOrder(formatOrderData(duplicated));
-      setShowForm(true);
+      const formatted = formatOrderData(duplicated);
       await fetchData();
       toast.success("Pedido duplicado. Revise e guarde.");
+      navigate(`/orders/${formatted.id}/edit`);
     } catch (error) {
       toast.error(error?.message || "Não foi possível duplicar o pedido.");
     } finally {
@@ -259,86 +243,79 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     const isQuote = order.documentType === "orcamento";
 
     return (
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3 items-center w-full sm:w-auto">
-        {isDelivered && (
-          <span className="inline-block col-span-2 sm:col-span-1 px-3 py-1.5 text-sm font-semibold text-green-800 bg-green-100 rounded-full shadow-sm text-center">
-            Entregue
-          </span>
-        )}
-        <button
+      <div className="grid w-full grid-cols-2 items-stretch gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2">
+        {isDelivered ? (
+          <div className="col-span-2 flex sm:col-span-1 sm:contents">
+            <StatusBadge status="Entregue" />
+          </div>
+        ) : null}
+        <SecondaryButton
           onClick={() => handleEditOrder(order.id)}
-          className="min-h-10 px-3 py-1 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
+          className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation"
         >
           Editar
-        </button>
-        {!isDelivered && (
+        </SecondaryButton>
+        {!isDelivered ? (
           <>
             {isQuote ? (
-              <button
+              <SecondaryButton
                 type="button"
-                onClick={() => handleConvertToPedido(order.id)}
-                className="min-h-10 px-3 py-1 text-sm font-medium text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                onClick={() => setConvertConfirmId(order.id)}
+                className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-indigo-200 !text-indigo-700 hover:!bg-indigo-50"
               >
                 Virar pedido
-              </button>
+              </SecondaryButton>
             ) : (
-              <button
+              <SecondaryButton
                 onClick={() =>
                   setModalAction({ type: "finalize", orderId: order.id })
                 }
-                className="min-h-10 px-3 py-1 text-sm font-medium text-green-600 border border-green-600 rounded-lg hover:bg-green-50 transition"
+                className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-emerald-200 !text-emerald-700 hover:!bg-emerald-50"
               >
                 Finalizar entrega
-              </button>
+              </SecondaryButton>
             )}
-            {!isQuote && order.paymentMethod === "carteira" && (
-              <button
+            {!isQuote && order.paymentMethod === "carteira" ? (
+              <SecondaryButton
                 type="button"
                 onClick={() => handleOpenPaymentDialog(order)}
-                className="min-h-10 px-3 py-1 text-sm font-medium text-amber-700 border border-amber-500 rounded-lg hover:bg-amber-50 transition"
+                className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-amber-200 !text-amber-800 hover:!bg-amber-50 sm:col-span-1"
               >
                 Registrar pagamento
-              </button>
-            )}
+              </SecondaryButton>
+            ) : null}
           </>
-        )}
-        <button
+        ) : null}
+        <SecondaryButton
           type="button"
           onClick={() => handleDuplicateOrder(order.id)}
           disabled={duplicatingOrderId === order.id}
-          className="min-h-10 px-3 py-1 text-sm font-medium text-violet-700 border border-violet-400 rounded-lg hover:bg-violet-50 transition disabled:opacity-60"
+          className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation"
         >
-          {duplicatingOrderId === order.id ? "Duplicando..." : "Duplicar"}
-        </button>
-        <button
+          {duplicatingOrderId === order.id ? "Duplicando…" : "Duplicar"}
+        </SecondaryButton>
+        <SecondaryButton
           onClick={() => setModalAction({ type: "delete", orderId: order.id })}
-          className="min-h-10 px-3 py-1 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition"
+          className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-red-200 !text-red-700 hover:!bg-red-50"
         >
           Excluir
-        </button>
-        <button
+        </SecondaryButton>
+        <SecondaryButton
           type="button"
           onClick={() => handleOpenPdf(order)}
           disabled={pdfLoadingOrderId === order.id}
-          className="min-h-10 px-3 py-1 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-blue-50 transition"
+          className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation"
         >
-          {pdfLoadingOrderId === order.id ? "Carregando..." : "Gerar PDF"}
-        </button>
+          {pdfLoadingOrderId === order.id ? "Carregando…" : "Gerar PDF"}
+        </SecondaryButton>
       </div>
     );
   };
 
-  if (loading || editingLoading) {
+  if (loading) {
     return (
-      <div className="p-3 sm:p-6 md:p-8 w-full max-w-full">
-        <div className="mb-6 h-8 bg-gray-200/80 rounded animate-pulse max-w-md" />
-        {editingLoading ? (
-          <p className="text-center text-gray-500 py-8">
-            Carregando pedido para edição...
-          </p>
-        ) : (
-          <ListPageSkeleton variant="list" />
-        )}
+      <div className="w-full max-w-full p-3 sm:p-6 md:p-8">
+        <ListPageSkeleton variant="list" />
       </div>
     );
   }
@@ -386,32 +363,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     </div>
   );
 
-  if (showForm) {
-    return (
-      <div className="w-full min-w-0 max-w-none -mx-2 sm:-mx-4 md:-mx-6 px-2 sm:px-3 md:px-4 overflow-x-hidden">
-        {offlineSyncBar}
-        <OrdersForm
-          userId={userId}
-          userRole={userRole}
-          clients={clients}
-          clientsList={clientsList}
-          brands={safeBrands} // ← Usando safeBrands validado
-          editingOrder={editingOrder}
-          onOrderAdded={() => {
-            setShowForm(false);
-            setEditingOrder(null);
-            if (isBrowserOnline()) fetchData();
-            else loadOfflinePendingOrders();
-          }}
-          onCancel={() => {
-            setShowForm(false);
-            setEditingOrder(null);
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="p-3 sm:p-6 md:p-8">
       {offlineSyncBar}
@@ -419,11 +370,31 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         show={!!modalAction.orderId}
         onConfirm={handleAction}
         onCancel={() => setModalAction({ type: null, orderId: null })}
+        title={
+          modalAction.type === "delete"
+            ? "Excluir pedido"
+            : "Finalizar entrega"
+        }
+        tone={modalAction.type === "delete" ? "danger" : "primary"}
+        confirmText={
+          modalAction.type === "delete" ? "Excluir" : "Finalizar"
+        }
         message={
           modalAction.type === "delete"
             ? "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
             : "Confirmar finalização da entrega? O estoque será baixado e o status ficará como Entregue."
         }
+      />
+      <ConfirmationModal
+        show={!!convertConfirmId}
+        title="Converter em pedido"
+        tone="primary"
+        confirmText="Converter"
+        message="Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega."
+        onConfirm={() =>
+          convertConfirmId && handleConvertToPedido(convertConfirmId)
+        }
+        onCancel={() => setConvertConfirmId(null)}
       />
 
       {pdfOrder && (
@@ -453,75 +424,73 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         }
       />
 
-      {paymentDialogOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-bold text-gray-800">
-              Registrar pagamento do pedido #{paymentDialogOrder.id}
+      {paymentDialogOrder ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-soft sm:rounded-2xl">
+            <h3 className="text-lg font-semibold text-ink">
+              Registrar pagamento #{paymentDialogOrder.id}
             </h3>
-            <p className="mt-1 text-sm text-gray-600">
-              Escolha como o cliente quitou o pedido que estava em carteira.
+            <p className="mt-1 text-sm text-ink-muted">
+              Como o cliente quitou o pedido em carteira?
             </p>
             <select
               value={paymentDialogMethod}
               onChange={(e) => setPaymentDialogMethod(e.target.value)}
-              className="mt-4 w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-4 min-h-11 w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
             >
               <option value="boleto">Boleto</option>
               <option value="pix">PIX</option>
               <option value="cheque">Cheque</option>
               <option value="dinheiro">Dinheiro</option>
             </select>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <SecondaryButton
                 type="button"
                 onClick={() => setPaymentDialogOrder(null)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                 disabled={updatingPayment}
+                className="!min-h-11 w-full sm:w-auto"
               >
                 Cancelar
-              </button>
-              <button
+              </SecondaryButton>
+              <PrimaryButton
                 type="button"
                 onClick={handleConfirmPaymentMethod}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                 disabled={updatingPayment}
+                className="!min-h-11 w-full sm:w-auto"
               >
-                {updatingPayment ? "Salvando..." : "Salvar pagamento"}
-              </button>
+                {updatingPayment ? "Salvando…" : "Salvar pagamento"}
+              </PrimaryButton>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-          Gerenciamento de Pedidos
-        </h1>
-        <button
-          onClick={() => {
-            setShowForm(true);
-            setEditingOrder(null);
-          }}
-          className="hidden sm:inline-flex sm:items-center sm:justify-center min-h-11 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-300 shadow-md"
-        >
-          + Novo orçamento
-        </button>
-      </div>
+      <PageHeader
+        title="Pedidos"
+        description="Orçamentos e pedidos agrupados por dia."
+        actions={
+          <PrimaryButton
+            className="hidden sm:inline-flex"
+            onClick={() => navigate("/orders/new")}
+          >
+            Novo orçamento
+          </PrimaryButton>
+        }
+      />
       <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <input
             type="search"
             value={orderSearch}
             onChange={(e) => setOrderSearch(e.target.value)}
-            placeholder="Buscar pedido por numero, cliente, representante, representada..."
-            className="w-full min-h-11 rounded-lg border border-gray-300 p-3 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Buscar por número, cliente, representante…"
+            className="min-h-11 w-full rounded-xl border border-edge bg-surface p-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
           />
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
           <label
             htmlFor="orders-seller-filter"
-            className="text-sm font-medium text-gray-700 whitespace-nowrap"
+            className="whitespace-nowrap text-sm font-medium text-ink"
           >
             Representante
           </label>
@@ -530,7 +499,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
             value={sellerFilterKey}
             onChange={(e) => setSellerFilterKey(e.target.value)}
             aria-label="Filtrar lista por representante"
-            className="min-h-11 w-full sm:w-[min(100%,280px)] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="min-h-11 w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-brand/30 sm:w-[min(100%,280px)]"
           >
             <option value="">Todos</option>
             {sellerOptions.map((opt) => (
@@ -543,23 +512,21 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       </div>
 
       {listFetchError && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           {listFetchError}
         </div>
       )}
 
-      <p className="text-gray-600 mb-8">
-        Acompanhe o status e histórico de pedidos.
-      </p>
-      <div className="bg-white rounded-2xl shadow-md p-3 sm:p-6 border border-gray-200">
+      <Surface padded={false} className="overflow-hidden">
+        <div className="p-3 sm:p-5">
         {filteredOrdersByDay.length > 0 ? (
           <div className="space-y-8">
             {filteredOrdersByDayPaged.map(({ dateKey, label, orders: dayOrders }) => (
               <section key={dateKey} className="space-y-3">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100 pb-2">
+                <h2 className="border-b border-edge pb-2 text-sm font-semibold uppercase tracking-wide text-ink-muted">
                   {label}
                 </h2>
-                <ul className="divide-y divide-gray-200">
+                <ul className="divide-y divide-edge">
                   {dayOrders.map((order) => {
                     const openDays = formatOpenDays(
                       order.createdAt,
@@ -568,11 +535,11 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                     return (
                       <li
                         key={order.id}
-                        className="py-5 sm:py-6 flex flex-col sm:flex-row justify-between sm:items-start gap-4"
+                        className="flex flex-col justify-between gap-4 py-5 sm:flex-row sm:items-start sm:py-6"
                       >
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <h3 className="text-lg font-semibold text-gray-800">
+                            <h3 className="text-lg font-semibold text-ink">
                               {order.documentType === "orcamento"
                                 ? "Orçamento"
                                 : "Pedido"}{" "}
@@ -583,28 +550,27 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                                 method={order.paymentMethod}
                                 prominent
                               />
-                            ) : null}
+                            ) : (
+                              <StatusBadge label="Orçamento" tone="neutral" />
+                            )}
                             {order.isOfflinePending ? (
-                              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
-                                Offline — aguardando envio
-                              </span>
+                              <StatusBadge
+                                label="Offline — aguardando envio"
+                                tone="warning"
+                              />
                             ) : null}
                             {order.hasStockWarning ? (
-                              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
-                                Sem estoque
-                              </span>
+                              <StatusBadge
+                                label="Sem estoque"
+                                tone="warning"
+                              />
                             ) : null}
                           </div>
-                          <p className="text-xs font-medium text-indigo-700 mt-0.5">
-                            {order.documentType === "orcamento"
-                              ? "Status: orçamento (aguardando virar pedido)"
-                              : "Pedido"}
-                          </p>
-                          <p className="text-sm text-gray-500 mt-1">
+                          <p className="mt-1 text-sm text-ink-muted">
                             Cliente: {clients[order.clientId] || "N/A"}
                           </p>
                           {userRole === "admin" && (order.sellerName || order.sellerUsername) ? (
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="mt-1 text-sm text-ink-muted">
                               Criado por:{" "}
                               {order.sellerName ||
                                 order.sellerUsername ||
@@ -615,15 +581,15 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                             </p>
                           ) : null}
                           {order.representadas ? (
-                            <p className="text-sm text-gray-700 mt-1 font-medium">
+                            <p className="mt-1 text-sm font-medium text-ink">
                               Representada: {order.representadas}
                             </p>
                           ) : null}
-                          <p className="text-sm text-gray-500 mt-1">
+                          <p className="mt-1 text-sm text-ink-muted">
                             Itens: {order.itemsCount ?? order.items?.length ?? 0}
                           </p>
                           {order.createdAt ? (
-                            <p className="text-sm text-gray-600 mt-1">
+                            <p className="mt-1 text-sm text-ink-muted">
                               Criado em:{" "}
                               {new Date(order.createdAt).toLocaleString(
                                 "pt-BR",
@@ -636,34 +602,36 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                                 },
                               )}
                               {openDays != null ? (
-                                <span className="ml-2 text-amber-800 font-medium">
+                                <span className="ml-2 font-medium text-amber-800">
                                   • há {openDays} dia
                                   {openDays === 1 ? "" : "s"}
                                 </span>
                               ) : null}
                             </p>
                           ) : null}
-                          <p className="text-sm text-gray-500 mt-1">
-                            Descrição: {order.description || "N/A"}
-                          </p>
-                          <p className="text-sm text-gray-500 mt-1">
-                            Finalizado em:{" "}
-                            {order.finishedAt
-                              ? new Date(order.finishedAt).toLocaleDateString(
-                                  "pt-BR",
-                                )
-                              : "—"}
-                          </p>
+                          {order.description ? (
+                            <p className="mt-1 text-sm text-ink-muted">
+                              Obs.: {order.description}
+                            </p>
+                          ) : null}
+                          {order.finishedAt ? (
+                            <p className="mt-1 text-sm text-ink-muted">
+                              Finalizado em:{" "}
+                              {new Date(order.finishedAt).toLocaleDateString(
+                                "pt-BR",
+                              )}
+                            </p>
+                          ) : null}
                         </div>
-                        <div className="flex flex-col items-start sm:items-end gap-3 text-left sm:text-right w-full sm:w-fit">
-                          <div className="flex flex-col items-start sm:items-end gap-2 w-full">
-                            <div className="bg-gray-50 rounded-xl px-4 py-2 shadow-sm w-full sm:w-fit">
-                              <p className="text-base font-bold text-gray-800">
-                                Total: {formatCurrency(order.totalPrice)}
+                        <div className="flex w-full flex-col items-start gap-3 text-left sm:w-fit sm:items-end sm:text-right">
+                          <div className="flex w-full flex-col items-start gap-2 sm:items-end">
+                            <div className="w-full rounded-xl border border-edge bg-surface-muted px-4 py-2 sm:w-fit">
+                              <p className="text-base font-semibold text-ink">
+                                {formatCurrency(order.totalPrice)}
                               </p>
                               {order.discount > 0 && (
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Desconto geral no pedido: {order.discount}%
+                                <p className="mt-0.5 text-xs text-ink-muted">
+                                  Desconto geral: {order.discount}%
                                 </p>
                               )}
                             </div>
@@ -677,36 +645,45 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
               </section>
             ))}
             {filteredOrdersByDay.length > visibleDayGroups && (
-              <div className="text-center py-6">
-                <button
+              <div className="py-6 text-center">
+                <SecondaryButton
                   type="button"
                   onClick={() => setVisibleDayGroups((n) => n + 10)}
-                  className="rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 text-sm font-semibold text-blue-800 hover:bg-blue-100 min-h-11 w-full max-w-sm mx-auto"
+                  className="mx-auto w-full max-w-sm"
                 >
                   Mostrar mais dias
-                </button>
+                </SecondaryButton>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center text-gray-500">
-            Nenhum pedido encontrado para esta busca.
+          <div className="py-12 text-center text-ink-muted">
+            <p className="text-sm font-medium text-ink">
+              Nenhum pedido encontrado
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              Ajuste a busca ou crie um novo orçamento.
+            </p>
+            <PrimaryButton
+              className="mt-4"
+              onClick={() => navigate("/orders/new")}
+            >
+              Novo orçamento
+            </PrimaryButton>
           </div>
         )}
-      </div>
+        </div>
+      </Surface>
 
       <button
         type="button"
         aria-label="Novo orçamento"
-        className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-2xl font-bold text-white shadow-lg hover:bg-blue-700 sm:hidden"
+        className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl font-bold text-white shadow-soft hover:bg-brand-600 sm:hidden"
         style={{
           bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))",
           right: "max(1.25rem, env(safe-area-inset-right, 0px))",
         }}
-        onClick={() => {
-          setShowForm(true);
-          setEditingOrder(null);
-        }}
+        onClick={() => navigate("/orders/new")}
       >
         +
       </button>

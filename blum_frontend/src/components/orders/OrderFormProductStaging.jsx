@@ -53,11 +53,11 @@ export default function OrderFormProductStaging({
             {stagingItem.productName}
           </h4>
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            <span className="rounded bg-white px-2 py-1 font-medium text-gray-700 border border-gray-200">
+            <span className="rounded bg-surface px-2 py-1 font-medium text-gray-700 border border-gray-200">
               Código: {stagingItem.productcode || "—"}
             </span>
             {stagingItem.brand ? (
-              <span className="rounded bg-white px-2 py-1 text-gray-600 border border-gray-200">
+              <span className="rounded bg-surface px-2 py-1 text-gray-600 border border-gray-200">
                 {stagingItem.brand}
               </span>
             ) : null}
@@ -68,7 +68,7 @@ export default function OrderFormProductStaging({
               <span
                 className={`rounded px-2 py-1 border ${
                   stagingItem.availableStock > 0
-                    ? "bg-white text-gray-700 border-gray-200"
+                    ? "bg-surface text-gray-700 border-gray-200"
                     : "bg-red-50 text-red-800 border-red-200"
                 }`}
               >
@@ -85,14 +85,14 @@ export default function OrderFormProductStaging({
         <button
           type="button"
           onClick={onCancel}
-          className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-white hover:text-gray-600"
+          className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-surface hover:text-gray-600"
           aria-label="Fechar painel do item"
         >
           ✕
         </button>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-3">
+      <div className="rounded-lg border border-gray-200 bg-surface p-3">
         <p className="mb-2 text-xs font-semibold text-gray-700">
           Histórico no cliente
         </p>
@@ -122,7 +122,7 @@ export default function OrderFormProductStaging({
             placeholder="0"
             onChange={(e) => onFieldChange("quantity", e.target.value)}
             onKeyDown={handleQtyKeyDown}
-            className="w-full rounded-lg border-2 border-blue-300 bg-white p-3 text-center text-lg font-semibold focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="w-full rounded-lg border-2 border-blue-300 bg-surface p-3 text-center text-lg font-semibold focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
         <div className="col-span-1">

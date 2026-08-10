@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
+import StatusBadge from "../components/ui/StatusBadge";
 import apiService from "../services/apiService";
 
 const ClientHistoryPage = ({ clients }) => {
@@ -62,26 +63,6 @@ const ClientHistoryPage = ({ clients }) => {
     } catch {
       return "Data inválida";
     }
-  };
-
-  const getOrderStatus = (status) => {
-    const statusMap = {
-      "Em aberto": {
-        text: "Em aberto",
-        color: "bg-yellow-100 text-yellow-800",
-      },
-      Entregue: { text: "Entregue", color: "bg-green-100 text-green-800" },
-      pending: { text: "Pendente", color: "bg-yellow-100 text-yellow-800" },
-      processing: { text: "Processando", color: "bg-blue-100 text-blue-800" },
-      completed: { text: "Concluído", color: "bg-green-100 text-green-800" },
-      cancelled: { text: "Cancelado", color: "bg-red-100 text-red-800" },
-    };
-    return (
-      statusMap[status] || {
-        text: status || "Desconhecido",
-        color: "bg-gray-100 text-gray-800",
-      }
-    );
   };
 
   const getSellerName = (order) => {
@@ -182,7 +163,7 @@ const ClientHistoryPage = ({ clients }) => {
         )}
 
         {/* Lista de Pedidos */}
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+        <div className="bg-surface rounded-2xl shadow-md border border-gray-200 overflow-hidden">
           {orders.length === 0 ? (
             <div className="text-center py-12 px-6">
               <div className="text-4xl mb-4">📦</div>
@@ -242,13 +223,7 @@ const ClientHistoryPage = ({ clients }) => {
                           {formatCurrency(order.totalprice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              getOrderStatus(order.status).color
-                            }`}
-                          >
-                            {getOrderStatus(order.status).text}
-                          </span>
+                          <StatusBadge status={order.status} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
@@ -293,7 +268,6 @@ const ClientHistoryPage = ({ clients }) => {
             onClose={() => setSelectedOrder(null)}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
-            getOrderStatus={getOrderStatus}
             getSellerName={getSellerName}
           />
         )}
@@ -307,7 +281,6 @@ const OrderDetailsModal = ({
   onClose,
   formatCurrency,
   formatDate,
-  getOrderStatus,
   getSellerName,
 }) => {
   // Parse dos items se for string JSON
@@ -335,7 +308,7 @@ const OrderDetailsModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">
             Detalhes do Pedido #{order.id}
@@ -362,15 +335,9 @@ const OrderDetailsModal = ({
                 <span className="font-medium">Vendedor:</span>{" "}
                 {getSellerName(order)}
               </p>
-              <p>
+              <p className="flex items-center gap-2">
                 <span className="font-medium">Status:</span>
-                <span
-                  className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                    getOrderStatus(order.status).color
-                  }`}
-                >
-                  {getOrderStatus(order.status).text}
-                </span>
+                <StatusBadge status={order.status} />
               </p>
             </div>
           </div>

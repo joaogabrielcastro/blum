@@ -11,7 +11,11 @@ import ProductImportSection from "../components/products/ProductImportSection";
 import ListPageSkeleton from "../components/ListPageSkeleton";
 import Drawer from "../components/ui/Drawer";
 import KebabMenu from "../components/ui/KebabMenu";
-import { PrimaryButton, SecondaryButton } from "../components/ui/Surface";
+import {
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+} from "../components/ui/Surface";
 import { useProductsPage } from "../hooks/useProductsPage";
 import { useToast } from "../context/ToastContext";
 import {
@@ -83,115 +87,113 @@ const ProductsPage = ({ userRole, subscription }) => {
   } = page;
 
   const headerBlock = (
-    <div className="mb-4 flex flex-col justify-between gap-3 md:mb-6 md:flex-row md:items-center md:gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-[1.65rem]">
-          {selectedBrand ? "Catálogo de produtos" : "Produtos"}
-        </h1>
-        {selectedBrand && (
-          <p className="mt-1 text-sm text-zinc-500 md:mt-1.5">
-            {`Itens da representada: ${selectedBrand}`}
-          </p>
-        )}
-      </div>
-
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-        {selectedBrand && (
-          <SecondaryButton type="button" onClick={clearSelectedBrand}>
-            Trocar representada
-          </SecondaryButton>
-        )}
-        {isAdmin && selectedBrand && (
-          <SecondaryButton type="button" onClick={() => setShowBrandForm(true)}>
-            + Representada
-          </SecondaryButton>
-        )}
-
-        {isAdmin && selectedBrand && (
-          <SecondaryButton
-            type="button"
-            onClick={() =>
-              canPriceBatch
-                ? setShowBulkAdjust(true)
-                : requestUpgrade("price-batch")
-            }
-            title={
-              canPriceBatch ? undefined : "Disponível no plano Profissional"
-            }
-          >
-            Reajuste
-            {!canPriceBatch ? " · Pro" : ""}
-          </SecondaryButton>
-        )}
-
-        {isAdmin && selectedBrand && (
-          <SecondaryButton
-            type="button"
-            onClick={() =>
-              canImport ? setShowImport(true) : requestUpgrade("product-import")
-            }
-            title={
-              canImport ? undefined : "Disponível no plano Profissional"
-            }
-          >
-            Importar
-            {!canImport ? " · Pro" : ""}
-          </SecondaryButton>
-        )}
-
-        {isAdmin && selectedBrand && (
-          <>
+    <PageHeader
+      title={selectedBrand ? "Catálogo" : "Produtos"}
+      description={
+        selectedBrand
+          ? `Representada: ${selectedBrand}`
+          : "Escolha uma representada para gerir o catálogo"
+      }
+      actions={
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+          {selectedBrand ? (
+            <SecondaryButton type="button" onClick={clearSelectedBrand}>
+              Trocar representada
+            </SecondaryButton>
+          ) : null}
+          {isAdmin && selectedBrand ? (
+            <SecondaryButton
+              type="button"
+              onClick={() => setShowBrandForm(true)}
+            >
+              Nova representada
+            </SecondaryButton>
+          ) : null}
+          {isAdmin && selectedBrand ? (
             <SecondaryButton
               type="button"
               onClick={() =>
-                canExport
-                  ? handleExportProducts("csv")
-                  : requestUpgrade("product-export")
+                canPriceBatch
+                  ? setShowBulkAdjust(true)
+                  : requestUpgrade("price-batch")
               }
-              disabled={exportingFormat != null}
               title={
-                canExport ? undefined : "Disponível no plano Profissional"
+                canPriceBatch ? undefined : "Disponível no plano Profissional"
               }
             >
-              {exportingFormat === "csv" ? "Exportando…" : "CSV"}
-              {!canExport ? " · Pro" : ""}
+              Reajuste
+              {!canPriceBatch ? " · Pro" : ""}
             </SecondaryButton>
+          ) : null}
+          {isAdmin && selectedBrand ? (
             <SecondaryButton
               type="button"
               onClick={() =>
-                canExport
-                  ? handleExportProducts("xlsx")
-                  : requestUpgrade("product-export")
+                canImport
+                  ? setShowImport(true)
+                  : requestUpgrade("product-import")
               }
-              disabled={exportingFormat != null}
               title={
-                canExport ? undefined : "Disponível no plano Profissional"
+                canImport ? undefined : "Disponível no plano Profissional"
               }
             >
-              {exportingFormat === "xlsx" ? "Exportando…" : "Excel"}
-              {!canExport ? " · Pro" : ""}
+              Importar
+              {!canImport ? " · Pro" : ""}
             </SecondaryButton>
-          </>
-        )}
-
-        {isAdmin && (
-          <PrimaryButton
-            type="button"
-            onClick={() => {
-              resetForms();
-              setShowProductForm(true);
-            }}
-          >
-            + Produto
-          </PrimaryButton>
-        )}
-      </div>
-    </div>
+          ) : null}
+          {isAdmin && selectedBrand ? (
+            <>
+              <SecondaryButton
+                type="button"
+                onClick={() =>
+                  canExport
+                    ? handleExportProducts("csv")
+                    : requestUpgrade("product-export")
+                }
+                disabled={exportingFormat != null}
+                title={
+                  canExport ? undefined : "Disponível no plano Profissional"
+                }
+              >
+                {exportingFormat === "csv" ? "Exportando…" : "CSV"}
+                {!canExport ? " · Pro" : ""}
+              </SecondaryButton>
+              <SecondaryButton
+                type="button"
+                onClick={() =>
+                  canExport
+                    ? handleExportProducts("xlsx")
+                    : requestUpgrade("product-export")
+                }
+                disabled={exportingFormat != null}
+                title={
+                  canExport ? undefined : "Disponível no plano Profissional"
+                }
+              >
+                {exportingFormat === "xlsx" ? "Exportando…" : "Excel"}
+                {!canExport ? " · Pro" : ""}
+              </SecondaryButton>
+            </>
+          ) : null}
+          {isAdmin && selectedBrand ? (
+            <PrimaryButton
+              type="button"
+              onClick={() => {
+                resetForms();
+                setShowProductForm(true);
+              }}
+            >
+              Novo produto
+            </PrimaryButton>
+          ) : null}
+        </div>
+      }
+    />
   );
 
   if (!selectedBrand) {
     return (
-      <div className="flex min-h-screen flex-col bg-zinc-50/70 p-2 sm:p-4">
+      <div className="flex min-h-0 flex-col bg-transparent p-2 sm:p-4 md:p-6">
         {headerBlock}
         {error && (
           <ErrorMessage message={error} onClose={() => setError(null)} />
@@ -258,16 +260,16 @@ const ProductsPage = ({ userRole, subscription }) => {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50/70 p-2 sm:p-4">
+    <div className="flex min-h-0 flex-col bg-transparent p-2 sm:p-4 md:p-6">
       {headerBlock}
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
       <FilterBar searchTerm={searchTerm} onSearchChange={handleSearchChange} />
 
-      <div className="relative min-h-[200px] flex-grow overflow-hidden rounded-2xl border border-zinc-200/80 bg-white/80 shadow-soft backdrop-blur-md">
+      <div className="relative min-h-[200px] flex-grow overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft backdrop-blur-md">
         {productsLoading && (
-          <div className="absolute inset-0 z-10 overflow-auto bg-white/70 p-2 backdrop-blur-[2px]">
+          <div className="absolute inset-0 z-10 overflow-auto bg-surface/70 p-2 backdrop-blur-[2px]">
             <ListPageSkeleton variant="table" rows={6} />
           </div>
         )}
@@ -276,8 +278,8 @@ const ProductsPage = ({ userRole, subscription }) => {
           <>
             <div className="hidden max-h-[calc(100vh-16rem)] overflow-auto md:block">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-                  <tr className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90 backdrop-blur-md">
+                  <tr className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     {isAdmin ? (
                       <th className="w-10 px-3 py-3.5">
                         <input
@@ -329,21 +331,21 @@ const ProductsPage = ({ userRole, subscription }) => {
               </table>
             </div>
 
-            <div className="divide-y divide-zinc-100 md:hidden">
+            <div className="divide-y divide-edge md:hidden">
               {products.map((product) => (
                 <div
                   key={product.id}
-                  className="p-4 transition-colors duration-200 hover:bg-zinc-50/50"
+                  className="p-4 transition-colors duration-200 hover:bg-surface-muted/50"
                 >
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <h3 className="mb-1 text-sm font-semibold text-zinc-900">
+                      <h3 className="mb-1 text-sm font-semibold text-ink">
                         {product.name}
                       </h3>
-                      <p className="mb-1 font-mono text-xs text-zinc-400">
+                      <p className="mb-1 font-mono text-xs text-ink-muted">
                         {product.productcode || "N/A"}
                       </p>
-                      <p className="text-xs font-medium text-zinc-500">
+                      <p className="text-xs font-medium text-ink-muted">
                         {product.brand}
                       </p>
                     </div>
@@ -373,14 +375,14 @@ const ProductsPage = ({ userRole, subscription }) => {
 
                   <div className="mt-3 flex items-center gap-6">
                     <div>
-                      <p className="text-xs text-zinc-400">Preço</p>
-                      <p className="text-sm font-semibold tabular-nums text-zinc-900">
+                      <p className="text-xs text-ink-muted">Preço</p>
+                      <p className="text-sm font-semibold tabular-nums text-ink">
                         R$ {parseFloat(product.price || 0).toFixed(2)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-400">Estoque</p>
-                      <p className="text-sm font-semibold tabular-nums text-zinc-700">
+                      <p className="text-xs text-ink-muted">Estoque</p>
+                      <p className="text-sm font-semibold tabular-nums text-ink">
                         {product.stock || 0}
                       </p>
                     </div>

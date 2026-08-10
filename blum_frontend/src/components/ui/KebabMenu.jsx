@@ -59,7 +59,7 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-zinc-400 transition-all duration-200 ease-in-out hover:border-zinc-200/80 hover:bg-zinc-50 hover:text-zinc-700 active:scale-[0.98]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-ink-muted transition-all duration-200 ease-in-out hover:border-edge hover:bg-surface-muted hover:text-ink active:scale-[0.98]"
       >
         <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
           <circle cx="12" cy="5" r="1.6" />
@@ -73,15 +73,15 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
               ref={menuRef}
               role="menu"
               style={{ top: coords.top, left: coords.left }}
-              className="fixed z-[80] w-[196px] overflow-hidden rounded-xl border border-zinc-200/80 bg-white/95 p-1 shadow-glass backdrop-blur-md animate-fade-in"
+              className="fixed z-[80] w-[196px] overflow-hidden rounded-xl border border-edge bg-surface/95 p-1 shadow-glass backdrop-blur-md animate-fade-in"
             >
               {items.map((item) => {
                 const tone =
                   item.tone === "danger"
                     ? "text-red-600 hover:bg-red-50"
                     : item.tone === "muted"
-                      ? "text-zinc-500 hover:bg-zinc-50"
-                      : "text-zinc-800 hover:bg-zinc-50";
+                      ? "text-ink-muted hover:bg-surface-muted"
+                      : "text-ink hover:bg-surface-muted";
                 return (
                   <button
                     key={item.id}

@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
+import FormField, { inputClassName } from "./ui/FormField";
+import { PrimaryButton, SecondaryButton } from "./ui/Surface";
+import { formatCepDisplay, lookupCep } from "../utils/cepLookup";
 
 const KNOWN_FIELDS = new Set([
   "companyName",
@@ -26,35 +29,52 @@ function normalizeDetailPath(path) {
     .trim();
 }
 
+function hasAddressData(data) {
+  return Boolean(
+    data.street ||
+      data.number ||
+      data.neighborhood ||
+      data.city ||
+      data.zipcode ||
+      data.complement,
+  );
+}
+
 const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
   const toast = useToast();
   const isEditing = !!client;
   const isDrawer = variant === "drawer";
 
-  const [formData, setFormData] = useState({
-    companyName: client?.companyName || "",
-    nomeFantasia:
-      client?.nomeFantasia || client?.nome_fantasia || "",
-    contactPerson: client?.contactPerson || "",
-    phone: client?.phone || "",
-    region: client?.region || "",
-    cnpj: client?.cnpj || "",
-    email: client?.email || "",
-    street: client?.street || "",
-    number: client?.number || "",
-    complement: client?.complement || "",
-    neighborhood: client?.neighborhood || "",
-    city: client?.city || "",
-    zipcode: client?.zipcode || "",
-  });
+  const initialData = useMemo(
+    () => ({
+      companyName: client?.companyName || "",
+      nomeFantasia: client?.nomeFantasia || client?.nome_fantasia || "",
+      contactPerson: client?.contactPerson || "",
+      phone: client?.phone || "",
+      region: client?.region || "",
+      cnpj: client?.cnpj || "",
+      email: client?.email || "",
+      street: client?.street || "",
+      number: client?.number || "",
+      complement: client?.complement || "",
+      neighborhood: client?.neighborhood || "",
+      city: client?.city || "",
+      zipcode: client?.zipcode || "",
+    }),
+    [client],
+  );
+
+  const [formData, setFormData] = useState(initialData);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isCepSearching, setIsCepSearching] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showAddress, setShowAddress] = useState(() =>
+    hasAddressData(initialData),
+  );
 
-  // Formata o CNPJ para exibição
   const formatCNPJ = (cnpj) => {
-    const cleanCNPJ = cnpj.replace(/\D/g, "");
-
+    const cleanCNPJ = String(cnpj || "").replace(/\D/g, "");
     if (cleanCNPJ.length <= 2) return cleanCNPJ;
     if (cleanCNPJ.length <= 5)
       return `${cleanCNPJ.slice(0, 2)}.${cleanCNPJ.slice(2)}`;
@@ -68,44 +88,29 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
         2,
         5,
       )}.${cleanCNPJ.slice(5, 8)}/${cleanCNPJ.slice(8)}`;
-
     return `${cleanCNPJ.slice(0, 2)}.${cleanCNPJ.slice(2, 5)}.${cleanCNPJ.slice(
       5,
       8,
     )}/${cleanCNPJ.slice(8, 12)}-${cleanCNPJ.slice(12, 14)}`;
   };
 
-  // Manipula a digitação normal
   const handleCnpjChange = (e) => {
-    const value = e.target.value;
-    const cleanCNPJ = value.replace(/\D/g, "").slice(0, 14);
-
-    setFormData((prev) => ({
-      ...prev,
-      cnpj: cleanCNPJ, // Armazena apenas números
-    }));
+    const cleanCNPJ = e.target.value.replace(/\D/g, "").slice(0, 14);
+    setFormData((prev) => ({ ...prev, cnpj: cleanCNPJ }));
     setErrors((prev) => ({ ...prev, cnpj: "" }));
   };
 
-  // Manipula o colar - CORREÇÃO DO PROBLEMA
   const handleCnpjPaste = (e) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text");
-    const cleanCNPJ = pastedData.replace(/\D/g, "").slice(0, 14);
-
-    setFormData((prev) => ({
-      ...prev,
-      cnpj: cleanCNPJ,
-    }));
+    const cleanCNPJ = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 14);
+    setFormData((prev) => ({ ...prev, cnpj: cleanCNPJ }));
     setErrors((prev) => ({ ...prev, cnpj: "" }));
-
-    // Dispara a busca automática se tiver 14 dígitos
-    if (cleanCNPJ.length === 14) {
-      handleCNPJSearch(cleanCNPJ);
-    }
+    if (cleanCNPJ.length === 14) handleCNPJSearch(cleanCNPJ);
   };
 
-  // Busca dados do CNPJ
   const handleCNPJSearch = async (cnpj) => {
     setIsSearching(true);
     try {
@@ -115,10 +120,27 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
           ...prev,
           companyName: data.razaoSocial || data.nome || prev.companyName,
           nomeFantasia: data.nomeFantasia || prev.nomeFantasia,
-          phone: data.telefone || "",
-          region: data.uf || "",
-          email: data.email || "",
+          phone: data.telefone || prev.phone,
+          region: data.uf || prev.region,
+          email: data.email || prev.email,
+          street: data.street || prev.street,
+          number: data.number || prev.number,
+          complement: data.complement || prev.complement,
+          neighborhood: data.neighborhood || prev.neighborhood,
+          city: data.city || prev.city,
+          zipcode: data.zipcode || prev.zipcode,
         }));
+        if (
+          data.street ||
+          data.city ||
+          data.zipcode ||
+          data.neighborhood
+        ) {
+          setShowAddress(true);
+          toast.info("Dados do CNPJ e endereço preenchidos automaticamente.");
+        } else {
+          toast.info("Dados do CNPJ preenchidos. Complete o endereço se precisar.");
+        }
       } else {
         setErrors((prev) => ({ ...prev, cnpj: "CNPJ não encontrado" }));
       }
@@ -126,14 +148,13 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
       console.error("Erro ao buscar CNPJ:", error);
       setErrors((prev) => ({
         ...prev,
-        cnpj: error.message || "Falha ao consultar CNPJ",
+        cnpj: error.message || "Não foi possível consultar o CNPJ.",
       }));
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Busca automática quando o CNPJ atinge 14 dígitos (digitação)
   const handleCnpjBlur = () => {
     if (formData.cnpj.length === 14 && !isSearching) {
       handleCNPJSearch(formData.cnpj);
@@ -143,8 +164,51 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleZipcodeChange = (e) => {
+    const clean = e.target.value.replace(/\D/g, "").slice(0, 8);
+    setFormData((prev) => ({ ...prev, zipcode: clean }));
+    setErrors((prev) => ({ ...prev, zipcode: "" }));
+  };
+
+  const handleCepLookup = async (rawZip) => {
+    const clean = String(rawZip || "").replace(/\D/g, "");
+    if (clean.length !== 8) return;
+    setIsCepSearching(true);
+    try {
+      const data = await lookupCep(clean);
+      if (!data) {
+        setErrors((prev) => ({
+          ...prev,
+          zipcode: "CEP não encontrado",
+        }));
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        zipcode: data.zipcode,
+        street: data.street || prev.street,
+        neighborhood: data.neighborhood || prev.neighborhood,
+        city: data.city || prev.city,
+        region: data.region || prev.region,
+        complement: data.complement || prev.complement,
+      }));
+      setShowAddress(true);
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        zipcode: error.message || "Falha ao consultar CEP",
+      }));
+    } finally {
+      setIsCepSearching(false);
+    }
+  };
+
+  const handleZipcodeBlur = () => {
+    if (formData.zipcode.replace(/\D/g, "").length === 8 && !isCepSearching) {
+      handleCepLookup(formData.zipcode);
     }
   };
 
@@ -155,7 +219,6 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
     if (!formData.cnpj.trim()) newErrors.cnpj = "CNPJ é obrigatório";
     if (formData.cnpj.length !== 14)
       newErrors.cnpj = "CNPJ deve ter 14 dígitos";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -178,14 +241,16 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
       complement: String(formData.complement || "").trim(),
       neighborhood: String(formData.neighborhood || "").trim(),
       city: String(formData.city || "").trim(),
-      zipcode: String(formData.zipcode || "").trim(),
+      zipcode: String(formData.zipcode || "").replace(/\D/g, ""),
     };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      toast.warning("Preencha os campos obrigatórios.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -216,6 +281,14 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
         }
         if (Object.keys(nextFieldErrors).length > 0) {
           setErrors((prev) => ({ ...prev, ...nextFieldErrors }));
+          if (
+            nextFieldErrors.street ||
+            nextFieldErrors.city ||
+            nextFieldErrors.zipcode ||
+            nextFieldErrors.neighborhood
+          ) {
+            setShowAddress(true);
+          }
           toast.warning("Corrija os campos assinalados abaixo.");
           return;
         }
@@ -237,26 +310,32 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
           className={
             isDrawer
               ? "w-full"
-              : "mx-auto w-full max-w-4xl rounded-2xl border border-zinc-200/80 bg-white/80 p-4 shadow-soft backdrop-blur-md sm:p-6 md:p-8"
+              : "mx-auto w-full max-w-4xl rounded-2xl border border-edge bg-surface/80 p-4 shadow-soft backdrop-blur-md sm:p-6 md:p-8"
           }
         >
           {!isDrawer ? (
-            <h2 className="mb-6 text-2xl font-semibold tracking-tight text-zinc-900">
-              {isEditing ? "Editar Cliente" : "Adicionar Novo Cliente"}
+            <h2 className="mb-6 text-2xl font-semibold tracking-tight text-ink">
+              {isEditing ? "Editar cliente" : "Novo cliente"}
             </h2>
           ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {/* Campo CNPJ Corrigido */}
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  CNPJ *
-                </label>
+              <FormField
+                className="md:col-span-2"
+                label="CNPJ"
+                required
+                error={errors.cnpj}
+                hint={
+                  isEditing
+                    ? "CNPJ não pode ser alterado em edição"
+                    : isSearching
+                      ? "A procurar dados do CNPJ…"
+                      : "Digite ou cole os 14 dígitos — preenchemos o cadastro automaticamente"
+                }
+              >
                 <input
-                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30 ${
-                    errors.cnpj ? "border-red-400" : "border-zinc-200"
-                  }`}
+                  className={inputClassName(Boolean(errors.cnpj))}
                   type="text"
                   value={formatCNPJ(formData.cnpj)}
                   onChange={handleCnpjChange}
@@ -266,231 +345,206 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                 />
-                {errors.cnpj && (
-                  <p className="mt-1 text-xs text-red-500">{errors.cnpj}</p>
-                )}
-                {isSearching && (
-                  <p className="mt-1 text-xs text-brand">
-                    A procurar dados do CNPJ…
-                  </p>
-                )}
-                {isEditing && (
-                  <p className="mt-1 text-xs text-zinc-400">
-                    CNPJ não pode ser alterado em edição
-                  </p>
-                )}
-                {!isEditing && (
-                  <p className="mt-1 text-xs text-zinc-400">
-                    Digite ou cole os 14 dígitos do CNPJ
-                  </p>
-                )}
-              </div>
+              </FormField>
 
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Nome da Empresa *
-                </label>
+              <FormField
+                className="md:col-span-2"
+                label="Nome da empresa"
+                required
+                error={errors.companyName}
+              >
                 <input
-                  className={`w-full rounded-xl border bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30 ${
-                    errors.companyName ? "border-red-400" : "border-zinc-200"
-                  }`}
+                  className={inputClassName(Boolean(errors.companyName))}
                   type="text"
                   name="companyName"
                   value={formData.companyName}
                   onChange={handleChange}
                   required
                 />
-                {errors.companyName && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {errors.companyName}
-                  </p>
-                )}
-              </div>
+              </FormField>
 
-              <div className="md:col-span-2">
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Nome fantasia
-                </label>
+              <FormField
+                className="md:col-span-2"
+                label="Nome fantasia"
+                hint="Usado na busca de clientes nos pedidos."
+              >
                 <input
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className={inputClassName()}
                   type="text"
                   name="nomeFantasia"
                   value={formData.nomeFantasia}
                   onChange={handleChange}
-                  placeholder="Como o cliente é conhecido no dia a dia (opcional)"
+                  placeholder="Como o cliente é conhecido (opcional)"
                 />
-                <p className="mt-1 text-xs text-zinc-400">
-                  Usado na busca de clientes nos pedidos.
-                </p>
-              </div>
+              </FormField>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Pessoa de Contato
-                </label>
+              <FormField label="Pessoa de contato">
                 <input
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className={inputClassName()}
                   type="text"
                   name="contactPerson"
                   value={formData.contactPerson}
                   onChange={handleChange}
                   placeholder="Nome do responsável"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Telefone
-                </label>
+              <FormField label="Telefone">
                 <input
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className={inputClassName()}
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="(00) 00000-0000"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Email
-                </label>
+              <FormField label="E-mail">
                 <input
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className={inputClassName()}
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="email@empresa.com"
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                  Região
-                </label>
+              <FormField label="UF" hint="Preenchida pelo CNPJ ou CEP.">
                 <input
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                  className={inputClassName()}
                   type="text"
                   name="region"
                   value={formData.region}
                   onChange={handleChange}
-                  placeholder="UF (ex.: PR)"
+                  placeholder="Ex.: PR"
+                  maxLength={2}
                 />
-              </div>
+              </FormField>
+            </div>
 
-              <div className="md:col-span-2">
-                <h3 className="mb-1 text-sm font-semibold text-zinc-900">
-                  Endereço
-                </h3>
-                <p className="mb-3 text-xs text-zinc-400">
-                  Para clientes da base PR (Paraná / PRL), preencha logradouro,
-                  cidade e CEP para entregas e documentos.
-                </p>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="md:col-span-2">
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      Logradouro
-                    </label>
+            <div className="rounded-2xl border border-edge bg-surface-muted/50">
+              <button
+                type="button"
+                onClick={() => setShowAddress((v) => !v)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    Endereço
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    Opcional — para entregas e documentos
+                  </p>
+                </div>
+                <span className="text-sm font-medium text-brand">
+                  {showAddress ? "Ocultar" : "Adicionar"}
+                </span>
+              </button>
+
+              {showAddress ? (
+                <div className="grid grid-cols-1 gap-4 border-t border-edge p-4 md:grid-cols-2">
+                  <FormField
+                    label="CEP"
+                    error={errors.zipcode}
+                    hint={
+                      isCepSearching
+                        ? "A consultar CEP…"
+                        : "Ao sair do campo, buscamos logradouro e cidade"
+                    }
+                  >
                     <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      className={inputClassName(Boolean(errors.zipcode))}
+                      type="text"
+                      name="zipcode"
+                      value={formatCepDisplay(formData.zipcode)}
+                      onChange={handleZipcodeChange}
+                      onBlur={handleZipcodeBlur}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      disabled={isCepSearching}
+                    />
+                  </FormField>
+
+                  <FormField label="Cidade">
+                    <input
+                      className={inputClassName()}
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                    />
+                  </FormField>
+
+                  <FormField className="md:col-span-2" label="Logradouro">
+                    <input
+                      className={inputClassName()}
                       type="text"
                       name="street"
                       value={formData.street}
                       onChange={handleChange}
                       placeholder="Rua, avenida…"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      Número
-                    </label>
+                  </FormField>
+
+                  <FormField label="Número">
                     <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      className={inputClassName()}
                       type="text"
                       name="number"
                       value={formData.number}
                       onChange={handleChange}
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      Complemento
-                    </label>
+                  </FormField>
+
+                  <FormField label="Complemento">
                     <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      className={inputClassName()}
                       type="text"
                       name="complement"
                       value={formData.complement}
                       onChange={handleChange}
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      Bairro
-                    </label>
+                  </FormField>
+
+                  <FormField className="md:col-span-2" label="Bairro">
                     <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
+                      className={inputClassName()}
                       type="text"
                       name="neighborhood"
                       value={formData.neighborhood}
                       onChange={handleChange}
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      Cidade
-                    </label>
-                    <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-zinc-700">
-                      CEP
-                    </label>
-                    <input
-                      className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand/30"
-                      type="text"
-                      name="zipcode"
-                      value={formData.zipcode}
-                      onChange={handleChange}
-                      placeholder="00000-000"
-                    />
-                  </div>
+                  </FormField>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             <div
-              className={`mt-6 flex justify-end gap-2 border-t border-zinc-200/80 pt-5 ${
-                isDrawer ? "sticky bottom-0 bg-white/90 pb-1 backdrop-blur-md" : ""
+              className={`mt-2 flex justify-end gap-2 border-t border-edge pt-5 ${
+                isDrawer
+                  ? "sticky bottom-0 bg-surface/90 pb-1 backdrop-blur-md"
+                  : ""
               }`}
             >
-              <button
+              <SecondaryButton
                 type="button"
                 onClick={onCancel}
-                className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-semibold text-zinc-700 transition-all duration-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-50"
                 disabled={loading}
               >
                 Cancelar
-              </button>
-              <button
+              </SecondaryButton>
+              <PrimaryButton
                 type="submit"
-                className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all duration-200 hover:bg-brand-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={loading || isSearching}
+                disabled={loading || isSearching || isCepSearching}
               >
                 {loading
-                  ? "A guardar..."
+                  ? "A guardar…"
                   : isEditing
                     ? "Atualizar cliente"
                     : "Guardar cliente"}
-              </button>
+              </PrimaryButton>
             </div>
           </form>
         </div>

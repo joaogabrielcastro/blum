@@ -8,40 +8,35 @@ const Pagination = ({
   const startItem = (currentPage - 1) * limit + 1;
   const endItem = Math.min(currentPage * limit, total);
 
-  // Gera array de páginas para mostrar
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
 
     if (totalPages <= maxPagesToShow) {
-      // Mostra todas as páginas
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
+    } else if (currentPage <= 3) {
+      pages.push(1, 2, 3, 4, "...", totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(
+        1,
+        "...",
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+        totalPages,
+      );
     } else {
-      // Lógica para mostrar ... quando há muitas páginas
-      if (currentPage <= 3) {
-        pages.push(1, 2, 3, 4, "...", totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(
-          1,
-          "...",
-          totalPages - 3,
-          totalPages - 2,
-          totalPages - 1,
-          totalPages
-        );
-      } else {
-        pages.push(
-          1,
-          "...",
-          currentPage - 1,
-          currentPage,
-          currentPage + 1,
-          "...",
-          totalPages
-        );
-      }
+      pages.push(
+        1,
+        "...",
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        "...",
+        totalPages,
+      );
     }
 
     return pages;
@@ -50,65 +45,62 @@ const Pagination = ({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 bg-white border-t border-gray-200">
-      {/* Informação de itens */}
-      <div className="text-sm text-gray-700">
-        Mostrando <span className="font-medium">{startItem}</span> a{" "}
-        <span className="font-medium">{endItem}</span> de{" "}
-        <span className="font-medium">{total}</span> resultados
+    <div className="flex flex-col items-center justify-between gap-4 border-t border-edge bg-surface px-4 py-3 sm:flex-row">
+      <div className="text-sm text-ink-muted">
+        Mostrando <span className="font-medium text-ink">{startItem}</span> a{" "}
+        <span className="font-medium text-ink">{endItem}</span> de{" "}
+        <span className="font-medium text-ink">{total}</span> resultados
       </div>
 
-      {/* Botões de navegação */}
       <div className="flex items-center gap-2">
-        {/* Botão Anterior */}
         <button
+          type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+          className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
             currentPage === 1
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              ? "cursor-not-allowed bg-surface-muted text-ink-muted"
+              : "border border-edge bg-surface text-ink hover:bg-surface-muted"
           }`}
         >
           Anterior
         </button>
 
-        {/* Números de página */}
-        <div className="hidden sm:flex items-center gap-1">
+        <div className="hidden items-center gap-1 sm:flex">
           {getPageNumbers().map((page, index) =>
             page === "..." ? (
-              <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
+              <span key={`ellipsis-${index}`} className="px-2 text-ink-muted">
                 ...
               </span>
             ) : (
               <button
+                type="button"
                 key={page}
                 onClick={() => onPageChange(page)}
-                className={`min-w-[2.5rem] px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                className={`min-w-[2.5rem] rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
                   currentPage === page
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+                    ? "bg-brand text-white"
+                    : "border border-edge bg-surface text-ink hover:bg-surface-muted"
                 }`}
               >
                 {page}
               </button>
-            )
+            ),
           )}
         </div>
 
-        {/* Indicador mobile */}
-        <div className="sm:hidden px-3 py-1 text-sm font-medium text-gray-700">
+        <div className="px-3 py-1 text-sm font-medium text-ink sm:hidden">
           {currentPage} / {totalPages}
         </div>
 
-        {/* Botão Próximo */}
         <button
+          type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+          className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
             currentPage === totalPages
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-300"
+              ? "cursor-not-allowed bg-surface-muted text-ink-muted"
+              : "border border-edge bg-surface text-ink hover:bg-surface-muted"
           }`}
         >
           Próximo

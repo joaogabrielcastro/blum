@@ -44,16 +44,16 @@ const EmptyState = ({
   return (
     <div className="col-span-full flex w-full items-center justify-center py-16 sm:py-20">
       <div className="mx-auto max-w-sm text-center">
-        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-zinc-200/80 bg-white/80 text-zinc-300 shadow-soft backdrop-blur-md">
+        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-edge bg-surface text-ink-muted shadow-soft backdrop-blur-md">
           {icon != null && typeof icon !== "string" ? (
             icon
           ) : (
             <Illustration className="h-10 w-10" />
           )}
         </div>
-        <h3 className="text-lg font-semibold text-zinc-900">{resolvedTitle}</h3>
+        <h3 className="text-lg font-semibold text-ink">{resolvedTitle}</h3>
         {resolvedMessage ? (
-          <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             {resolvedMessage}
           </p>
         ) : null}

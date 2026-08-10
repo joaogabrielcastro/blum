@@ -5,13 +5,13 @@ import UploadSection from "../common/UploadSection";
 import PurchaseDateSection from "./PurchaseDateSection";
 import PurchaseActions from "./PurchaseActions";
 import PurchaseInlineNotice from "./PurchaseInlineNotice";
+import ConfirmationModal from "../ConfirmationModal";
 import {
   buildVerificationCatalog,
   buildImportSuccessSummary,
   buildFinalizePurchasePayload,
   getDuplicateProductCodesFromItems,
   mergePurchaseItemsByProductCode,
-  maybeMergeDuplicateProductCodes,
   validatePurchaseImportRows,
 } from "../../utils/purchaseImportUtils";
 
@@ -34,6 +34,8 @@ export default function CsvImportSection({ purchaseLogic }) {
   const [parsedCsvItems, setParsedCsvItems] = useState([]);
   const [selectedCsvBrandId, setSelectedCsvBrandId] = useState("");
   const [isCsvProcessing, setIsCsvProcessing] = useState(false);
+  const [createConfirm, setCreateConfirm] = useState(null);
+  const [mergeConfirm, setMergeConfirm] = useState(null);
 
   const csvDuplicateProductCodes = useMemo(
     () => getDuplicateProductCodesFromItems(parsedCsvItems),
@@ -48,11 +50,11 @@ export default function CsvImportSection({ purchaseLogic }) {
 
   const handleCsvProcess = async () => {
     if (!csvFile) {
-      setError("Por favor, selecione um arquivo CSV.");
+      setError("Selecione um arquivo CSV.");
       return;
     }
     if (!selectedCsvBrandId) {
-      setError("Por favor, selecione uma Representada para os produtos.");
+      setError("Selecione uma representada para os produtos.");
       return;
     }
 
@@ -99,7 +101,7 @@ export default function CsvImportSection({ purchaseLogic }) {
       console.error("Erro no processamento CSV:", err);
       setError(
         err.message ||
-          "Falha ao processar o CSV. Verifique o formato do arquivo e tente novamente.",
+          "Não foi possível processar o CSV. Verifique o formato e tente novamente.",
       );
     } finally {
       setIsCsvProcessing(false);
@@ -120,23 +122,47 @@ export default function CsvImportSection({ purchaseLogic }) {
     });
   };
 
-  const handleCsvConfirmPurchase = async () => {
-    setError(null);
-    setSuccessMessage(null);
-
-    if (!selectedCsvBrandId) {
-      setError("Selecione uma representada para os produtos.");
-      return;
-    }
-
-    let rows = [...parsedCsvItems];
-    const merged = await maybeMergeDuplicateProductCodes(
-      rows,
-      setParsedCsvItems,
+  const finalizeCsvRows = async (rows) => {
+    const selectedBrand = brands.find(
+      (b) => String(b.id) === String(selectedCsvBrandId),
     );
-    if (merged === null) return;
-    rows = merged;
+    const mergedRows = mergePurchaseItemsByProductCode(rows);
+    setParsedCsvItems(mergedRows);
+    setIsLoading(true);
+    setCreateConfirm(null);
+    setMergeConfirm(null);
 
+    try {
+      const result = await apiService.finalizePurchaseFromCsv(
+        buildFinalizePurchasePayload(
+          selectedCsvBrandId,
+          purchaseDate,
+          mergedRows,
+        ),
+      );
+      setSuccessMessage(
+        buildImportSuccessSummary(
+          result,
+          selectedBrand,
+          purchaseDate,
+          mergedRows.length,
+        ),
+      );
+      setParsedCsvItems([]);
+      setCsvFile(null);
+      setUserProducts([]);
+    } catch (err) {
+      console.error("Erro ao confirmar importação CSV:", err);
+      setError(
+        err.message ||
+          "Não foi possível finalizar a importação. Tente novamente.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const continueAfterRowsReady = async (rows) => {
     const validation = validatePurchaseImportRows(rows);
     if (!validation.ok) {
       setError(validation.error);
@@ -149,42 +175,43 @@ export default function CsvImportSection({ purchaseLogic }) {
     const newProductsCount = rows.filter((item) => item.isNewProduct).length;
 
     if (newProductsCount > 0) {
-      const confirmMessage =
-        `⚠️ ATENÇÃO!\n\n` +
-        `${newProductsCount} produtos NÃO EXISTEM no seu catálogo e serão CRIADOS AUTOMATICAMENTE.\n\n` +
-        `• Produtos existentes: ${rows.length - newProductsCount}\n` +
-        `• Novos produtos: ${newProductsCount}\n` +
-        `• Representada: ${selectedBrand?.name || "Não selecionada"}\n` +
-        `• Data da compra: ${purchaseDate}\n\n` +
-        `Deseja continuar?`;
-      if (!window.confirm(confirmMessage)) return;
+      setCreateConfirm({
+        rows,
+        newProductsCount,
+        existingCount: rows.length - newProductsCount,
+        brandName: selectedBrand?.name || "Não selecionada",
+      });
+      return;
     }
 
-    rows = mergePurchaseItemsByProductCode(rows);
-    setParsedCsvItems(rows);
-    setIsLoading(true);
+    await finalizeCsvRows(rows);
+  };
 
-    try {
-      const result = await apiService.finalizePurchaseFromCsv(
-        buildFinalizePurchasePayload(selectedCsvBrandId, purchaseDate, rows),
-      );
-      setSuccessMessage(
-        buildImportSuccessSummary(
-          result,
-          selectedBrand,
-          purchaseDate,
-          rows.length,
-        ),
-      );
-      setParsedCsvItems([]);
-      setCsvFile(null);
-      setUserProducts([]);
-    } catch (err) {
-      console.error("Erro ao confirmar importação CSV:", err);
-      setError(err.message || "Ocorreu um erro ao processar a importação.");
-    } finally {
-      setIsLoading(false);
+  const handleCsvConfirmPurchase = async () => {
+    setError(null);
+    setSuccessMessage(null);
+
+    if (!selectedCsvBrandId) {
+      setError("Selecione uma representada para os produtos.");
+      return;
     }
+
+    const rows = [...parsedCsvItems];
+    const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
+    if (duplicateProductCodes.length > 0) {
+      setMergeConfirm({ rows, codes: duplicateProductCodes });
+      return;
+    }
+
+    await continueAfterRowsReady(rows);
+  };
+
+  const handleMergeConfirm = async () => {
+    if (!mergeConfirm?.rows) return;
+    const merged = mergePurchaseItemsByProductCode(mergeConfirm.rows);
+    setParsedCsvItems(merged);
+    setMergeConfirm(null);
+    await continueAfterRowsReady(merged);
   };
 
   if (parsedCsvItems.length === 0) {
@@ -207,8 +234,8 @@ export default function CsvImportSection({ purchaseLogic }) {
           brands={brands}
           selectedBrandId={selectedCsvBrandId}
           onBrandChange={(e) => setSelectedCsvBrandId(e.target.value)}
-          title="Importar Produtos do CSV"
-          description="Envie o arquivo CSV do seu fornecedor para importar os produtos em lote."
+          title="Importar CSV"
+          description="Envie o arquivo CSV do fornecedor para importar produtos em lote."
           accept=".csv"
           fileType="CSV"
         />
@@ -218,25 +245,21 @@ export default function CsvImportSection({ purchaseLogic }) {
 
   return (
     <>
-      <PurchaseInlineNotice
-        message={error}
-        onDismiss={() => setError(null)}
-      />
-      <div className="bg-green-50 border border-green-200 p-4 rounded-lg mb-6">
-        <h3 className="text-green-800 font-bold text-lg">
-          ✅ CSV Processado com Sucesso!
+      <PurchaseInlineNotice message={error} onDismiss={() => setError(null)} />
+      <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <h3 className="text-base font-semibold text-emerald-900">
+          CSV processado
         </h3>
-        <p className="text-green-700">
+        <p className="mt-1 text-sm text-emerald-800">
           {parsedCsvItems.length} itens encontrados. Verifique e confirme os
           dados abaixo.
         </p>
-        {csvDuplicateProductCodes.length > 0 && (
-          <p className="text-amber-800 text-sm mt-2 font-medium">
-            Há códigos de produto repetidos na lista. Use «Unificar códigos
-            duplicados» ou confirme a importação — será perguntado se deseja
-            agrupar automaticamente.
+        {csvDuplicateProductCodes.length > 0 ? (
+          <p className="mt-2 text-sm font-medium text-amber-900">
+            Há códigos repetidos. Use «Unificar códigos duplicados» ou confirme
+            — será perguntado se deseja agrupar.
           </p>
-        )}
+        ) : null}
       </div>
 
       <PurchaseDateSection date={purchaseDate} onDateChange={setPurchaseDate} />
@@ -245,7 +268,7 @@ export default function CsvImportSection({ purchaseLogic }) {
         items={parsedCsvItems}
         onItemChange={handleCsvItemChange}
         userProducts={userProducts}
-        title="Verifique os Itens do CSV"
+        title="Verifique os itens do CSV"
         description="Mapeie os itens para produtos existentes e confira código, quantidade e preço."
         source="CSV"
       />
@@ -258,7 +281,7 @@ export default function CsvImportSection({ purchaseLogic }) {
         }}
         onConfirm={handleCsvConfirmPurchase}
         isLoading={isLoading}
-        confirmLabel="Confirmar e Importar Produtos"
+        confirmLabel="Confirmar e importar produtos"
         secondaryAction={
           csvDuplicateProductCodes.length > 0
             ? {
@@ -273,6 +296,35 @@ export default function CsvImportSection({ purchaseLogic }) {
               }
             : undefined
         }
+      />
+
+      <ConfirmationModal
+        show={!!mergeConfirm}
+        title="Unificar códigos duplicados?"
+        tone="primary"
+        confirmText="Unificar e continuar"
+        message={
+          mergeConfirm
+            ? `Códigos repetidos: ${mergeConfirm.codes.join(", ")}. Vamos somar quantidades e usar média ponderada de preço. Cancelar interrompe a importação.`
+            : ""
+        }
+        onConfirm={handleMergeConfirm}
+        onCancel={() => setMergeConfirm(null)}
+      />
+      <ConfirmationModal
+        show={!!createConfirm}
+        title="Criar produtos novos?"
+        tone="primary"
+        confirmText="Continuar"
+        message={
+          createConfirm
+            ? `${createConfirm.newProductsCount} produto(s) não existem no catálogo e serão criados automaticamente. Existentes: ${createConfirm.existingCount}. Representada: ${createConfirm.brandName}. Data: ${purchaseDate}.`
+            : ""
+        }
+        onConfirm={() =>
+          createConfirm?.rows && finalizeCsvRows(createConfirm.rows)
+        }
+        onCancel={() => setCreateConfirm(null)}
       />
     </>
   );

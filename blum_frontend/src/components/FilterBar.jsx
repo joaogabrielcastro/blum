@@ -3,20 +3,21 @@
  */
 const FilterBar = ({ searchTerm, onSearchChange = () => {} }) => {
   return (
-    <div className="mb-6 bg-white p-4 rounded-lg shadow border border-gray-100">
+    <div className="mb-4 rounded-2xl border border-edge bg-surface p-4 shadow-soft">
       <label
-        htmlFor="search"
-        className="block text-sm font-medium text-gray-700 mb-1"
+        htmlFor="product-search"
+        className="mb-1.5 block text-sm font-medium text-ink"
       >
         Buscar produtos
       </label>
       <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
           <svg
-            className="h-5 w-5 text-gray-400"
+            className="h-4 w-4 text-ink-muted"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
             fill="currentColor"
+            aria-hidden
           >
             <path
               fillRule="evenodd"
@@ -26,22 +27,22 @@ const FilterBar = ({ searchTerm, onSearchChange = () => {} }) => {
           </svg>
         </div>
         <input
-          type="text"
-          id="search"
+          type="search"
+          id="product-search"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Várias palavras; não precisa igual ao cadastro (ex.: lamp 9w)"
-          className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Nome ou código (ex.: lamp 9w)"
+          className="block w-full rounded-xl border border-edge bg-surface py-2.5 pl-10 pr-10 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
         />
-        {searchTerm && (
+        {searchTerm ? (
           <button
             type="button"
             onClick={() => onSearchChange("")}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-ink-muted hover:text-ink"
             aria-label="Limpar busca"
           >
             <svg
-              className="h-4 w-4 text-gray-400 hover:text-gray-600"
+              className="h-4 w-4"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
@@ -53,7 +54,7 @@ const FilterBar = ({ searchTerm, onSearchChange = () => {} }) => {
               />
             </svg>
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

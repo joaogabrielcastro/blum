@@ -1,9 +1,9 @@
-const LoadingSpinner = ({ message = "Carregando..." }) => {
+const LoadingSpinner = ({ message = "Carregando…" }) => {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+    <div className="flex min-h-[40vh] items-center justify-center bg-transparent">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">{message}</p>
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-zinc-200 border-t-brand" />
+        <p className="mt-4 text-sm text-zinc-500">{message}</p>
       </div>
     </div>
   );

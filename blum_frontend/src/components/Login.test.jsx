@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Login from "./Login";
 import { ToastProvider } from "../context/ToastContext";
+import { ThemeProvider } from "../context/ThemeContext";
 
 const mockLogin = jest.fn();
 const mockPersistAuthSession = jest.fn();
@@ -22,9 +23,11 @@ jest.mock("../utils/tenantHost", () => ({
 function renderLogin(onLogin = jest.fn()) {
   return render(
     <MemoryRouter>
-      <ToastProvider>
-        <Login onLogin={onLogin} />
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <Login onLogin={onLogin} />
+        </ToastProvider>
+      </ThemeProvider>
     </MemoryRouter>,
   );
 }
@@ -42,7 +45,7 @@ describe("Login", () => {
       await screen.findByRole("heading", { name: "Entrar" }),
     ).toBeTruthy();
     expect(screen.getByLabelText(/e-mail ou usuário/i)).toBeTruthy();
-    expect(screen.getByLabelText(/^senha$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/^senha/i)).toBeTruthy();
   });
 
   it("não exibe campo de identificador da empresa", async () => {
@@ -68,7 +71,7 @@ describe("Login", () => {
     renderLogin(onLogin);
 
     await user.type(screen.getByLabelText(/e-mail ou usuário/i), "admin@test.com");
-    await user.type(screen.getByLabelText(/^senha$/i), "secret123");
+    await user.type(screen.getByLabelText(/^senha/i), "secret123");
     await user.click(screen.getByRole("button", { name: /^entrar$/i }));
 
     await waitFor(() => {
@@ -95,7 +98,7 @@ describe("Login", () => {
     renderLogin();
 
     await user.type(screen.getByLabelText(/e-mail ou usuário/i), "bad@test.com");
-    await user.type(screen.getByLabelText(/^senha$/i), "wrong");
+    await user.type(screen.getByLabelText(/^senha/i), "wrong");
     await user.click(screen.getByRole("button", { name: /^entrar$/i }));
 
     expect(

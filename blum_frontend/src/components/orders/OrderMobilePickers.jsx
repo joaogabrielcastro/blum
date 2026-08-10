@@ -7,7 +7,7 @@ function ClientOptionRow({ opt, onSelect }) {
       type="button"
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => onSelect(opt)}
-      className="flex w-full flex-col gap-1 border-b border-gray-100 bg-white px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-indigo-50 active:bg-indigo-100"
+      className="flex w-full flex-col gap-1 border-b border-gray-100 bg-surface px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-indigo-50 active:bg-indigo-100"
     >
       <span className="text-sm font-medium leading-snug text-gray-900">
         {opt.primary}
@@ -54,7 +54,7 @@ export function OrderMobileProductPicker({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-white md:hidden"
+      className="fixed inset-0 z-50 flex flex-col bg-surface md:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Buscar produto"
@@ -139,7 +139,7 @@ export function OrderMobileClientPicker({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col bg-white md:hidden"
+      className="fixed inset-0 z-[60] flex flex-col bg-surface md:hidden"
       role="dialog"
       aria-modal="true"
       aria-label="Buscar cliente"

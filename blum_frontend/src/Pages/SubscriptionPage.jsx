@@ -8,6 +8,11 @@ import PlanComparisonTable from "../components/billing/PlanComparisonTable";
 import SubscriptionStatusBanner from "../components/billing/SubscriptionStatusBanner";
 import ConfirmationModal from "../components/ConfirmationModal";
 import { useToast } from "../context/ToastContext";
+import Surface, {
+  PageHeader,
+  PrimaryButton,
+  SecondaryButton,
+} from "../components/ui/Surface";
 import {
   formatBillingDate,
   formatPlanPrice,
@@ -192,25 +197,20 @@ const SubscriptionPage = () => {
     subscription?.subscriptionStatus === "active";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-          Assinatura
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Planos com cobrança mensal. Gerencie pagamentos, renovação e forma de
-          pagamento (cartão, Pix ou boleto).
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 md:p-8">
+      <PageHeader
+        title="Assinatura"
+        description="Planos mensais. Gerencie pagamentos, renovação e forma de pagamento."
+      />
 
       {error ? <ErrorMessage message={error} /> : null}
 
       {isOnboarding && !hasActiveSub ? (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900">
-          <p className="font-semibold">Bem-vindo ao Blum!</p>
+        <div className="rounded-2xl border border-brand/20 bg-brand-50 px-5 py-4 text-sm text-brand-700">
+          <p className="font-semibold">Bem-vindo ao Blum</p>
           <p className="mt-1">
             {actionLoading
-              ? `A abrir o pagamento do plano ${onboardingPlanSlug} no Stripe…`
+              ? `A abrir o pagamento do plano ${onboardingPlanSlug}…`
               : "Sua empresa foi criada. Em instantes você será redirecionado para concluir a assinatura."}
           </p>
         </div>
@@ -219,45 +219,45 @@ const SubscriptionPage = () => {
       <SubscriptionStatusBanner subscription={subscription} />
 
       {subscription ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Resumo</h2>
+        <Surface>
+          <h2 className="text-base font-semibold text-ink">Resumo</h2>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-sm text-gray-500">Empresa</dt>
-              <dd className="font-medium text-gray-900">
+              <dt className="text-sm text-ink-muted">Empresa</dt>
+              <dd className="font-medium text-ink">
                 {subscription.tenantName || "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Plano</dt>
-              <dd className="font-medium text-gray-900">
+              <dt className="text-sm text-ink-muted">Plano</dt>
+              <dd className="font-medium text-ink">
                 {subscription.planName || "Nenhum plano ativo"}
                 {subscription.pricePerMonthLabel ? (
-                  <span className="block text-sm font-normal text-gray-600">
+                  <span className="block text-sm font-normal text-ink-muted">
                     {formatPlanPrice(subscription)}
                   </span>
                 ) : null}
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Cobrança</dt>
-              <dd className="font-medium text-gray-900">
+              <dt className="text-sm text-ink-muted">Cobrança</dt>
+              <dd className="font-medium text-ink">
                 {subscription.billingLabel || "Mensal"}
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Status</dt>
+              <dt className="text-sm text-ink-muted">Status</dt>
               <dd>
                 <span
-                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSubscriptionStatusStyle(subscription.subscriptionStatus)}`}
+                  className={`inline-flex rounded-lg border px-2.5 py-0.5 text-xs font-semibold ${getSubscriptionStatusStyle(subscription.subscriptionStatus)}`}
                 >
                   {getSubscriptionStatusLabel(subscription.subscriptionStatus)}
                 </span>
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-gray-500">Próxima renovação</dt>
-              <dd className="font-medium text-gray-900">
+              <dt className="text-sm text-ink-muted">Próxima renovação</dt>
+              <dd className="font-medium text-ink">
                 {formatBillingDate(subscription.currentPeriodEnd)}
               </dd>
             </div>
@@ -265,46 +265,44 @@ const SubscriptionPage = () => {
 
           <div className="mt-6 flex flex-wrap gap-3">
             {subscription.stripeCustomerId ? (
-              <button
+              <SecondaryButton
                 type="button"
                 onClick={handlePortal}
                 disabled={Boolean(actionLoading)}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
               >
                 {actionLoading === "portal" ? "A abrir…" : "Portal do cliente"}
-              </button>
+              </SecondaryButton>
             ) : null}
             {canReactivate ? (
-              <button
+              <PrimaryButton
                 type="button"
                 onClick={handleReactivate}
                 disabled={Boolean(actionLoading)}
-                className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
                 {actionLoading === "reactivate"
                   ? "A processar…"
                   : "Reativar assinatura"}
-              </button>
+              </PrimaryButton>
             ) : null}
             {canCancel ? (
-              <button
+              <SecondaryButton
                 type="button"
                 onClick={() => setShowCancelModal(true)}
                 disabled={Boolean(actionLoading)}
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                className="!border-red-200 !text-red-700 hover:!bg-red-50"
               >
                 Cancelar assinatura
-              </button>
+              </SecondaryButton>
             ) : null}
           </div>
-        </div>
+        </Surface>
       ) : null}
 
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">
+        <h2 className="text-base font-semibold text-ink">
           {hasActiveSub ? "Alterar plano" : "Escolha um plano mensal"}
         </h2>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-ink-muted">
           Valores por mês, renovados automaticamente. Pagamento via Stripe
           Checkout — cartão, Pix ou boleto.
         </p>
@@ -338,6 +336,7 @@ const SubscriptionPage = () => {
 
       <ConfirmationModal
         show={showCancelModal}
+        title="Cancelar assinatura"
         message="O acesso continuará até o fim do período já pago. Deseja agendar o cancelamento?"
         confirmText={
           actionLoading === "cancel" ? "A processar…" : "Sim, cancelar"

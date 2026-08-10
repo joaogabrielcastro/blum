@@ -52,23 +52,23 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto rounded-lg shadow-lg px-4 py-3 text-sm font-medium border ${
+            className={`pointer-events-auto rounded-lg border px-4 py-3 text-sm font-medium shadow-lg ${
               t.variant === "success"
-                ? "bg-green-50 text-green-900 border-green-200"
+                ? "border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950/80 dark:text-green-100"
                 : t.variant === "error"
-                  ? "bg-red-50 text-red-900 border-red-200"
+                  ? "border-red-200 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/80 dark:text-red-100"
                   : t.variant === "warning"
-                    ? "bg-amber-50 text-amber-900 border-amber-200"
-                    : "bg-white text-gray-900 border-gray-200"
+                    ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/80 dark:text-amber-100"
+                    : "border-edge bg-surface text-ink"
             }`}
           >
-            <div className="flex justify-between gap-3 items-start">
-              <span className="flex-1 whitespace-pre-wrap break-words">
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex-1 break-words whitespace-pre-wrap">
                 {t.message}
               </span>
               <button
                 type="button"
-                className="text-gray-500 hover:text-gray-800 shrink-0 -mr-1 px-1"
+                className="-mr-1 shrink-0 px-1 text-ink-muted hover:text-ink"
                 onClick={() => remove(t.id)}
                 aria-label="Fechar"
               >

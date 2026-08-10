@@ -54,7 +54,10 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.14.0",
+    "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
     "typescript": "4.9.5"
   },
   "jest": {

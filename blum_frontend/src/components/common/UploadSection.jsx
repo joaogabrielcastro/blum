@@ -1,4 +1,5 @@
-import React from "react";
+import FormField, { inputClassName } from "../ui/FormField";
+import { PrimaryButton } from "../ui/Surface";
 
 const UploadSection = ({
   onFileChange,
@@ -15,58 +16,61 @@ const UploadSection = ({
   fileType = "file",
 }) => {
   return (
-    <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-800 mb-2">{title}</h3>
-      {description && (
-        <p className="text-sm text-gray-600 mb-4">{description}</p>
-      )}
+    <div className="mb-6 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft sm:p-6">
+      <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
+      {description ? (
+        <p className="mt-1 text-sm text-zinc-500">{description}</p>
+      ) : null}
 
-      <div className="flex flex-col md:flex-row gap-4 items-center">
-        <div className="flex-1">
-          <input
-            type="file"
-            accept={accept}
-            onChange={onFileChange}
-            className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700"
-          />
-
-          <label className="mt-3 block text-sm font-medium text-gray-700">
-            Representada (marca da NF)
-          </label>
-          {brands && brands.length > 0 ? (
-            <select
-              value={selectedBrandId}
-              onChange={onBrandChange}
-              className="mt-1 block w-full md:w-96 p-2 border border-gray-300 rounded"
-            >
-              <option value="">Selecione a representada...</option>
-              {brands.map((b) => (
-                <option key={b.id ?? b} value={b.id ?? b}>
-                  {b.name || b.displayName || String(b)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="mt-1 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              Nenhuma representada encontrada. Cadastre marcas em{" "}
-              <strong>Produtos</strong> antes de importar a NF.
-            </p>
-          )}
-
-          {error && (
-            <p className="text-sm text-red-600 mt-2">{String(error)}</p>
-          )}
-        </div>
-
-        <div className="flex-shrink-0">
-          <button
-            onClick={onUpload}
-            disabled={isLoading}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded shadow-md disabled:opacity-60"
+      <div className="mt-4 flex flex-col items-stretch gap-4 md:flex-row md:items-end">
+        <div className="min-w-0 flex-1 space-y-4">
+          <FormField
+            label="Arquivo"
+            hint={selectedFile ? selectedFile.name : undefined}
           >
-            {isLoading ? `Enviando...` : `Enviar ${fileType.toUpperCase()}`}
-          </button>
+            <input
+              type="file"
+              accept={accept}
+              onChange={onFileChange}
+              className="block w-full text-sm text-zinc-700 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+            />
+          </FormField>
+
+          <FormField label="Representada (marca da NF)" required>
+            {brands && brands.length > 0 ? (
+              <select
+                value={selectedBrandId}
+                onChange={onBrandChange}
+                className={`${inputClassName()} md:max-w-md`}
+              >
+                <option value="">Selecione a representada…</option>
+                {brands.map((b) => (
+                  <option key={b.id ?? b} value={b.id ?? b}>
+                    {b.name || b.displayName || String(b)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Nenhuma representada encontrada. Cadastre marcas em{" "}
+                <strong>Produtos</strong> antes de importar a NF.
+              </p>
+            )}
+          </FormField>
+
+          {error ? (
+            <p className="text-sm text-red-600">{String(error)}</p>
+          ) : null}
         </div>
+
+        <PrimaryButton
+          type="button"
+          onClick={onUpload}
+          disabled={isLoading}
+          className="shrink-0"
+        >
+          {isLoading ? "A enviar…" : `Enviar ${fileType.toUpperCase()}`}
+        </PrimaryButton>
       </div>
     </div>
   );

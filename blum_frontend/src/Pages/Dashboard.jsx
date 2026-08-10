@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import apiService from "../services/apiService";
 import SalesChart from "../components/SalesChart";
 import LoadingSpinner from "../components/LoadingSpinner";
+import StatusBadge from "../components/ui/StatusBadge";
+import Surface, {
+  PageHeader,
+  PrimaryButton,
+  GhostButton,
+} from "../components/ui/Surface";
 import {
   orderCreatedAt,
   formatOrderDateLabel,
@@ -10,13 +17,13 @@ import {
 import { useAppData } from "../context/AppDataProvider";
 
 const Dashboard = ({ onNavigate, userId, userRole }) => {
+  const navigate = useNavigate();
   const { clientsList } = useAppData();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     clients: 0,
     products: 0,
     orders: 0,
-    purchases: 0,
     revenue: 0,
   });
   const [recentOrders, setRecentOrders] = useState([]);
@@ -52,7 +59,7 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
           revenue: salesResponse?.totalSales ?? 0,
         });
 
-        setRecentOrders(ordersList.slice(0, 3));
+        setRecentOrders(ordersList.slice(0, 5));
 
         const finishedOrders = ordersList.filter(
           (order) => order.status === "Entregue",
@@ -102,263 +109,138 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
     }).format(value || 0);
   };
 
-  const getOrderStatus = (status) => {
-    const statusMap = {
-      Entregue: { color: "bg-green-100 text-green-800", text: "Entregue" },
-      pending: { color: "bg-yellow-100 text-yellow-800", text: "Pendente" },
-      processing: { color: "bg-blue-100 text-blue-800", text: "Processando" },
-      completed: { color: "bg-green-100 text-green-800", text: "Concluído" },
-      cancelled: { color: "bg-red-100 text-red-800", text: "Cancelado" },
-    };
-    return (
-      statusMap[status] || { color: "bg-gray-100 text-gray-800", text: status }
-    );
-  };
-
   if (loading) {
-    return <LoadingSpinner message="Carregando dashboard..." />;
+    return <LoadingSpinner message="Carregando painel…" />;
   }
 
+  const kpis = [
+    {
+      key: "orders",
+      label: "Pedidos",
+      value: stats.orders,
+      hint: "Total registrados",
+      page: "orders",
+    },
+    {
+      key: "revenue",
+      label: "Receita",
+      value: formatCurrency(stats.revenue),
+      hint: "Total acumulado",
+      page: "reports",
+    },
+    {
+      key: "clients",
+      label: "Clientes",
+      value: stats.clients,
+      hint: "Cadastrados",
+      page: "clients",
+    },
+    {
+      key: "products",
+      label: "Produtos",
+      value: stats.products,
+      hint: "No catálogo",
+      page: "products",
+    },
+  ];
+
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
-      <div className="flex-shrink-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold mb-1">
-                Bem-vindo(a) ao Painel Blum
-              </h1>
-              <p className="text-blue-100 text-sm">
-                Gerencie suas operações com eficiência e clareza
-              </p>
-            </div>
-            <div className="flex items-center gap-2 bg-white text-blue-700 px-3 py-1 rounded-full shadow-sm">
-              <span className="text-sm font-medium">{currentDate}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+          <PageHeader
+            title="Painel"
+            description={currentDate}
+            actions={
+              <PrimaryButton onClick={() => navigate("/orders/new")}>
+                Novo orçamento
+              </PrimaryButton>
+            }
+          />
 
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="max-w-7xl mx-auto w-full px-6 py-6 overflow-x-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-blue-300 group"
-              onClick={() => onNavigate("clients")}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">
-                  {stats.clients}
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">Clientes</h3>
-              <p className="text-sm text-gray-600">Total cadastrado</p>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-green-300 group"
-              onClick={() => onNavigate("products")}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
-                </div>
-                <span className="text-2xl font-bold text-green-600">
-                  {stats.products}
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">Produtos</h3>
-              <p className="text-sm text-gray-600">Em estoque</p>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-purple-300 group"
-              onClick={() => onNavigate("orders")}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-purple-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                    />
-                  </svg>
-                </div>
-                <span className="text-2xl font-bold text-purple-600">
-                  {stats.orders}
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">Pedidos</h3>
-              <p className="text-sm text-gray-600">Realizados</p>
-            </div>
-
-            <div
-              className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-all duration-300 hover:border-orange-300 group"
-              onClick={() => onNavigate("reports")}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-orange-50 rounded-lg group-hover:bg-orange-100 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-orange-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                    />
-                  </svg>
-                </div>
-                <span className="text-2xl font-bold text-orange-600">
-                  {formatCurrency(stats.revenue)}
-                </span>
-              </div>
-              <h3 className="font-semibold text-gray-800 mb-1">Receita</h3>
-              <p className="text-sm text-gray-600">Total acumulado</p>
-            </div>
+          <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {kpis.map((kpi) => (
+              <button
+                key={kpi.key}
+                type="button"
+                onClick={() => onNavigate(kpi.page)}
+                className="rounded-2xl border border-edge bg-surface p-5 text-left shadow-soft transition-colors hover:border-brand/30 hover:bg-brand-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+              >
+                <p className="text-sm font-medium text-ink-muted">{kpi.label}</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-ink">
+                  {kpi.value}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">{kpi.hint}</p>
+              </button>
+            ))}
           </div>
 
-          <div className="flex-1 grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-            <div className="xl:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Desempenho de Vendas
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Surface className="xl:col-span-2 flex min-h-[320px] flex-col">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-ink">
+                  Desempenho de vendas
                 </h2>
-                <button
-                  type="button"
+                <GhostButton
                   onClick={() => onNavigate("reports")}
-                  className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+                  className="!px-2 !py-1.5 text-brand hover:text-brand-700"
                 >
-                  Ver detalhes
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
+                  Ver relatórios
+                </GhostButton>
               </div>
-              <div className="flex-1 min-h-[280px]">
+              <div className="min-h-[260px] flex-1">
                 <SalesChart data={salesData} simplified={true} />
               </div>
-            </div>
+            </Surface>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800">
-                  Pedidos Recentes
+            <Surface className="flex min-h-[320px] flex-col">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold text-ink">
+                  Atividade recente
                 </h2>
-                <button
-                  type="button"
+                <GhostButton
                   onClick={() => onNavigate("orders")}
-                  className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+                  className="!px-2 !py-1.5 text-brand hover:text-brand-700"
                 >
                   Ver todos
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
+                </GhostButton>
               </div>
-              <div className="flex-1 overflow-auto">
-                <div className="space-y-4">
-                  {recentOrders.length > 0 ? (
-                    recentOrders.map((order) => (
-                      <div
-                        key={order.id}
-                        className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            Pedido #{order.id}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {formatOrderDateLabel(orderCreatedAt(order))}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            getOrderStatus(order.status).color
-                          }`}
-                        >
-                          {getOrderStatus(order.status).text}
-                        </span>
+              <div className="flex-1 space-y-2 overflow-auto">
+                {recentOrders.length > 0 ? (
+                  recentOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-edge px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink">
+                          Pedido #{order.id}
+                        </p>
+                        <p className="text-xs text-ink-muted">
+                          {formatOrderDateLabel(orderCreatedAt(order))}
+                        </p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <svg
-                        className="w-12 h-12 mx-auto text-gray-400 mb-2"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                        />
-                      </svg>
-                      <p>Nenhum pedido recente</p>
+                      <StatusBadge status={order.status} />
                     </div>
-                  )}
-                </div>
+                  ))
+                ) : (
+                  <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
+                    <p className="text-sm font-medium text-ink">
+                      Nenhum pedido recente
+                    </p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Crie um orçamento para começar.
+                    </p>
+                    <PrimaryButton
+                      className="mt-4"
+                      onClick={() => navigate("/orders/new")}
+                    >
+                      Novo orçamento
+                    </PrimaryButton>
+                  </div>
+                )}
               </div>
-            </div>
+            </Surface>
           </div>
         </div>
       </div>
