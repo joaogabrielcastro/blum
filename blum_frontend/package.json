@@ -27,14 +27,7 @@
     "underscore": "1.13.8",
     "nth-check": "2.1.1",
     "@tootallnate/once": "3.0.1",
-    "serialize-javascript": "7.0.5",
-    "postcss": "8.4.49",
-    "rollup-plugin-terser": {
-      "serialize-javascript": "7.0.5"
-    },
-    "css-minimizer-webpack-plugin": {
-      "serialize-javascript": "7.0.5"
-    }
+    "serialize-javascript": "7.0.5"
   },
   "browserslist": {
     "production": [
