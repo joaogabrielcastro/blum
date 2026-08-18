@@ -35,7 +35,13 @@ export async function fetchCatalogPage(
   brandId,
 ) {
   if (!brand && !brandId) return [];
-  const response = await api.getProducts(brand || "all", page, limit, brandId);
+  const response = await api.getProducts(
+    brand || "all",
+    page,
+    limit,
+    "",
+    brandId,
+  );
   const normalizeList = (res) => {
     if (Array.isArray(res?.data)) return res.data;
     if (Array.isArray(res)) return res;

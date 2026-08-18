@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
-import { useAppData } from "../context/AppDataProvider";
+import { mergeProductCodeFields } from "../utils/productSearch";
 
 const EMPTY_PAGINATION = {
   total: 0,
@@ -63,10 +63,13 @@ export function useProductsPage(userRole) {
       );
 
       if (response.data && response.pagination) {
-        setProducts(response.data);
+        setProducts((response.data || []).map(mergeProductCodeFields));
         setPagination(response.pagination);
       } else {
-        setProducts(Array.isArray(response) ? response : []);
+        const list = (Array.isArray(response) ? response : []).map(
+          mergeProductCodeFields,
+        );
+        setProducts(list);
         setPagination({
           total: Array.isArray(response) ? response.length : 0,
           page: 1,

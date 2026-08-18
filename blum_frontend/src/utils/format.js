@@ -88,7 +88,7 @@ export const formatOrderData = (order) => {
   const items = normalizeOrderLineItems(order.items);
   const itemsLen = items.length;
   const documentType =
-    order.document_type ?? order.documentType ?? "pedido";
+    order.document_type ?? order.documentType ?? "orcamento";
   const rawId = order.id ?? order.orderId;
   const numericId = Number(rawId);
   const id = Number.isFinite(numericId) ? numericId : rawId;

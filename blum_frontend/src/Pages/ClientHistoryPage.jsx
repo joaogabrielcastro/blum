@@ -4,6 +4,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 import StatusBadge from "../components/ui/StatusBadge";
 import apiService from "../services/apiService";
+import formatCurrency, { formatOrderData } from "../utils/format";
 
 const ClientHistoryPage = ({ clients }) => {
   const { clientId } = useParams();
@@ -40,20 +41,15 @@ const ClientHistoryPage = ({ clients }) => {
       }
 
       setClient(clientData);
-      setOrders(ordersData);
+      setOrders(
+        (Array.isArray(ordersData) ? ordersData : []).map(formatOrderData),
+      );
     } catch (err) {
       console.error("Erro ao carregar dados do cliente:", err);
       setError(err.message || "Erro ao carregar histórico de pedidos.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value || 0);
   };
 
   const formatDate = (dateString) => {
@@ -66,28 +62,21 @@ const ClientHistoryPage = ({ clients }) => {
   };
 
   const getSellerName = (order) => {
-    if (order?.seller_name) return order.seller_name;
-    const id = order?.user_ref ?? order?.userid;
+    if (order?.sellerName || order?.seller_name) {
+      return order.sellerName || order.seller_name;
+    }
+    const id = order?.userId ?? order?.user_ref ?? order?.userid;
     return id != null ? String(id) : "Não informado";
   };
 
-  const parseOrderItems = (order) => {
-    if (!order.items) return [];
-
-    if (Array.isArray(order.items)) {
-      return order.items;
+  const handleOpenDetails = async (order) => {
+    try {
+      const detailed = await apiService.getOrderById(order.id);
+      setSelectedOrder(formatOrderData(detailed) || order);
+    } catch (err) {
+      console.error("Erro ao carregar detalhes do pedido:", err);
+      setSelectedOrder(order);
     }
-
-    if (typeof order.items === "string") {
-      try {
-        return JSON.parse(order.items);
-      } catch (error) {
-        console.error("Erro ao fazer parse dos items:", error);
-        return [];
-      }
-    }
-
-    return [];
   };
 
   const handleRefresh = () => {
@@ -201,8 +190,6 @@ const ClientHistoryPage = ({ clients }) => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {orders.map((order) => {
-                    const items = parseOrderItems(order);
-
                     return (
                       <tr
                         key={order.id}
@@ -214,20 +201,20 @@ const ClientHistoryPage = ({ clients }) => {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                          {formatDate(order.createdat)}
+                          {formatDate(order.createdAt)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                           {getSellerName(order)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-semibold">
-                          {formatCurrency(order.totalprice)}
+                          {formatCurrency(order.totalPrice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusBadge status={order.status} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
-                            onClick={() => setSelectedOrder(order)}
+                            onClick={() => handleOpenDetails(order)}
                             className="text-blue-600 hover:text-blue-900 font-medium flex items-center gap-1 px-3 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
                           >
                             <svg
@@ -283,28 +270,8 @@ const OrderDetailsModal = ({
   formatDate,
   getSellerName,
 }) => {
-  // Parse dos items se for string JSON
-  const parseItems = () => {
-    if (!order.items) return [];
-
-    if (Array.isArray(order.items)) {
-      return order.items;
-    }
-
-    if (typeof order.items === "string") {
-      try {
-        return JSON.parse(order.items);
-      } catch (error) {
-        console.error("Erro ao fazer parse dos items:", error);
-        return [];
-      }
-    }
-
-    return [];
-  };
-
-  const items = parseItems();
-  const netValue = order.totalprice - (order.discount || 0);
+  const items = Array.isArray(order.items) ? order.items : [];
+  const total = order.totalPrice ?? order.totalprice ?? 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -329,7 +296,7 @@ const OrderDetailsModal = ({
             <div className="space-y-2 text-sm">
               <p>
                 <span className="font-medium">Data:</span>{" "}
-                {formatDate(order.createdat)}
+                {formatDate(order.createdAt ?? order.createdat)}
               </p>
               <p>
                 <span className="font-medium">Vendedor:</span>{" "}
@@ -349,15 +316,17 @@ const OrderDetailsModal = ({
             <div className="space-y-2 text-sm">
               <p>
                 <span className="font-medium">Valor Total:</span>{" "}
-                {formatCurrency(order.totalprice)}
+                {formatCurrency(total)}
               </p>
               <p>
                 <span className="font-medium">Desconto:</span>{" "}
-                {formatCurrency(order.discount || 0)}
+                {order.discount > 0
+                  ? `${order.discount}%`
+                  : "—"}
               </p>
               <p>
                 <span className="font-medium">Valor Líquido:</span>{" "}
-                {formatCurrency(netValue)}
+                {formatCurrency(total)}
               </p>
             </div>
           </div>
@@ -400,9 +369,9 @@ const OrderDetailsModal = ({
                               item.name ||
                               "Produto não especificado"}
                           </div>
-                          {item.productCode && (
+                          {(item.productcode || item.productCode) && (
                             <div className="text-sm text-gray-600">
-                              Código: {item.productCode}
+                              Código: {item.productcode || item.productCode}
                             </div>
                           )}
                           {item.productId && (
@@ -435,7 +404,7 @@ const OrderDetailsModal = ({
                     Total:
                   </td>
                   <td className="px-4 py-3 font-semibold">
-                    {formatCurrency(order.totalprice)}
+                    {formatCurrency(total)}
                   </td>
                 </tr>
                 {order.discount > 0 && (
@@ -447,7 +416,7 @@ const OrderDetailsModal = ({
                       Desconto:
                     </td>
                     <td className="px-4 py-3 font-semibold text-red-600">
-                      -{formatCurrency(order.discount)}
+                      -{order.discount}%
                     </td>
                   </tr>
                 )}
@@ -459,7 +428,7 @@ const OrderDetailsModal = ({
                     Valor Líquido:
                   </td>
                   <td className="px-4 py-3 font-semibold text-green-600">
-                    {formatCurrency(netValue)}
+                    {formatCurrency(total)}
                   </td>
                 </tr>
               </tfoot>

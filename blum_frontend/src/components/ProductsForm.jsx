@@ -26,7 +26,7 @@ const ProductsForm = ({
     if (product) {
       setFormData({
         name: product.name || "",
-        productcode: product.productcode || "",
+        productcode: product.productcode || product.productCode || "",
         price: product.price?.toString() || "",
         brand: product.brand || "",
         stock: product.stock?.toString() || "",

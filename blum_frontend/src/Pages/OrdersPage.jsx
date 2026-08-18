@@ -8,12 +8,19 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import PdfGenerator from "../components/PdfGenerator";
 import { formatOrderData } from "../utils/format";
 import PaymentMethodBadge from "../components/orders/PaymentMethodBadge";
+import PaymentMethodPicker from "../components/orders/PaymentMethodPicker";
 import StatusBadge from "../components/ui/StatusBadge";
 import OfflineSyncBar from "../components/offline/OfflineSyncBar";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { useAppData } from "../context/AppDataProvider";
 import { useOrdersList } from "../hooks/useOrdersList";
 import { formatOpenDays } from "../utils/ordersListUtils";
+import {
+  hasPaymentMethod,
+  needsPaymentRegistration,
+  finalizeDeliveryBlockReason,
+  paymentOptionsForOrder,
+} from "../utils/paymentMethods";
 import Surface, {
   PageHeader,
   PrimaryButton,
@@ -47,7 +54,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   const [pdfLoadingOrderId, setPdfLoadingOrderId] = useState(null);
   const [duplicatingOrderId, setDuplicatingOrderId] = useState(null);
   const [paymentDialogOrder, setPaymentDialogOrder] = useState(null);
-  const [paymentDialogMethod, setPaymentDialogMethod] = useState("boleto");
+  const [paymentDialogMethod, setPaymentDialogMethod] = useState("");
   const [updatingPayment, setUpdatingPayment] = useState(false);
   const [modalAction, setModalAction] = useState({ type: null, orderId: null });
   const [convertConfirmId, setConvertConfirmId] = useState(null);
@@ -136,7 +143,9 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
 
   const handleConvertToPedido = async (orderId, { confirmStockWarning = false } = {}) => {
     try {
-      await apiService.convertOrderToPedido(orderId, { confirmStockWarning });
+      const converted = await apiService.convertOrderToPedido(orderId, {
+        confirmStockWarning,
+      });
       setConvertStockModal({ open: false, orderId: null, lines: [] });
       setConvertConfirmId(null);
       await fetchData();
@@ -145,6 +154,10 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
           ? "Orçamento convertido em pedido com aviso de ruptura de estoque."
           : "Orçamento convertido em pedido.",
       );
+      const formatted = formatOrderData(converted);
+      if (formatted?.id && !hasPaymentMethod(formatted.paymentMethod)) {
+        handleOpenPaymentDialog(formatted);
+      }
     } catch (error) {
       if (error?.code === "STOCK_WARNING_CONFIRM_REQUIRED") {
         const lines = (error.stockWarnings || []).map((row) => ({
@@ -206,11 +219,30 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
 
   const handleOpenPaymentDialog = (order) => {
     setPaymentDialogOrder(order);
-    setPaymentDialogMethod("boleto");
+    setPaymentDialogMethod(
+      order?.paymentMethod === "carteira"
+        ? "boleto"
+        : order?.paymentMethod || "",
+    );
+  };
+
+  const handleRequestFinalize = (order) => {
+    const reason = finalizeDeliveryBlockReason(order);
+    if (reason) {
+      toast.warning(reason);
+      if (!hasPaymentMethod(order.paymentMethod)) {
+        handleOpenPaymentDialog(order);
+      }
+      return;
+    }
+    setModalAction({ type: "finalize", orderId: order.id });
   };
 
   const handleConfirmPaymentMethod = async () => {
-    if (!paymentDialogOrder?.id) return;
+    if (!paymentDialogOrder?.id || !hasPaymentMethod(paymentDialogMethod)) {
+      toast.warning("Selecione a forma de pagamento.");
+      return;
+    }
     try {
       setUpdatingPayment(true);
       await apiService.updateOrderPaymentMethod(
@@ -267,21 +299,22 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
               </SecondaryButton>
             ) : (
               <SecondaryButton
-                onClick={() =>
-                  setModalAction({ type: "finalize", orderId: order.id })
-                }
+                type="button"
+                onClick={() => handleRequestFinalize(order)}
                 className="!min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-emerald-200 !text-emerald-700 hover:!bg-emerald-50"
               >
                 Finalizar entrega
               </SecondaryButton>
             )}
-            {!isQuote && order.paymentMethod === "carteira" ? (
+            {!isQuote && needsPaymentRegistration(order.paymentMethod) ? (
               <SecondaryButton
                 type="button"
                 onClick={() => handleOpenPaymentDialog(order)}
                 className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-amber-200 !text-amber-800 hover:!bg-amber-50 sm:col-span-1"
               >
-                Registrar pagamento
+                {hasPaymentMethod(order.paymentMethod)
+                  ? "Registrar pagamento"
+                  : "Definir pagamento"}
               </SecondaryButton>
             ) : null}
           </>
@@ -390,7 +423,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         title="Converter em pedido"
         tone="primary"
         confirmText="Converter"
-        message="Converter este orçamento em pedido? Depois você poderá registrar a forma de pagamento e finalizar a entrega."
+        message="Converter este orçamento em pedido? Se a forma de pagamento ainda não estiver definida, pediremos em seguida."
         onConfirm={() =>
           convertConfirmId && handleConvertToPedido(convertConfirmId)
         }
@@ -428,21 +461,25 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-soft sm:rounded-2xl">
             <h3 className="text-lg font-semibold text-ink">
-              Registrar pagamento #{paymentDialogOrder.id}
+              {hasPaymentMethod(paymentDialogOrder.paymentMethod)
+                ? `Registrar pagamento #${paymentDialogOrder.id}`
+                : `Definir pagamento #${paymentDialogOrder.id}`}
             </h3>
             <p className="mt-1 text-sm text-ink-muted">
-              Como o cliente quitou o pedido em carteira?
+              {Number(paymentDialogOrder.discount) > 0
+                ? "Este pedido tem desconto geral. Só PIX ou dinheiro são permitidos — ou zere o desconto ao editar."
+                : paymentDialogOrder.paymentMethod === "carteira"
+                  ? "Como o cliente quitou o pedido em carteira?"
+                  : "Escolha a forma de pagamento deste pedido."}
             </p>
-            <select
-              value={paymentDialogMethod}
-              onChange={(e) => setPaymentDialogMethod(e.target.value)}
-              className="mt-4 min-h-11 w-full rounded-xl border border-edge bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
-            >
-              <option value="boleto">Boleto</option>
-              <option value="pix">PIX</option>
-              <option value="cheque">Cheque</option>
-              <option value="dinheiro">Dinheiro</option>
-            </select>
+            <div className="mt-4">
+              <PaymentMethodPicker
+                value={paymentDialogMethod}
+                onChange={setPaymentDialogMethod}
+                options={paymentOptionsForOrder(paymentDialogOrder)}
+                disabled={updatingPayment}
+              />
+            </div>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <SecondaryButton
                 type="button"
@@ -455,7 +492,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
               <PrimaryButton
                 type="button"
                 onClick={handleConfirmPaymentMethod}
-                disabled={updatingPayment}
+                disabled={updatingPayment || !hasPaymentMethod(paymentDialogMethod)}
                 className="!min-h-11 w-full sm:w-auto"
               >
                 {updatingPayment ? "Salvando…" : "Salvar pagamento"}

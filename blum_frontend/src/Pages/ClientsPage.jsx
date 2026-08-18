@@ -16,9 +16,10 @@ import { getClientDisplayName } from "../utils/clients";
 import { useToast } from "../context/ToastContext";
 import { useAppData } from "../context/AppDataProvider";
 
-const ClientsPage = () => {
+const ClientsPage = ({ userRole }) => {
   const navigate = useNavigate();
   const toast = useToast();
+  const isAdmin = userRole === "admin";
   const { clientsList, isLoadingClients, clientsError, invalidateClients } =
     useAppData();
   const [filteredClients, setFilteredClients] = useState([]);
@@ -96,7 +97,10 @@ const ClientsPage = () => {
         error.message?.includes("404") ||
         error.message?.includes("não encontrado")
           ? "Cliente não encontrado. A lista será atualizada."
-          : "Falha ao excluir cliente. Tente novamente.";
+          : error?.status === 403 ||
+              /acesso negado|não autoriz/i.test(error.message || "")
+            ? "Só o administrador pode excluir clientes."
+            : "Falha ao excluir cliente. Tente novamente.";
       toast.error(errorMessage);
       await invalidateClients();
     } finally {
@@ -263,13 +267,15 @@ const ClientsPage = () => {
                                     label: "Editar",
                                     onClick: () => handleEditClient(client),
                                   },
-                                  {
-                                    id: "delete",
-                                    label: "Excluir",
-                                    tone: "danger",
-                                    onClick: () => openDeleteConfirm(client),
-                                  },
-                                ]}
+                                  isAdmin
+                                    ? {
+                                        id: "delete",
+                                        label: "Excluir",
+                                        tone: "danger",
+                                        onClick: () => openDeleteConfirm(client),
+                                      }
+                                    : null,
+                                ].filter(Boolean)}
                               />
                             </td>
                           </tr>
@@ -314,13 +320,15 @@ const ClientsPage = () => {
                               label: "Editar",
                               onClick: () => handleEditClient(client),
                             },
-                            {
-                              id: "delete",
-                              label: "Excluir",
-                              tone: "danger",
-                              onClick: () => openDeleteConfirm(client),
-                            },
-                          ]}
+                            isAdmin
+                              ? {
+                                  id: "delete",
+                                  label: "Excluir",
+                                  tone: "danger",
+                                  onClick: () => openDeleteConfirm(client),
+                                }
+                              : null,
+                          ].filter(Boolean)}
                         />
                       </div>
                       <dl className="mt-4 space-y-1.5 text-sm">
@@ -383,7 +391,8 @@ const ClientsPage = () => {
               {deleteConfirm.cnpj
                 ? ` (CNPJ: ${formatCNPJ(deleteConfirm.cnpj)})`
                 : ""}
-              ? Esta ação não pode ser desfeita.
+              ? Esta ação não pode ser desfeita e também apaga os pedidos
+              deste cliente.
             </p>
             <div className="mt-6 flex justify-end gap-2">
               <button

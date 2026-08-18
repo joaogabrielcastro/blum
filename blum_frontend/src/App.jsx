@@ -212,7 +212,7 @@ function AuthenticatedApp({
                 {isPlatformAdmin ? (
                   <Route path="/platform" element={<PlatformAdminPage />} />
                 ) : null}
-                <Route path="/clients" element={<ClientsPage />} />
+                <Route path="/clients" element={<ClientsPage userRole={userRole} />} />
                 <Route
                   path="/clients/:clientId/history"
                   element={<ClientHistoryPage clients={clientsMap} />}

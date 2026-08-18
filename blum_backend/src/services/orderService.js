@@ -781,6 +781,19 @@ class OrderService {
       throw new Error("Não é possível duplicar um pedido sem itens.");
     }
     const sourceDiscount = parseFloat(source.discount) || 0;
+    const sourcePayment = source.payment_method ?? source.paymentMethod ?? null;
+    let payment =
+      sourcePayment && ALLOWED_PAYMENT_METHODS.includes(sourcePayment)
+        ? sourcePayment
+        : null;
+    let discountToCopy = sourceDiscount;
+    if (
+      discountToCopy > 0 &&
+      payment !== "pix" &&
+      payment !== "dinheiro"
+    ) {
+      discountToCopy = 0;
+    }
     const stockMap = await this.loadProductStockMap(
       sourceItems.map((item) => item.productId),
       tenantId,
@@ -792,15 +805,15 @@ class OrderService {
     const hasStockWarning = computeHasStockWarning(itemsWithStock);
     const calculated = await this.calculateItemsCommission(
       itemsWithStock,
-      sourceDiscount,
+      discountToCopy,
     );
     const inserted = await sql`
       INSERT INTO orders
         (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method, has_stock_warning)
       VALUES
         (${source.clientid}, ${source.user_ref}, ${tenantId}, ${source.description || ""},
-         ${sourceDiscount}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', NOW(), 'orcamento', null, ${hasStockWarning})
+         ${discountToCopy}, ${calculated.finalTotal}, ${calculated.totalCommission},
+         'Em aberto', NOW(), 'orcamento', ${payment}, ${hasStockWarning})
       RETURNING id
     `;
     const newId = inserted[0].id;

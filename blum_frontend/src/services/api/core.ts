@@ -275,12 +275,8 @@ export const apiRequest = async <T = unknown>(
         redirectAdminToSubscription();
         throw apiErr;
       }
-      if (response.status === 403) {
-        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
-          emitPlanFeatureRequired(apiErr);
-          throw apiErr;
-        }
-        forceLogout(403);
+      if (response.status === 403 && apiErr.code === "PLAN_FEATURE_REQUIRED") {
+        emitPlanFeatureRequired(apiErr);
       }
       throw apiErr;
     }
@@ -334,12 +330,8 @@ export const apiUpload = async <T = unknown>(
         redirectAdminToSubscription();
         throw apiErr;
       }
-      if (response.status === 403) {
-        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
-          emitPlanFeatureRequired(apiErr);
-          throw apiErr;
-        }
-        forceLogout(403);
+      if (response.status === 403 && apiErr.code === "PLAN_FEATURE_REQUIRED") {
+        emitPlanFeatureRequired(apiErr);
       }
       throw apiErr;
     }
@@ -368,12 +360,8 @@ export const apiDownloadBlob = async (
         redirectAdminToSubscription();
         throw apiErr;
       }
-      if (response.status === 403) {
-        if (apiErr.code === "PLAN_FEATURE_REQUIRED") {
-          emitPlanFeatureRequired(apiErr);
-          throw apiErr;
-        }
-        forceLogout(403);
+      if (response.status === 403 && apiErr.code === "PLAN_FEATURE_REQUIRED") {
+        emitPlanFeatureRequired(apiErr);
       }
       throw apiErr;
     }

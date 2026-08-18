@@ -1,7 +1,7 @@
 const STEPS = [
   { id: 1, label: "Cliente" },
   { id: 2, label: "Itens" },
-  { id: 3, label: "Condições" },
+  { id: 3, label: "Pagamento" },
 ];
 
 export default function OrderFormStepper({ step }) {
