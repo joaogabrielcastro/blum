@@ -154,7 +154,7 @@ const OrdersForm = ({
       }
       setPaymentMethod(editingOrder.paymentMethod || "");
       setOrderDateTime(toDateTimeLocalValue(editingOrder.createdAt));
-      setStep(1);
+      setStep(lines.length > 0 ? 3 : 1);
       setShowAdvanced(Boolean(editingOrder.description));
     } else {
       setClientId("");
@@ -186,6 +186,26 @@ const OrdersForm = ({
       }
     }
   }, [editingOrder]);
+
+  useEffect(() => {
+    if (!editingOrder || selectedBrandId || !Array.isArray(brands) || brands.length === 0) {
+      return;
+    }
+    const firstLine = items.find((i) => i.brand || i.brandId);
+    if (firstLine?.brandId && findBrandById(brands, firstLine.brandId)) {
+      const b = findBrandById(brands, firstLine.brandId);
+      setSelectedBrandId(String(b.id));
+      setSelectedBrand(b.name || firstLine.brand || "");
+      return;
+    }
+    if (firstLine?.brand) {
+      const b = findBrandByName(brands, firstLine.brand);
+      if (b?.id != null) {
+        setSelectedBrandId(String(b.id));
+        setSelectedBrand(b.name || firstLine.brand);
+      }
+    }
+  }, [brands, editingOrder, items, selectedBrandId]);
 
   useEffect(() => {
     cancelStaging();
@@ -307,19 +327,18 @@ const OrdersForm = ({
         );
         return false;
       }
-      if (documentType === "pedido" && !hasPaymentMethod(paymentMethod)) {
-        toast.warning("Selecione a forma de pagamento para continuar.");
-        return false;
-      }
     }
     return true;
   };
 
-  const goNext = () => {
-    const next = Math.min(3, step + 1);
-    if (!validateStep(next)) return;
+  const goToStep = (target) => {
+    const next = Math.min(3, Math.max(1, Number(target) || 1));
+    if (next === step) return;
+    if (next > step && !validateStep(next)) return;
     setStep(next);
   };
+
+  const goNext = () => goToStep(step + 1);
 
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
@@ -583,7 +602,7 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full min-w-0 max-w-none pb-28 md:pb-8">
+      <div className="w-full min-w-0 max-w-none pb-36 md:pb-8">
         <PageHeader
           title={title}
           description="Três passos: cliente, itens e forma de pagamento."
@@ -594,7 +613,7 @@ const OrdersForm = ({
           }
         />
 
-        <OrderFormStepper step={step} />
+        <OrderFormStepper step={step} onStepSelect={goToStep} />
 
         {editingOrder?.status === "Entregue" ? (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
