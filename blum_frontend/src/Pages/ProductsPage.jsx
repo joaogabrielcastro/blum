@@ -343,12 +343,13 @@ const ProductsPage = ({ userRole, subscription }) => {
                         {product.name}
                       </h3>
                       <p className="mb-1 font-mono text-xs text-ink-muted">
-                        {product.productcode || "N/A"}
+                        {product.productcode || product.productCode || "N/A"}
                       </p>
                       <p className="text-xs font-medium text-ink-muted">
                         {product.brand}
                       </p>
                     </div>
+                    {isAdmin ? (
                     <KebabMenu
                       items={[
                         {
@@ -356,21 +357,20 @@ const ProductsPage = ({ userRole, subscription }) => {
                           label: "Editar",
                           onClick: () => handleEditProduct(product),
                         },
-                        isAdmin
-                          ? {
-                              id: "delete",
-                              label: "Excluir",
-                              tone: "danger",
-                              onClick: () =>
-                                confirmDeleteAction(
-                                  "product",
-                                  product.id,
-                                  product.name,
-                                ),
-                          }
-                          : null,
-                      ].filter(Boolean)}
+                        {
+                          id: "delete",
+                          label: "Excluir",
+                          tone: "danger",
+                          onClick: () =>
+                            confirmDeleteAction(
+                              "product",
+                              product.id,
+                              product.name,
+                            ),
+                        },
+                      ]}
                     />
+                    ) : null}
                   </div>
 
                   <div className="mt-3 flex items-center gap-6">

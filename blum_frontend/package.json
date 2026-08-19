@@ -62,6 +62,7 @@
       "src/utils/format.js",
       "src/utils/orderFormUtils.js",
       "src/utils/orderLineTotals.js",
+      "src/utils/paymentMethods.js",
       "src/utils/tenantHost.js"
     ],
     "coverageThreshold": {

@@ -55,10 +55,20 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    const orderBrand =
+      (Array.isArray(order?.items) && order.items.find((i) => i.brand)?.brand) ||
+      String(order?.representadas || "")
+        .split(",")
+        .map((s) => s.trim())
+        .find(Boolean) ||
+      "";
     if (brands && brands.length > 0) {
-      setSelectedPdfBrand(brands[0].name || "Blumenau");
+      const match = brands.find(
+        (b) => b.name && b.name.toLowerCase() === String(orderBrand).toLowerCase(),
+      );
+      setSelectedPdfBrand(match?.name || brands[0].name || orderBrand);
     } else {
-      setSelectedPdfBrand("Blumenau");
+      setSelectedPdfBrand(orderBrand);
     }
 
     const loadHeaderImage = async () => {
@@ -98,7 +108,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
     };
 
     loadHeaderImage();
-  }, [brands]);
+  }, [brands, order]);
 
   useEffect(() => {
     const probe = new File(["x"], "probe.pdf", { type: "application/pdf" });
@@ -135,6 +145,19 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
       pix: "53.283.047/0001-76"
     }
   };
+
+  const orderBrandOptions = [
+    ...new Set(
+      [
+        ...(Array.isArray(order?.items)
+          ? order.items.map((item) => item.brand)
+          : []),
+        ...String(order?.representadas || "").split(","),
+      ]
+        .map((name) => String(name || "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
   const buildPdfDocument = () => {
     if (!order) return null;
@@ -549,11 +572,15 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
             className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {(!brands || brands.length === 0) ? (
-              <>
-                <option value="Blumenau">Blumenau</option>
-                <option value="Zagonel">Zagonel</option>
-                <option value="Padova">Padova</option>
-              </>
+              orderBrandOptions.length > 0 ? (
+                orderBrandOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Nenhuma representada neste pedido</option>
+              )
             ) : (
               brands.map((brand) => (
                 <option key={brand.id} value={brand.name}>

@@ -31,11 +31,13 @@ const ProductRow = ({
           onClick: () => setShowPriceHistory(true),
         }
       : null,
-    {
-      id: "edit",
-      label: "Editar",
-      onClick: () => onEdit(product),
-    },
+    userRole === "admin"
+      ? {
+          id: "edit",
+          label: "Editar",
+          onClick: () => onEdit(product),
+        }
+      : null,
     userRole === "admin"
       ? {
           id: "delete",
@@ -64,7 +66,7 @@ const ProductRow = ({
           <div className="flex min-w-0 flex-col">
             <h3 className="font-semibold text-ink">{product.name}</h3>
             <span className="mt-1 w-fit rounded-md border border-edge bg-surface-muted px-2 py-0.5 font-mono text-xs text-ink-muted">
-              {product.productcode}
+              {product.productcode || product.productCode || "—"}
             </span>
           </div>
         </td>
@@ -91,7 +93,7 @@ const ProductRow = ({
           </div>
         </td>
         <td className="px-3 py-3.5 text-right">
-          <KebabMenu items={menuItems} />
+          {menuItems.length > 0 ? <KebabMenu items={menuItems} /> : null}
         </td>
       </tr>
 

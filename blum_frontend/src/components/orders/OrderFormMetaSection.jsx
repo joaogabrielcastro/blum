@@ -1,4 +1,5 @@
 import FormField, { inputClassName } from "../ui/FormField";
+import PaymentMethodPicker from "./PaymentMethodPicker";
 
 function ClientOptionRow({ opt, onSelect }) {
   return (
@@ -164,6 +165,7 @@ function ClientBrandFields({
 function ConditionsFields({
   paymentMethod,
   onPaymentMethodChange,
+  paymentRequired = false,
   orderDateTime,
   onOrderDateTimeChange,
   description,
@@ -176,33 +178,29 @@ function ConditionsFields({
 }) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FormField
-          label="Forma de pagamento"
-          hint="Desconto geral só é permitido em PIX ou dinheiro."
-        >
-          <select
-            value={paymentMethod}
-            onChange={(e) => onPaymentMethodChange(e.target.value)}
-            className={inputClassName()}
-          >
-            <option value="">Selecione (opcional)</option>
-            <option value="carteira">Carteira (não pago / em aberto)</option>
-            <option value="boleto">Pagamento em boleto</option>
-            <option value="pix">Pagamento via PIX</option>
-            <option value="cheque">Pagamento via cheque</option>
-            <option value="dinheiro">Pagamento em dinheiro</option>
-          </select>
-        </FormField>
+      <FormField
+        label="Forma de pagamento"
+        required={paymentRequired}
+        hint={
+          paymentRequired
+            ? "Toque na opção. Obrigatório neste pedido. Desconto geral só em PIX ou dinheiro."
+            : "Toque na opção. Pode definir agora ou ao virar o orçamento em pedido."
+        }
+      >
+        <PaymentMethodPicker
+          value={paymentMethod}
+          onChange={onPaymentMethodChange}
+        />
+      </FormField>
 
-        <FormField
-          label="Desconto geral (%)"
-          hint={
-            canApplyGeneralDiscount
-              ? "Para PIX ou dinheiro, máximo 2%."
-              : "Para esta forma de pagamento, desconto geral deve ser 0%."
-          }
-        >
+      <FormField
+        label="Desconto geral (%)"
+        hint={
+          canApplyGeneralDiscount
+            ? "Para PIX ou dinheiro, máximo 2%."
+            : "Para esta forma de pagamento, desconto geral deve ser 0%."
+        }
+      >
           <input
             type="number"
             min="0"
@@ -217,10 +215,18 @@ function ConditionsFields({
               onDiscountChange(capped);
             }}
             className={inputClassName()}
-            disabled={!canApplyGeneralDiscount}
+            disabled={!canApplyGeneralDiscount && !(parseFloat(discount) > 0)}
           />
+          {!canApplyGeneralDiscount && parseFloat(discount) > 0 ? (
+            <button
+              type="button"
+              className="mt-2 text-xs font-medium text-brand hover:underline"
+              onClick={() => onDiscountChange(0)}
+            >
+              Zerar desconto para usar outra forma de pagamento
+            </button>
+          ) : null}
         </FormField>
-      </div>
 
       <div>
         <button
@@ -280,6 +286,7 @@ export default function OrderFormMetaSection({
   onBrandChange,
   paymentMethod,
   onPaymentMethodChange,
+  paymentRequired = false,
   orderDateTime,
   onOrderDateTimeChange,
   description,
@@ -297,7 +304,7 @@ export default function OrderFormMetaSection({
     variant === "basics"
       ? "Cliente e representada"
       : variant === "conditions"
-        ? "Condições"
+        ? "Pagamento"
         : "Dados do pedido";
   const subtitle =
     variant === "basics"
@@ -338,6 +345,7 @@ export default function OrderFormMetaSection({
         <ConditionsFields
           paymentMethod={paymentMethod}
           onPaymentMethodChange={onPaymentMethodChange}
+          paymentRequired={paymentRequired}
           orderDateTime={orderDateTime}
           onOrderDateTimeChange={onOrderDateTimeChange}
           description={description}

@@ -27,6 +27,7 @@ import OrderFormSummaryCard from "./orders/OrderFormSummaryCard";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
 import { findClientOptionByTypedValue } from "../utils/clients";
 import { getStockWarningLines } from "../utils/orderStockWarnings";
+import { hasPaymentMethod } from "../utils/paymentMethods";
 import {
   OrderMobileClientPicker,
   OrderMobileProductPicker,
@@ -153,7 +154,7 @@ const OrdersForm = ({
       }
       setPaymentMethod(editingOrder.paymentMethod || "");
       setOrderDateTime(toDateTimeLocalValue(editingOrder.createdAt));
-      setStep(1);
+      setStep(lines.length > 0 ? 3 : 1);
       setShowAdvanced(Boolean(editingOrder.description));
     } else {
       setClientId("");
@@ -185,6 +186,26 @@ const OrdersForm = ({
       }
     }
   }, [editingOrder]);
+
+  useEffect(() => {
+    if (!editingOrder || selectedBrandId || !Array.isArray(brands) || brands.length === 0) {
+      return;
+    }
+    const firstLine = items.find((i) => i.brand || i.brandId);
+    if (firstLine?.brandId && findBrandById(brands, firstLine.brandId)) {
+      const b = findBrandById(brands, firstLine.brandId);
+      setSelectedBrandId(String(b.id));
+      setSelectedBrand(b.name || firstLine.brand || "");
+      return;
+    }
+    if (firstLine?.brand) {
+      const b = findBrandByName(brands, firstLine.brand);
+      if (b?.id != null) {
+        setSelectedBrandId(String(b.id));
+        setSelectedBrand(b.name || firstLine.brand);
+      }
+    }
+  }, [brands, editingOrder, items, selectedBrandId]);
 
   useEffect(() => {
     cancelStaging();
@@ -284,8 +305,16 @@ const OrdersForm = ({
         toast.warning("Adicione pelo menos um item ao pedido.");
         return false;
       }
-      if (items.some((item) => !item.productName || !item.price)) {
+      if (items.some((item) => !item.productName)) {
         toast.warning("Preencha todos os campos dos produtos.");
+        return false;
+      }
+      const missingPrice = items.some((item) => {
+        const p = parseFloat(item.price);
+        return !Number.isFinite(p) || p < 0;
+      });
+      if (missingPrice) {
+        toast.warning("Informe o preço de cada produto.");
         return false;
       }
       const missingQty = items.some((item) => {
@@ -302,11 +331,14 @@ const OrdersForm = ({
     return true;
   };
 
-  const goNext = () => {
-    const next = Math.min(3, step + 1);
-    if (!validateStep(next)) return;
+  const goToStep = (target) => {
+    const next = Math.min(3, Math.max(1, Number(target) || 1));
+    if (next === step) return;
+    if (next > step && !validateStep(next)) return;
     setStep(next);
   };
+
+  const goNext = () => goToStep(step + 1);
 
   const goBack = () => setStep((s) => Math.max(1, s - 1));
 
@@ -392,6 +424,10 @@ const OrdersForm = ({
       return;
     }
     if (!validateStep(3)) return;
+    if (documentType === "pedido" && !hasPaymentMethod(paymentMethod)) {
+      toast.warning("Selecione a forma de pagamento para guardar o pedido.");
+      return;
+    }
 
     const discountValue = parseFloat(discount) || 0;
     if (!canApplyGeneralDiscount && discountValue > 0) {
@@ -428,6 +464,10 @@ const OrdersForm = ({
       await saveOrder();
     } catch (error) {
       console.error("Erro ao salvar pedido:", error);
+      if (error?.code === "STOCK_WARNING_CONFIRM_REQUIRED") {
+        setStockWarningModalOpen(true);
+        return;
+      }
       let errorMessage = `Não foi possível ${
         editingOrder ? "atualizar" : "criar"
       } o pedido.`;
@@ -489,6 +529,7 @@ const OrdersForm = ({
     onBrandChange: handleBrandChange,
     paymentMethod,
     onPaymentMethodChange: handlePaymentMethodChange,
+    paymentRequired: documentType === "pedido",
     orderDateTime,
     onOrderDateTimeChange: setOrderDateTime,
     description,
@@ -561,10 +602,10 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full min-w-0 max-w-none pb-28 md:pb-8">
+      <div className="w-full min-w-0 max-w-none pb-36 md:pb-8">
         <PageHeader
           title={title}
-          description="Três passos: cliente, itens e condições."
+          description="Três passos: cliente, itens e forma de pagamento."
           actions={
             <GhostButton type="button" onClick={onCancel} className="hidden sm:inline-flex">
               Voltar à lista
@@ -572,7 +613,7 @@ const OrdersForm = ({
           }
         />
 
-        <OrderFormStepper step={step} />
+        <OrderFormStepper step={step} onStepSelect={goToStep} />
 
         {editingOrder?.status === "Entregue" ? (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950">
@@ -600,7 +641,7 @@ const OrdersForm = ({
             <form
               id="order-form-main"
               onSubmit={handleSubmit}
-              className="min-w-0 space-y-5 overflow-hidden rounded-2xl border border-edge bg-surface p-3 shadow-soft sm:space-y-6 sm:p-4 md:p-6"
+              className="min-w-0 space-y-5 overflow-visible rounded-2xl border border-edge bg-surface p-3 shadow-soft sm:space-y-6 sm:p-4 md:p-6"
             >
               {step === 1 ? (
                 <OrderFormMetaSection variant="basics" {...metaProps} />

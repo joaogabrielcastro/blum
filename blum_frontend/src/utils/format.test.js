@@ -71,6 +71,16 @@ describe("formatOrderData", () => {
     expect(out.totalPrice).toBe(50);
   });
 
+  it("assume orçamento quando o tipo não vem na API", () => {
+    const out = formatOrderData({
+      id: 1,
+      clientid: 1,
+      items: [],
+      totalprice: 0,
+    });
+    expect(out.documentType).toBe("orcamento");
+  });
+
   it("normaliza itens em snake_case vindos da API", () => {
     const out = formatOrderData({
       id: 83,
