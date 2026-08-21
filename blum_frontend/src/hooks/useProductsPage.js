@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
+import { useAppData } from "../context/AppDataProvider";
 import { mergeProductCodeFields } from "../utils/productSearch";
 
 const EMPTY_PAGINATION = {
