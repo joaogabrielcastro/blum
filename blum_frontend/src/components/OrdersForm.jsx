@@ -56,6 +56,8 @@ const OrdersForm = ({
   const toast = useToast();
   const [step, setStep] = useState(1);
   const hydratedOrderKeyRef = useRef(null);
+  /** Evita que o 2º clique de um double-click no "Continuar" dispare "Criar orçamento". */
+  const blockSaveUntilRef = useRef(0);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -351,7 +353,18 @@ const OrdersForm = ({
   const goToStep = (target) => {
     const next = Math.min(3, Math.max(1, Number(target) || 1));
     if (next === step) return;
+    if (next > step && step === 2 && stagingItem) {
+      if (!validateStep(2)) return;
+      if (!confirmStaging()) return;
+      blockSaveUntilRef.current = Date.now() + 500;
+      setStep(next);
+      return;
+    }
     if (next > step && !validateStep(next)) return;
+    if (next > step) {
+      // Mesma posição do botão vira "Criar orçamento"; ignora clique residual.
+      blockSaveUntilRef.current = Date.now() + 500;
+    }
     setStep(next);
   };
 
@@ -444,9 +457,16 @@ const OrdersForm = ({
       goNext();
       return;
     }
+    if (Date.now() < blockSaveUntilRef.current) {
+      return;
+    }
     if (!validateStep(3)) return;
-    if (documentType === "pedido" && !hasPaymentMethod(paymentMethod)) {
-      toast.warning("Selecione a forma de pagamento para guardar o pedido.");
+    if (!hasPaymentMethod(paymentMethod)) {
+      toast.warning(
+        documentType === "pedido"
+          ? "Selecione a forma de pagamento para guardar o pedido."
+          : "Selecione a forma de pagamento para criar o orçamento.",
+      );
       return;
     }
 
@@ -550,7 +570,7 @@ const OrdersForm = ({
     onBrandChange: handleBrandChange,
     paymentMethod,
     onPaymentMethodChange: handlePaymentMethodChange,
-    paymentRequired: documentType === "pedido",
+    paymentRequired: true,
     orderDateTime,
     onOrderDateTimeChange: setOrderDateTime,
     description,
@@ -575,7 +595,7 @@ const OrdersForm = ({
     />
   );
 
-  const actionButtons = (
+  const renderActionButtons = () => (
     <>
       {step > 1 ? (
         <SecondaryButton
@@ -606,10 +626,13 @@ const OrdersForm = ({
         </PrimaryButton>
       ) : (
         <PrimaryButton
-          type="submit"
-          form="order-form-main"
+          type="button"
           disabled={saving}
           className="w-full md:w-auto"
+          onClick={(e) => {
+            if (Date.now() < blockSaveUntilRef.current) return;
+            handleSubmit(e);
+          }}
         >
           {saving
             ? "A guardar…"
@@ -747,7 +770,7 @@ const OrdersForm = ({
               ) : null}
 
               <div className="hidden justify-end gap-3 border-t border-edge pt-4 md:flex">
-                {actionButtons}
+                {renderActionButtons()}
               </div>
             </form>
           </div>
@@ -766,7 +789,7 @@ const OrdersForm = ({
           paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
         }}
       >
-        <div className="flex flex-col-reverse gap-2">{actionButtons}</div>
+        <div className="flex flex-col-reverse gap-2">{renderActionButtons()}</div>
       </div>
 
       <OrderMobileProductPicker

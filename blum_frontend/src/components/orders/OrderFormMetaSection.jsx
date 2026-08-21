@@ -170,8 +170,8 @@ function ConditionsFields({
         required={paymentRequired}
         hint={
           paymentRequired
-            ? "Toque na opção. Obrigatório neste pedido. Desconto geral só em PIX ou dinheiro."
-            : "Toque na opção. Pode definir agora ou ao virar o orçamento em pedido."
+            ? "Toque na opção. Obrigatório para guardar. Desconto geral só em PIX ou dinheiro."
+            : "Toque na opção. Desconto geral só em PIX ou dinheiro."
         }
       >
         <PaymentMethodPicker
