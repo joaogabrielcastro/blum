@@ -1,5 +1,6 @@
 import FormField, { inputClassName } from "../ui/FormField";
 import PaymentMethodPicker from "./PaymentMethodPicker";
+import BrandSelectField from "./BrandSelectField";
 
 function ClientOptionRow({ opt, onSelect }) {
   return (
@@ -138,26 +139,12 @@ function ClientBrandFields({
         )}
       </FormField>
 
-      <FormField label="Representada" required>
-        <select
-          value={selectedBrandId}
-          onChange={(e) => onBrandChange(e.target.value)}
-          className={inputClassName()}
-        >
-          <option value="">Selecione uma representada</option>
-          {Array.isArray(brands) &&
-            brands.map((brand) => (
-              <option key={brand.id ?? brand.name} value={String(brand.id)}>
-                {brand.name}
-              </option>
-            ))}
-        </select>
-        {Array.isArray(brands) && brands.length === 0 ? (
-          <p className="mt-1 text-sm text-amber-700">
-            Nenhuma representada cadastrada. Cadastre em Produtos.
-          </p>
-        ) : null}
-      </FormField>
+      <BrandSelectField
+        brands={brands}
+        selectedBrandId={selectedBrandId}
+        onBrandChange={onBrandChange}
+        hint="Pode trocar a representada também no passo de produtos."
+      />
     </div>
   );
 }
@@ -308,7 +295,7 @@ export default function OrderFormMetaSection({
         : "Dados do pedido";
   const subtitle =
     variant === "basics"
-      ? "Comece escolhendo para quem e qual marca."
+      ? "Comece pelo cliente. A representada também pode ser trocada nos produtos."
       : variant === "conditions"
         ? "Pagamento, desconto e detalhes finais."
         : "Preencha cliente, representada, pagamento e demais informações.";

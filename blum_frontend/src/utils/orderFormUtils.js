@@ -36,3 +36,30 @@ export const safeToFixed = (value, decimals = 2) => {
   if (isNaN(num)) return "0.00";
   return num.toFixed(decimals);
 };
+
+/** Aceita digitação BR (vírgula) e EN (ponto) em campos de preço no celular. */
+export const sanitizeDecimalTyping = (raw) => {
+  let s = String(raw ?? "").replace(/[^\d.,]/g, "");
+  const sepIndex = Math.max(s.lastIndexOf(","), s.lastIndexOf("."));
+  if (sepIndex === -1) return s.replace(/[.,]/g, "");
+  const intPart = s.slice(0, sepIndex).replace(/[.,]/g, "");
+  const fracPart = s
+    .slice(sepIndex + 1)
+    .replace(/[.,]/g, "")
+    .slice(0, 4);
+  const sep = s[sepIndex];
+  return fracPart.length > 0 || s.endsWith(",") || s.endsWith(".")
+    ? `${intPart}${sep}${fracPart}`
+    : intPart;
+};
+
+export const parseDecimalInput = (value) => {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/\s/g, "")
+    .replace(",", ".");
+  if (!raw) return NaN;
+  const parsed = parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+

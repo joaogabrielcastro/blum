@@ -4,6 +4,7 @@ import {
 } from "../../utils/orderFormUtils";
 import { computeLineNetTotal } from "../../utils/orderLineTotals";
 import { computeItemStockShortfall } from "../../utils/orderStockWarnings";
+import DecimalInput from "./DecimalInput";
 
 function StockShortfallBadge({ item }) {
   const shortfall = computeItemStockShortfall(item);
@@ -93,16 +94,10 @@ function OrderItemCard({
         </div>
         <div className="col-span-1">
           <label className="text-xs text-gray-500 block mb-1">Desc. %</label>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
+          <DecimalInput
             value={item.lineDiscount ?? 0}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) =>
-              onItemChange(index, "lineDiscount", e.target.value)
-            }
+            onChange={(v) => onItemChange(index, "lineDiscount", v)}
             className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base"
           />
         </div>
@@ -110,13 +105,10 @@ function OrderItemCard({
           <label className="text-xs text-gray-500 block mb-1">
             Preço unit. (R$)
           </label>
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
+          <DecimalInput
             value={item.price}
             onClick={(e) => e.stopPropagation()}
-            onChange={(e) => onItemChange(index, "price", e.target.value)}
+            onChange={(v) => onItemChange(index, "price", v)}
             disabled={!canEditUnitPrice}
             className="w-full p-2.5 border border-gray-300 rounded-md text-center text-base disabled:bg-gray-100 disabled:text-gray-500"
           />
@@ -297,27 +289,16 @@ export default function OrderFormLineItems({
                   />
                 </td>
                 <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
+                  <DecimalInput
                     value={item.lineDiscount ?? 0}
-                    onChange={(e) =>
-                      onItemChange(index, "lineDiscount", e.target.value)
-                    }
+                    onChange={(v) => onItemChange(index, "lineDiscount", v)}
                     className="w-full p-2 border border-gray-300 rounded-md text-center text-sm"
                   />
                 </td>
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                  <DecimalInput
                     value={item.price}
-                    onChange={(e) =>
-                      onItemChange(index, "price", e.target.value)
-                    }
+                    onChange={(v) => onItemChange(index, "price", v)}
                     disabled={!canEditUnitPrice}
                     className="w-full p-2 border border-gray-300 rounded-md text-right text-sm disabled:bg-gray-100"
                   />

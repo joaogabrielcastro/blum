@@ -3,6 +3,8 @@ import {
   parseQuantityByBrand,
   safeToFixed,
   toDateTimeLocalValue,
+  sanitizeDecimalTyping,
+  parseDecimalInput,
 } from "./orderFormUtils";
 
 describe("orderFormUtils", () => {
@@ -26,5 +28,18 @@ describe("orderFormUtils", () => {
   it("safeToFixed trata valores inválidos", () => {
     expect(safeToFixed("abc")).toBe("0.00");
     expect(safeToFixed(10.567, 1)).toBe("10.6");
+  });
+
+  it("sanitizeDecimalTyping aceita vírgula e ponto", () => {
+    expect(sanitizeDecimalTyping("17,48")).toBe("17,48");
+    expect(sanitizeDecimalTyping("17.48")).toBe("17.48");
+    expect(sanitizeDecimalTyping("17,")).toBe("17,");
+    expect(sanitizeDecimalTyping("abc17,4x8")).toBe("17,48");
+  });
+
+  it("parseDecimalInput lê BR e EN", () => {
+    expect(parseDecimalInput("17,48")).toBe(17.48);
+    expect(parseDecimalInput("17.48")).toBe(17.48);
+    expect(parseDecimalInput("")).toBeNaN();
   });
 });

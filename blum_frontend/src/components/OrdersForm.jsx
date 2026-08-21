@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
 import { normalizeOrderLineItems } from "../utils/format";
@@ -15,6 +15,7 @@ import {
 import {
   parseQuantityByBrand,
   toDateTimeLocalValue,
+  parseDecimalInput,
 } from "../utils/orderFormUtils";
 import { isBrowserOnline, enqueuePendingOrder } from "../offline";
 import OrderFormLineItems from "./orders/OrderFormLineItems";
@@ -25,6 +26,7 @@ import OrderFormTotals from "./orders/OrderFormTotals";
 import OrderFormStepper from "./orders/OrderFormStepper";
 import OrderFormSummaryCard from "./orders/OrderFormSummaryCard";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
+import BrandSelectField from "./orders/BrandSelectField";
 import { findClientOptionByTypedValue } from "../utils/clients";
 import { getStockWarningLines } from "../utils/orderStockWarnings";
 import { hasPaymentMethod } from "../utils/paymentMethods";
@@ -53,6 +55,7 @@ const OrdersForm = ({
 }) => {
   const toast = useToast();
   const [step, setStep] = useState(1);
+  const hydratedOrderKeyRef = useRef(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -130,9 +133,16 @@ const OrdersForm = ({
   });
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
-  const canEditUnitPrice = userRole === "admin";
+  const canEditUnitPrice =
+    userRole === "admin" || userRole === "salesperson";
 
   useEffect(() => {
+    const orderKey =
+      editingOrder?.id != null ? `edit-${editingOrder.id}` : "new";
+    // Evita resetar passo/marca se o pai recriar o objeto editingOrder.
+    if (hydratedOrderKeyRef.current === orderKey) return;
+    hydratedOrderKeyRef.current = orderKey;
+
     if (editingOrder) {
       const cid =
         editingOrder.clientId ?? editingOrder.clientid ?? editingOrder.client_id;
@@ -185,10 +195,11 @@ const OrdersForm = ({
         setSelectedBrandId("");
       }
     }
-  }, [editingOrder]);
+  }, [editingOrder, brands]);
 
+  // Se a lista de marcas chega depois, preenche só quando ainda não há seleção.
   useEffect(() => {
-    if (!editingOrder || selectedBrandId || !Array.isArray(brands) || brands.length === 0) {
+    if (selectedBrandId || !editingOrder || !Array.isArray(brands) || brands.length === 0) {
       return;
     }
     const firstLine = items.find((i) => i.brand || i.brandId);
@@ -257,11 +268,17 @@ const OrdersForm = ({
     setSelectedBrand(brand?.name || "");
     setProductSearch("");
     clearSearch();
+    cancelStaging();
     if (brandId) {
       try {
         localStorage.setItem(LAST_BRAND_KEY, String(brandId));
       } catch {
         /* ignore */
+      }
+      if (step === 2 && brand?.name) {
+        toast.info(
+          `Buscando produtos de ${brand.name}. Os itens já adicionados permanecem no pedido.`,
+        );
       }
     }
   };
@@ -295,12 +312,12 @@ const OrdersForm = ({
         toast.warning("Selecione um cliente para continuar.");
         return false;
       }
-      if (!selectedBrandId && !selectedBrand) {
-        toast.warning("Selecione uma representada para continuar.");
-        return false;
-      }
     }
     if (targetStep >= 3) {
+      if (!selectedBrandId && !selectedBrand && items.length === 0) {
+        toast.warning("Selecione uma representada e adicione itens.");
+        return false;
+      }
       if (items.length === 0) {
         toast.warning("Adicione pelo menos um item ao pedido.");
         return false;
@@ -310,7 +327,7 @@ const OrdersForm = ({
         return false;
       }
       const missingPrice = items.some((item) => {
-        const p = parseFloat(item.price);
+        const p = parseDecimalInput(item.price);
         return !Number.isFinite(p) || p < 0;
       });
       if (missingPrice) {
@@ -360,12 +377,16 @@ const OrdersForm = ({
         return {
           ...item,
           brandId: resolvedBrandId != null ? resolvedBrandId : null,
-          price: parseFloat(item.price) || 0,
+          price: (() => {
+            const p = parseDecimalInput(item.price);
+            return Number.isFinite(p) && p > 0 ? p : 0;
+          })(),
           quantity: parseQuantityByBrand(item.quantity, item.brand),
-          lineDiscount: Math.min(
-            100,
-            Math.max(0, parseFloat(item.lineDiscount) || 0),
-          ),
+          lineDiscount: (() => {
+            const d = parseDecimalInput(item.lineDiscount);
+            if (!Number.isFinite(d)) return 0;
+            return Math.min(100, Math.max(0, d));
+          })(),
         };
       }),
       discount: parseFloat(discount) || 0,
@@ -654,15 +675,21 @@ const OrdersForm = ({
                       Produtos
                     </h3>
                     <p className="mt-1 text-xs text-ink-muted sm:text-sm">
-                      Busque, informe a quantidade e adicione ao pedido.
+                      Escolha a representada, busque o produto e adicione ao
+                      pedido. Para outra marca, troque a representada aqui —
+                      não precisa voltar ao passo 1.
                     </p>
-                    {!selectedBrand ? (
-                      <p className="mt-2 text-sm text-amber-700">
-                        Selecione a representada no passo anterior para buscar
-                        produtos.
-                      </p>
-                    ) : null}
                   </div>
+                  <BrandSelectField
+                    brands={brands}
+                    selectedBrandId={selectedBrandId}
+                    onBrandChange={handleBrandChange}
+                  />
+                  {!selectedBrand ? (
+                    <p className="text-sm text-amber-700">
+                      Selecione a representada acima para buscar produtos.
+                    </p>
+                  ) : null}
                   <OrderFormProductSearch
                     selectedBrand={selectedBrand}
                     productSearch={productSearch}
