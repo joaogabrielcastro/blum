@@ -1,11 +1,13 @@
-import { parseQuantityByBrand } from "./orderFormUtils";
+import { parseQuantityByBrand, parseDecimalInput } from "./orderFormUtils";
 
 export function computeLineNetTotal(item) {
-  const price = parseFloat(item.price) || 0;
+  const price = parseDecimalInput(item.price);
+  const safePrice = Number.isFinite(price) ? price : 0;
   const quantity = parseQuantityByBrand(item.quantity, item.brand);
-  const ld = parseFloat(item.lineDiscount) || 0;
+  const ldRaw = parseDecimalInput(item.lineDiscount);
+  const ld = Number.isFinite(ldRaw) ? ldRaw : 0;
   const factor = 1 - Math.min(100, Math.max(0, ld)) / 100;
-  return price * (quantity > 0 ? quantity : 0) * factor;
+  return safePrice * (quantity > 0 ? quantity : 0) * factor;
 }
 
 export function computeOrderTotals(items, discountPercent) {

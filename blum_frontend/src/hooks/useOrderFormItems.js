@@ -3,6 +3,8 @@ import { useToast } from "../context/ToastContext";
 import {
   allowsDecimalQuantityBrand,
   parseQuantityByBrand,
+  sanitizeDecimalTyping,
+  parseDecimalInput,
 } from "../utils/orderFormUtils";
 
 function lineToStaging(item, index) {
@@ -95,14 +97,9 @@ export function useOrderFormItems(
       }
 
       if (field === "lineDiscount") {
-        let v = parseFloat(value);
-        if (!Number.isFinite(v)) v = 0;
-        v = Math.min(100, Math.max(0, v));
-        newItems[index][field] = v;
+        newItems[index][field] = sanitizeDecimalTyping(value);
       } else if (field === "price") {
-        const price = parseFloat(String(value).replace(",", "."));
-        if (!Number.isFinite(price) || price <= 0) return;
-        newItems[index][field] = price;
+        newItems[index][field] = sanitizeDecimalTyping(value);
       } else {
         newItems[index][field] = value;
       }
@@ -141,16 +138,11 @@ export function useOrderFormItems(
         }
 
         if (field === "lineDiscount") {
-          let v = parseFloat(value);
-          if (!Number.isFinite(v)) v = 0;
-          v = Math.min(100, Math.max(0, v));
-          return { ...prev, lineDiscount: v };
+          return { ...prev, lineDiscount: sanitizeDecimalTyping(value) };
         }
 
         if (field === "price") {
-          const price = parseFloat(String(value).replace(",", "."));
-          if (!Number.isFinite(price) || price <= 0) return prev;
-          return { ...prev, price };
+          return { ...prev, price: sanitizeDecimalTyping(value) };
         }
 
         return { ...prev, [field]: value };
@@ -216,13 +208,22 @@ export function useOrderFormItems(
       return false;
     }
 
+    const parsedPrice = parseDecimalInput(stagingItem.price);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      toast.warning("Informe um preço unitário válido maior que zero.");
+      return false;
+    }
+    let parsedDiscount = parseDecimalInput(stagingItem.lineDiscount);
+    if (!Number.isFinite(parsedDiscount)) parsedDiscount = 0;
+    parsedDiscount = Math.min(100, Math.max(0, parsedDiscount));
+
     const linePayload = {
       productName: stagingItem.productName,
       brand: stagingItem.brand,
       brandId: stagingItem.brandId,
       quantity: parsedQty,
-      price: stagingItem.price,
-      lineDiscount: stagingItem.lineDiscount ?? 0,
+      price: parsedPrice,
+      lineDiscount: parsedDiscount,
       productId: stagingItem.productId,
       productcode: stagingItem.productcode,
       availableStock: stagingItem.availableStock,

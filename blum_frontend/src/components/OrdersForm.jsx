@@ -15,6 +15,7 @@ import {
 import {
   parseQuantityByBrand,
   toDateTimeLocalValue,
+  parseDecimalInput,
 } from "../utils/orderFormUtils";
 import { isBrowserOnline, enqueuePendingOrder } from "../offline";
 import OrderFormLineItems from "./orders/OrderFormLineItems";
@@ -130,7 +131,8 @@ const OrdersForm = ({
   });
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
-  const canEditUnitPrice = userRole === "admin";
+  const canEditUnitPrice =
+    userRole === "admin" || userRole === "salesperson";
 
   useEffect(() => {
     if (editingOrder) {
@@ -310,7 +312,7 @@ const OrdersForm = ({
         return false;
       }
       const missingPrice = items.some((item) => {
-        const p = parseFloat(item.price);
+        const p = parseDecimalInput(item.price);
         return !Number.isFinite(p) || p < 0;
       });
       if (missingPrice) {
@@ -360,12 +362,16 @@ const OrdersForm = ({
         return {
           ...item,
           brandId: resolvedBrandId != null ? resolvedBrandId : null,
-          price: parseFloat(item.price) || 0,
+          price: (() => {
+            const p = parseDecimalInput(item.price);
+            return Number.isFinite(p) && p > 0 ? p : 0;
+          })(),
           quantity: parseQuantityByBrand(item.quantity, item.brand),
-          lineDiscount: Math.min(
-            100,
-            Math.max(0, parseFloat(item.lineDiscount) || 0),
-          ),
+          lineDiscount: (() => {
+            const d = parseDecimalInput(item.lineDiscount);
+            if (!Number.isFinite(d)) return 0;
+            return Math.min(100, Math.max(0, d));
+          })(),
         };
       }),
       discount: parseFloat(discount) || 0,

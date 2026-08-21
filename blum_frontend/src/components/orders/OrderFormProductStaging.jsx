@@ -6,6 +6,7 @@ import {
 import { computeLineNetTotal } from "../../utils/orderLineTotals";
 import { computeItemStockShortfall } from "../../utils/orderStockWarnings";
 import OrderFormItemHistoryPanel from "./OrderFormItemHistoryPanel";
+import DecimalInput from "./DecimalInput";
 
 export default function OrderFormProductStaging({
   stagingItem,
@@ -111,9 +112,10 @@ export default function OrderFormProductStaging({
           </label>
           <input
             ref={qtyRef}
-            type="number"
-            step={decimalQty ? "0.001" : "1"}
-            min={decimalQty ? "0.001" : "1"}
+            type="text"
+            inputMode={decimalQty ? "decimal" : "numeric"}
+            enterKeyHint="done"
+            autoComplete="off"
             value={
               stagingItem.quantity === "" || stagingItem.quantity == null
                 ? ""
@@ -129,13 +131,11 @@ export default function OrderFormProductStaging({
           <label className="mb-1 block text-xs font-semibold text-gray-700">
             Desc. %
           </label>
-          <input
-            type="number"
+          <DecimalInput
             min="0"
             max="100"
-            step="0.01"
             value={stagingItem.lineDiscount ?? 0}
-            onChange={(e) => onFieldChange("lineDiscount", e.target.value)}
+            onChange={(v) => onFieldChange("lineDiscount", v)}
             className="w-full rounded-lg border border-gray-300 p-3 text-center text-base focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
         </div>
@@ -143,15 +143,21 @@ export default function OrderFormProductStaging({
           <label className="mb-1 block text-xs font-semibold text-gray-700">
             Preço unit. (R$)
           </label>
-          <input
-            type="number"
-            min="0.01"
-            step="0.01"
+          <DecimalInput
             value={stagingItem.price}
-            onChange={(e) => onFieldChange("price", e.target.value)}
+            onChange={(v) => onFieldChange("price", v)}
             disabled={!canEditUnitPrice}
             className="w-full rounded-lg border border-gray-300 p-3 text-center text-base disabled:bg-gray-100 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
+          {!canEditUnitPrice ? (
+            <p className="mt-1 text-xs text-ink-muted">
+              Só o administrador altera o preço unitário.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-ink-muted">
+              Use vírgula ou ponto (ex.: 17,48).
+            </p>
+          )}
         </div>
       </div>
 
