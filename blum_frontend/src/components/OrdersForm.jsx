@@ -646,7 +646,7 @@ const OrdersForm = ({
 
   return (
     <>
-      <div className="w-full min-w-0 max-w-none pb-36 md:pb-8">
+      <div className="w-full min-w-0 max-w-none pb-8">
         <PageHeader
           title={title}
           description="Três passos: cliente, itens e forma de pagamento."
@@ -769,7 +769,7 @@ const OrdersForm = ({
                 </>
               ) : null}
 
-              <div className="hidden justify-end gap-3 border-t border-edge pt-4 md:flex">
+              <div className="flex flex-col-reverse gap-2 border-t border-edge pt-4 sm:flex-row sm:justify-end sm:gap-3">
                 {renderActionButtons()}
               </div>
             </form>
@@ -781,15 +781,6 @@ const OrdersForm = ({
         </div>
 
         <div className="mt-4 lg:hidden">{summary}</div>
-      </div>
-
-      <div
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-edge bg-surface/95 px-3 pt-3 backdrop-blur-sm md:hidden"
-        style={{
-          paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
-        }}
-      >
-        <div className="flex flex-col-reverse gap-2">{renderActionButtons()}</div>
       </div>
 
       <OrderMobileProductPicker

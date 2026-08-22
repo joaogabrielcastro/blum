@@ -17,6 +17,7 @@ function lineToStaging(item, index) {
     quantity: item.quantity === "" || item.quantity == null ? "" : item.quantity,
     price: item.price,
     lineDiscount: item.lineDiscount ?? 0,
+    lineMarkup: 0,
     productId: item.productId,
     productcode: item.productcode ?? "",
     availableStock: item.availableStock ?? null,
@@ -33,6 +34,7 @@ function productToStaging(product, selectedBrandId) {
     quantity: "",
     price: product.price,
     lineDiscount: 0,
+    lineMarkup: 0,
     productId: product.id,
     productcode: product.productcode ?? product.productCode ?? "",
     availableStock: product.stock,
@@ -141,6 +143,10 @@ export function useOrderFormItems(
           return { ...prev, lineDiscount: sanitizeDecimalTyping(value) };
         }
 
+        if (field === "lineMarkup") {
+          return { ...prev, lineMarkup: sanitizeDecimalTyping(value) };
+        }
+
         if (field === "price") {
           return { ...prev, price: sanitizeDecimalTyping(value) };
         }
@@ -217,12 +223,22 @@ export function useOrderFormItems(
     if (!Number.isFinite(parsedDiscount)) parsedDiscount = 0;
     parsedDiscount = Math.min(100, Math.max(0, parsedDiscount));
 
+    let parsedMarkup = parseDecimalInput(stagingItem.lineMarkup);
+    if (!Number.isFinite(parsedMarkup)) parsedMarkup = 0;
+    parsedMarkup = Math.min(100, Math.max(0, parsedMarkup));
+
+    // Acréscimo entra no preço unitário; desconto permanece na linha.
+    const priceWithMarkup =
+      parsedMarkup > 0
+        ? parsedPrice * (1 + parsedMarkup / 100)
+        : parsedPrice;
+
     const linePayload = {
       productName: stagingItem.productName,
       brand: stagingItem.brand,
       brandId: stagingItem.brandId,
       quantity: parsedQty,
-      price: parsedPrice,
+      price: priceWithMarkup,
       lineDiscount: parsedDiscount,
       productId: stagingItem.productId,
       productcode: stagingItem.productcode,

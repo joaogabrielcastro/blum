@@ -23,3 +23,20 @@ export const formatRowDate = (value, withTime = false) => {
     ? date.toLocaleString("pt-BR")
     : date.toLocaleDateString("pt-BR");
 };
+
+/** Dias corridos desde a data (0 = hoje). */
+export const daysSince = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const ms = Date.now() - date.getTime();
+  return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)));
+};
+
+export const formatDaysAgo = (value) => {
+  const days = daysSince(value);
+  if (days == null) return "—";
+  if (days === 0) return "hoje";
+  if (days === 1) return "há 1 dia";
+  return `há ${days} dias`;
+};

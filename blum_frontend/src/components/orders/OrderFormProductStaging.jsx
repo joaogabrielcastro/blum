@@ -3,7 +3,10 @@ import {
   allowsDecimalQuantityBrand,
   safeToFixed,
 } from "../../utils/orderFormUtils";
-import { computeLineNetTotal } from "../../utils/orderLineTotals";
+import {
+  computeLineNetTotal,
+  computeLineUnitNet,
+} from "../../utils/orderLineTotals";
 import { computeItemStockShortfall } from "../../utils/orderStockWarnings";
 import OrderFormItemHistoryPanel from "./OrderFormItemHistoryPanel";
 import DecimalInput from "./DecimalInput";
@@ -31,12 +34,22 @@ export default function OrderFormProductStaging({
   const isEdit = stagingItem.mode === "edit";
   const shortfall = computeItemStockShortfall(stagingItem);
   const decimalQty = allowsDecimalQuantityBrand(stagingItem.brand);
+  const unitNet = computeLineUnitNet(stagingItem);
+  const lineTotal = computeLineNetTotal(stagingItem);
 
   const handleQtyKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       onConfirm();
     }
+  };
+
+  const applyLastPrice = (price) => {
+    if (!canEditUnitPrice) return;
+    const n = Number(price);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onFieldChange("price", String(n).replace(".", ","));
+    onFieldChange("lineMarkup", 0);
   };
 
   return (
@@ -48,7 +61,7 @@ export default function OrderFormProductStaging({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-800">
-            {isEdit ? "Editar item do pedido" : "Item selecionado"}
+            {isEdit ? "Editar item do pedido" : "Adicionar produto ao pedido"}
           </p>
           <h4 className="mt-1 text-base sm:text-lg font-bold text-gray-900 break-words">
             {stagingItem.productName}
@@ -63,7 +76,7 @@ export default function OrderFormProductStaging({
               </span>
             ) : null}
             <span className="rounded bg-green-50 px-2 py-1 font-semibold text-green-800 border border-green-200">
-              R$ {safeToFixed(stagingItem.price)}
+              Tabela: R$ {safeToFixed(stagingItem.price)}
             </span>
             {stagingItem.availableStock != null && !decimalQty ? (
               <span
@@ -95,13 +108,14 @@ export default function OrderFormProductStaging({
 
       <div className="rounded-lg border border-gray-200 bg-surface p-3">
         <p className="mb-2 text-xs font-semibold text-gray-700">
-          Histórico no cliente
+          Histórico no cliente — apoio à barganha
         </p>
         <OrderFormItemHistoryPanel
           clientId={clientId}
           productId={stagingItem.productId}
           compact
           onOpenFullHistory={onOpenFullHistory}
+          onApplyLastPrice={canEditUnitPrice ? applyLastPrice : undefined}
         />
       </div>
 
@@ -129,17 +143,29 @@ export default function OrderFormProductStaging({
         </div>
         <div className="col-span-1">
           <label className="mb-1 block text-xs font-semibold text-gray-700">
-            Desc. %
+            Desconto %
           </label>
           <DecimalInput
             min="0"
             max="100"
             value={stagingItem.lineDiscount ?? 0}
             onChange={(v) => onFieldChange("lineDiscount", v)}
-            className="w-full rounded-lg border border-gray-300 p-3 text-center text-base focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="w-full rounded-lg border border-red-200 bg-red-50/40 p-3 text-center text-base focus:outline-none focus:ring-2 focus:ring-red-200"
           />
         </div>
-        <div className="col-span-2">
+        <div className="col-span-1">
+          <label className="mb-1 block text-xs font-semibold text-gray-700">
+            Acréscimo %
+          </label>
+          <DecimalInput
+            min="0"
+            max="100"
+            value={stagingItem.lineMarkup ?? 0}
+            onChange={(v) => onFieldChange("lineMarkup", v)}
+            className="w-full rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 text-center text-base focus:outline-none focus:ring-2 focus:ring-emerald-200"
+          />
+        </div>
+        <div className="col-span-1">
           <label className="mb-1 block text-xs font-semibold text-gray-700">
             Preço unit. (R$)
           </label>
@@ -149,25 +175,36 @@ export default function OrderFormProductStaging({
             disabled={!canEditUnitPrice}
             className="w-full rounded-lg border border-gray-300 p-3 text-center text-base disabled:bg-gray-100 disabled:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
-          {!canEditUnitPrice ? (
-            <p className="mt-1 text-xs text-ink-muted">
-              Só o administrador altera o preço unitário.
-            </p>
-          ) : (
-            <p className="mt-1 text-xs text-ink-muted">
-              Use vírgula ou ponto (ex.: 17,48).
-            </p>
-          )}
         </div>
       </div>
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 pt-3">
-        <p className="text-sm text-gray-600">
-          Subtotal:{" "}
-          <span className="font-bold text-gray-900">
-            R$ {safeToFixed(computeLineNetTotal(stagingItem))}
-          </span>
+      {!canEditUnitPrice ? (
+        <p className="text-xs text-ink-muted">
+          Só o administrador altera o preço unitário. Desconto e acréscimo
+          continuam disponíveis.
         </p>
+      ) : (
+        <p className="text-xs text-ink-muted">
+          Use vírgula ou ponto no preço (ex.: 17,48). O acréscimo entra no preço
+          ao adicionar; o desconto fica na linha.
+        </p>
+      )}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200 pt-3">
+        <div className="text-sm text-gray-600 space-y-0.5">
+          <p>
+            Preço líquido:{" "}
+            <span className="font-semibold text-gray-900">
+              R$ {safeToFixed(unitNet)}
+            </span>
+          </p>
+          <p>
+            Subtotal:{" "}
+            <span className="font-bold text-gray-900">
+              R$ {safeToFixed(lineTotal)}
+            </span>
+          </p>
+        </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"

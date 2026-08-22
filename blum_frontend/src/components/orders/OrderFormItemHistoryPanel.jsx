@@ -3,6 +3,7 @@ import apiService from "../../services/apiService";
 import formatCurrency from "../../utils/format";
 import {
   PAYMENT_LABELS,
+  formatDaysAgo,
   formatRowDate,
   rowCreatedAt,
   rowOrderId,
@@ -15,6 +16,7 @@ export default function OrderFormItemHistoryPanel({
   productId,
   compact = false,
   onOpenFullHistory,
+  onApplyLastPrice,
 }) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
@@ -48,6 +50,7 @@ export default function OrderFormItemHistoryPanel({
   }, [clientId, productId, compact]);
 
   const latest = useMemo(() => rows[0] || null, [rows]);
+  const lastPrice = latest ? rowUnitPrice(latest) : null;
 
   if (!clientId) {
     return (
@@ -73,6 +76,63 @@ export default function OrderFormItemHistoryPanel({
     );
   }
 
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="rounded-lg border border-edge bg-surface-muted/60 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+              Último preço
+            </p>
+            <p className="mt-0.5 text-sm font-bold text-ink">
+              {formatCurrency(lastPrice)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-edge bg-surface-muted/60 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+              Último pedido
+            </p>
+            <p className="mt-0.5 text-sm font-bold text-ink">
+              {rowOrderId(latest) ? `#${rowOrderId(latest)}` : "—"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-edge bg-surface-muted/60 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+              Comprado
+            </p>
+            <p className="mt-0.5 text-sm font-bold text-ink">
+              {latest.quantity ?? "—"}{" "}
+              <span className="font-medium text-ink-muted">
+                {formatDaysAgo(rowCreatedAt(latest))}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {onApplyLastPrice && lastPrice != null ? (
+            <button
+              type="button"
+              onClick={() => onApplyLastPrice(lastPrice)}
+              className="rounded-lg border border-brand/30 bg-brand/5 px-3 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
+            >
+              Usar último preço ({formatCurrency(lastPrice)})
+            </button>
+          ) : null}
+          {onOpenFullHistory ? (
+            <button
+              type="button"
+              onClick={onOpenFullHistory}
+              className="text-xs font-semibold text-brand hover:underline"
+            >
+              Ver histórico completo
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {latest ? (
@@ -83,6 +143,9 @@ export default function OrderFormItemHistoryPanel({
           {rowOrderId(latest) ? (
             <> (Pedido #{rowOrderId(latest)})</>
           ) : null}
+          {" · "}
+          Comprado: <strong>{latest.quantity}</strong>{" "}
+          {formatDaysAgo(rowCreatedAt(latest))}
         </div>
       ) : null}
 
@@ -94,11 +157,7 @@ export default function OrderFormItemHistoryPanel({
               <th className="px-2 py-1.5 text-left font-semibold">Pedido</th>
               <th className="px-2 py-1.5 text-right font-semibold">Preço</th>
               <th className="px-2 py-1.5 text-center font-semibold">Qtd</th>
-              {!compact ? (
-                <th className="px-2 py-1.5 text-left font-semibold">
-                  Pagamento
-                </th>
-              ) : null}
+              <th className="px-2 py-1.5 text-left font-semibold">Pagamento</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -116,13 +175,11 @@ export default function OrderFormItemHistoryPanel({
                 <td className="px-2 py-1.5 text-center text-gray-700">
                   {row.quantity}
                 </td>
-                {!compact ? (
-                  <td className="px-2 py-1.5 text-gray-700">
-                    {PAYMENT_LABELS[rowPaymentMethod(row)] ||
-                      rowPaymentMethod(row) ||
-                      "—"}
-                  </td>
-                ) : null}
+                <td className="px-2 py-1.5 text-gray-700">
+                  {PAYMENT_LABELS[rowPaymentMethod(row)] ||
+                    rowPaymentMethod(row) ||
+                    "—"}
+                </td>
               </tr>
             ))}
           </tbody>
