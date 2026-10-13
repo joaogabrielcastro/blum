@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  orderFinishedAt,
+  orderReportDate,
   orderTotalPrice,
   orderTotalCommission,
   orderSellerUserKey,
@@ -16,6 +16,7 @@ import {
   orderMatchesBrandFilter,
   orderAmountForBrandFilter,
   buildBrandOptionsFromOrders,
+  getPreviousCalendarMonth,
 } from "../utils/orderApiFields";
 import { defaultMonthKey, parseMonthKey } from "./useReportsData";
 
@@ -34,14 +35,20 @@ export function useReportsMetrics({
   usersById,
 }) {
   const monthOptions = useMemo(() => {
-    const keys = new Set([defaultMonthKey, selectedMonthKey]);
+    const current = parseMonthKey(defaultMonthKey);
+    const previous = getPreviousCalendarMonth(current.year, current.month);
+    const keys = new Set([
+      defaultMonthKey,
+      selectedMonthKey,
+      monthYearKey(previous.year, previous.month),
+    ]);
     monthlySummaries.forEach((row) => {
       keys.add(monthYearKey(row.year, row.month));
     });
     allOrders.forEach((order) => {
-      const fin = orderFinishedAt(order);
-      if (!fin) return;
-      const d = new Date(fin);
+      const reportDate = orderReportDate(order);
+      if (!reportDate) return;
+      const d = new Date(reportDate);
       if (Number.isNaN(d.getTime())) return;
       keys.add(monthYearKey(d.getFullYear(), d.getMonth() + 1));
     });

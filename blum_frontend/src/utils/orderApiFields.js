@@ -10,6 +10,11 @@ export function orderFinishedAt(order) {
   return order.finishedAt ?? order.finishedat ?? order.finished_at;
 }
 
+/** Data comercial dos relatórios: emissão do pedido, com fallback legado. */
+export function orderReportDate(order) {
+  return orderCreatedAt(order) ?? orderFinishedAt(order);
+}
+
 export function orderTotalPrice(order) {
   const v = order.totalPrice ?? order.totalprice ?? order.total_price;
   return parseFloat(v) || 0;
@@ -199,9 +204,9 @@ export function brandBarsFromSalesMap(salesMap, maxBars = 12) {
 export function prepareCumulativeSalesChartData(orders) {
   const salesByDayKey = {};
   for (const order of orders) {
-    const fin = orderFinishedAt(order);
-    if (!fin) continue;
-    const dayKey = localDateKeyFromIso(fin);
+    const reportDate = orderReportDate(order);
+    if (!reportDate) continue;
+    const dayKey = localDateKeyFromIso(reportDate);
     if (!dayKey) continue;
     salesByDayKey[dayKey] =
       (salesByDayKey[dayKey] || 0) + orderTotalPrice(order);
@@ -236,9 +241,9 @@ export function monthYearKey(year, month) {
 }
 
 export function orderInCalendarMonth(order, year, month) {
-  const fin = orderFinishedAt(order);
-  if (!fin) return false;
-  const d = new Date(fin);
+  const reportDate = orderReportDate(order);
+  if (!reportDate) return false;
+  const d = new Date(reportDate);
   if (Number.isNaN(d.getTime())) return false;
   return d.getFullYear() === year && d.getMonth() + 1 === month;
 }
@@ -262,8 +267,8 @@ export function prepareMonthlyCumulativeChartData(
 
   for (const order of orders) {
     if (!orderInCalendarMonth(order, year, month)) continue;
-    const fin = orderFinishedAt(order);
-    const day = new Date(fin).getDate();
+    const reportDate = orderReportDate(order);
+    const day = new Date(reportDate).getDate();
     salesByDay[day] = (salesByDay[day] || 0) + amountFn(order);
   }
 

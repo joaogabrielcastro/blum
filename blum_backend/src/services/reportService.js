@@ -157,15 +157,15 @@ class ReportService {
     return await reportRepository.query(query, params);
   }
 
-  /** Sincroniza resumos mensais a partir de pedidos entregues (finishedat). */
+  /** Sincroniza resumos mensais pela data comercial de emissão do pedido. */
   async syncMonthlySalesSummaries(tenantId) {
     tenantId = requireTenantId(tenantId);
     await sql`
       INSERT INTO monthly_sales_summary (tenant_id, year, month, seller_user_id, total_sales, order_count, updated_at)
       SELECT
         o.tenant_id,
-        EXTRACT(YEAR FROM o.finishedat)::int AS year,
-        EXTRACT(MONTH FROM o.finishedat)::int AS month,
+        EXTRACT(YEAR FROM o.createdat)::int AS year,
+        EXTRACT(MONTH FROM o.createdat)::int AS month,
         o.user_ref AS seller_user_id,
         COALESCE(SUM(o.totalprice), 0) AS total_sales,
         COUNT(o.id)::int AS order_count,
@@ -173,7 +173,7 @@ class ReportService {
       FROM orders o
       WHERE o.status = 'Entregue'
         AND o.tenant_id = ${tenantId}
-        AND o.finishedat IS NOT NULL
+        AND o.createdat IS NOT NULL
       GROUP BY o.tenant_id, year, month, o.user_ref
       ON CONFLICT (tenant_id, year, month, seller_user_id) WHERE seller_user_id IS NOT NULL
       DO UPDATE SET
@@ -186,8 +186,8 @@ class ReportService {
       INSERT INTO monthly_sales_summary (tenant_id, year, month, seller_user_id, total_sales, order_count, updated_at)
       SELECT
         o.tenant_id,
-        EXTRACT(YEAR FROM o.finishedat)::int AS year,
-        EXTRACT(MONTH FROM o.finishedat)::int AS month,
+        EXTRACT(YEAR FROM o.createdat)::int AS year,
+        EXTRACT(MONTH FROM o.createdat)::int AS month,
         NULL AS seller_user_id,
         COALESCE(SUM(o.totalprice), 0) AS total_sales,
         COUNT(o.id)::int AS order_count,
@@ -195,7 +195,7 @@ class ReportService {
       FROM orders o
       WHERE o.status = 'Entregue'
         AND o.tenant_id = ${tenantId}
-        AND o.finishedat IS NOT NULL
+        AND o.createdat IS NOT NULL
       GROUP BY o.tenant_id, year, month
       ON CONFLICT (tenant_id, year, month) WHERE seller_user_id IS NULL
       DO UPDATE SET
