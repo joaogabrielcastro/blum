@@ -119,13 +119,16 @@ exports.deleteBrand = async (req, res) => {
 
     // Verificar se existem produtos com esta marca (usa o nome da marca)
     const productsWithBrand = await sql`
-      SELECT COUNT(*) as count FROM products WHERE brand = ${brandName} AND tenant_id = ${req.user.tenantId}
+      SELECT COUNT(*) as count
+      FROM products
+      WHERE tenant_id = ${req.user.tenantId}
+        AND (brand_id = ${brandId} OR brand = ${brandName})
     `;
 
     if (parseInt(productsWithBrand[0].count) > 0) {
       return res.status(400).json({
         error:
-          "Não é possível excluir a marca. Existem produtos associados a ela.",
+          "Não é possível excluir a representada enquanto existirem produtos associados. Mova ou exclua esses produtos primeiro.",
       });
     }
 

@@ -206,8 +206,8 @@ const ProductsPage = ({ userRole, subscription }) => {
           onCadastrar={() => setShowBrandForm(true)}
           userRole={userRole}
           onEditBrand={handleEditBrand}
-          onRequestDeleteBrand={(name) =>
-            confirmDeleteAction("brand", name, name)
+          onRequestDeleteBrand={(id, name) =>
+            confirmDeleteAction("brand", id, name)
           }
           confirmDelete={confirmDelete}
           deleteType={deleteType}
@@ -266,6 +266,45 @@ const ProductsPage = ({ userRole, subscription }) => {
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
 
       <FilterBar searchTerm={searchTerm} onSearchChange={handleSearchChange} />
+
+      {isAdmin && selectedProductIds.length > 0 ? (
+        <div
+          className="mb-3 flex flex-col gap-3 rounded-2xl border border-brand/25 bg-brand-50/90 px-4 py-3 shadow-soft sm:flex-row sm:items-center sm:justify-between"
+          role="region"
+          aria-label="Ações para produtos selecionados"
+        >
+          <div>
+            <p className="text-sm font-semibold text-brand-900">
+              {selectedProductIds.length} produto(s) selecionado(s)
+            </p>
+            <p className="text-xs text-brand-700">
+              A seleção vale para os produtos exibidos nesta página.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <SecondaryButton
+              type="button"
+              onClick={() =>
+                canPriceBatch
+                  ? setShowBulkAdjust(true)
+                  : requestUpgrade("price-batch")
+              }
+              title={
+                canPriceBatch ? undefined : "Disponível no plano Profissional"
+              }
+            >
+              Reajustar selecionados
+              {!canPriceBatch ? " · Pro" : ""}
+            </SecondaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={() => setSelectedProductIds([])}
+            >
+              Limpar seleção
+            </SecondaryButton>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative min-h-[200px] flex-grow overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft backdrop-blur-md">
         {productsLoading && (

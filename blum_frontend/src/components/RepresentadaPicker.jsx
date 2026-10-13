@@ -4,11 +4,11 @@ import FormField, { inputClassName } from "./ui/FormField";
 import {
   PrimaryButton,
   SecondaryButton,
-  DangerButton,
   GhostButton,
 } from "./ui/Surface";
 import EmptyState from "./EmptyState";
 import ListPageSkeleton from "./ListPageSkeleton";
+import ConfirmationModal from "./ConfirmationModal";
 
 const BuildingIcon = ({ className = "h-6 w-6" }) => (
   <svg
@@ -184,24 +184,14 @@ const RepresentadaPicker = ({
         </div>
       </div>
 
-      {isAdmin && confirmDelete && deleteType === "brand" ? (
-        <div className="mx-4 mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm sm:mx-5">
-          <p className="font-semibold text-amber-950">
-            Excluir representada &quot;{confirmDelete}&quot;?
-          </p>
-          <p className="mt-1 text-xs text-amber-900/90">
-            Produtos vinculados a esta representada podem ser afetados.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <DangerButton type="button" onClick={onConfirmDelete} className="!py-2 !text-sm">
-              Confirmar exclusão
-            </DangerButton>
-            <SecondaryButton type="button" onClick={onCancelDelete} className="!py-2 !text-sm">
-              Cancelar
-            </SecondaryButton>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmationModal
+        show={isAdmin && Boolean(confirmDelete) && deleteType === "brand"}
+        title="Excluir representada?"
+        message={`Deseja excluir “${confirmDelete || ""}”? A exclusão só será permitida quando não houver produtos vinculados. Os pedidos históricos serão preservados.`}
+        confirmText="Excluir representada"
+        onConfirm={onConfirmDelete}
+        onCancel={onCancelDelete}
+      />
 
       <ul className="divide-y divide-edge">
         {filtered.length === 0 ? (
@@ -260,7 +250,7 @@ const RepresentadaPicker = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onRequestDeleteBrand(brand.displayName);
+                          onRequestDeleteBrand(brand.id, brand.displayName);
                         }}
                         className="!border-red-200 !px-3 !py-2 !text-sm !text-red-700 hover:!bg-red-50"
                       >

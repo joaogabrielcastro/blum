@@ -1,6 +1,6 @@
 // Alterar a versão em releases que mudam regras de exibição força a remoção
 // do bundle anterior em instalações PWA/offline.
-const CACHE_NAME = "blum-static-v6-reports-period";
+const CACHE_NAME = "blum-static-v7-empty-responses";
 
 const PRECACHE_URLS = [
   "/",
@@ -89,6 +89,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request)),
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      return cached || new Response("Recurso indisponível offline", {
+        status: 503,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }),
   );
 });

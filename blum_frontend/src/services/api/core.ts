@@ -283,7 +283,18 @@ export const apiRequest = async <T = unknown>(
     }
   }
 
-  return response.json() as Promise<T>;
+  if (response.status === 204 || response.status === 205) {
+    return undefined as T;
+  }
+
+  const rawText = await response.text();
+  if (!rawText.trim()) return undefined as T;
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    return rawText as T;
+  }
 };
 
 function getUploadHeaders(): AuthHeaders {
