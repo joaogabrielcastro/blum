@@ -9,6 +9,8 @@ const VerificationTable = ({
   title = "Verificação",
   description = "",
   source = "PDF",
+  focusItemIndex = null,
+  problemCodes = [],
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -17,10 +19,27 @@ const VerificationTable = ({
     () => items.slice(pageStart, pageStart + PAGE_SIZE),
     [items, pageStart],
   );
+  const problemCodeSet = useMemo(
+    () => new Set(problemCodes.map((code) => String(code).trim().toLowerCase())),
+    [problemCodes],
+  );
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
+
+  useEffect(() => {
+    if (!Number.isInteger(focusItemIndex) || focusItemIndex < 0) return;
+    setCurrentPage(Math.floor(focusItemIndex / PAGE_SIZE) + 1);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`verification-item-${focusItemIndex}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [focusItemIndex]);
+
+  const isProblemItem = (item) =>
+    problemCodeSet.has(String(item.productCode ?? "").trim().toLowerCase());
 
   const handleChange = (index, field, value) => {
     onItemChange(index, field, value);
@@ -57,8 +76,13 @@ const VerificationTable = ({
               const itemIndex = pageStart + idx;
               return (
               <section
+                id={`verification-item-${itemIndex}`}
                 key={it.id ?? itemIndex}
-                className="rounded-xl border border-gray-200 bg-gray-50/70 p-3"
+                className={`rounded-xl border p-3 ${
+                  isProblemItem(it)
+                    ? "border-red-300 bg-red-50/80 ring-1 ring-red-200"
+                    : "border-gray-200 bg-gray-50/70"
+                }`}
                 aria-label={`Produto ${itemIndex + 1}`}
               >
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -139,7 +163,11 @@ const VerificationTable = ({
               {visibleItems.map((it, idx) => {
                 const itemIndex = pageStart + idx;
                 return (
-                <tr key={it.id ?? itemIndex} className="border-t">
+                <tr
+                  id={`verification-item-${itemIndex}`}
+                  key={it.id ?? itemIndex}
+                  className={`border-t ${isProblemItem(it) ? "bg-red-50" : ""}`}
+                >
                   <td className="px-3 py-2 align-top">
                     <input
                       value={it.productCode || ""}

@@ -12,6 +12,7 @@ import {
   buildProductImportSuccessSummary,
   getDuplicateProductCodesFromItems,
   mergePurchaseItemsByProductCode,
+  normalizeProductCode,
   validateProductImportRows,
 } from "../../utils/productImportUtils";
 
@@ -37,11 +38,23 @@ export default function ProductImportSection({
   const [stats, setStats] = useState(null);
   const [createConfirm, setCreateConfirm] = useState(null);
   const [mergeConfirm, setMergeConfirm] = useState(null);
+  const [focusItemIndex, setFocusItemIndex] = useState(null);
 
   const duplicateProductCodes = useMemo(
     () => getDuplicateProductCodesFromItems(parsedItems),
     [parsedItems],
   );
+  const duplicateRows = useMemo(() => {
+    if (duplicateProductCodes.length === 0) return [];
+    const duplicateSet = new Set(duplicateProductCodes);
+    return parsedItems
+      .map((item, index) => ({
+        index,
+        code: String(item.productCode ?? "").trim(),
+        normalizedCode: normalizeProductCode(item.productCode),
+      }))
+      .filter((item) => duplicateSet.has(item.normalizedCode));
+  }, [duplicateProductCodes, parsedItems]);
 
   useEffect(() => {
     if (defaultBrandId) {
@@ -188,6 +201,7 @@ export default function ProductImportSection({
         setError(
           `A planilha tem códigos repetidos: ${codes.join(", ")}. Corrija os códigos na revisão antes de sincronizar o catálogo.`,
         );
+        setFocusItemIndex(duplicateRows[0]?.index ?? null);
         return;
       }
       setMergeConfirm({ rows, codes });
@@ -319,7 +333,30 @@ export default function ProductImportSection({
         title="Revise os produtos"
         description="Confira código, estoque e preço antes de importar."
         source="Planilha"
+        focusItemIndex={focusItemIndex}
+        problemCodes={duplicateProductCodes}
       />
+
+      {error ? (
+        <div className="mb-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-semibold">A importação ainda não pode ser confirmada.</p>
+          <p className="mt-1">{error}</p>
+          {duplicateRows.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {duplicateRows.map((row) => (
+                <button
+                  key={`${row.normalizedCode}-${row.index}`}
+                  type="button"
+                  onClick={() => setFocusItemIndex(row.index)}
+                  className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100"
+                >
+                  Ir para linha {row.index + 1} ({row.code})
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <PurchaseActions
         onCancel={() => {
