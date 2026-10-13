@@ -36,9 +36,30 @@ BEGIN
       ON DELETE SET NULL (brand_id) NOT VALID;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'price_history_product_tenant_fk') THEN
-    ALTER TABLE price_history ADD CONSTRAINT price_history_product_tenant_fk
-      FOREIGN KEY (tenant_id, productid) REFERENCES products(tenant_id, id)
-      ON DELETE CASCADE NOT VALID;
+    -- Existem bancos legados com `productid` e bancos mais recentes apenas com
+    -- `product_id`. A migração 005 normaliza para snake_case, mas instalações
+    -- antigas podem ter removido a coluna original antes desta migração.
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'price_history'
+        AND column_name = 'product_id'
+    ) THEN
+      ALTER TABLE price_history ADD CONSTRAINT price_history_product_tenant_fk
+        FOREIGN KEY (tenant_id, product_id) REFERENCES products(tenant_id, id)
+        ON DELETE CASCADE NOT VALID;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'price_history'
+        AND column_name = 'productid'
+    ) THEN
+      ALTER TABLE price_history ADD CONSTRAINT price_history_product_tenant_fk
+        FOREIGN KEY (tenant_id, productid) REFERENCES products(tenant_id, id)
+        ON DELETE CASCADE NOT VALID;
+    ELSE
+      RAISE EXCEPTION 'price_history não possui product_id nem productid; execute a migração 005 antes da 031';
+    END IF;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uab_user_tenant_fk') THEN
     ALTER TABLE user_allowed_brands ADD CONSTRAINT uab_user_tenant_fk
