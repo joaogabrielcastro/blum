@@ -101,7 +101,7 @@ const ProductsPage = ({ userRole, subscription }) => {
               Trocar representada
             </SecondaryButton>
           ) : null}
-          {isAdmin && selectedBrand ? (
+          {isAdmin ? (
             <SecondaryButton
               type="button"
               onClick={() => setShowBrandForm(true)}
@@ -125,7 +125,7 @@ const ProductsPage = ({ userRole, subscription }) => {
               {!canPriceBatch ? " · Pro" : ""}
             </SecondaryButton>
           ) : null}
-          {isAdmin && selectedBrand ? (
+          {isAdmin ? (
             <SecondaryButton
               type="button"
               onClick={() =>
@@ -255,6 +255,23 @@ const ProductsPage = ({ userRole, subscription }) => {
             />
           </Drawer>
         )}
+
+        {isAdmin && showImport && canImport ? (
+          <Drawer
+            open={showImport}
+            onClose={() => setShowImport(false)}
+            title="Importar produtos"
+            description="Escolha a representada e envie uma planilha Excel ou CSV"
+            widthClass="max-w-5xl"
+          >
+            <ProductImportSection
+              brands={brands}
+              defaultBrandId=""
+              onSuccess={() => toast.success("Produtos importados com sucesso.")}
+              onClose={() => setShowImport(false)}
+            />
+          </Drawer>
+        ) : null}
       </div>
     );
   }

@@ -3,9 +3,11 @@ const path = require("path");
 const {
   parseSpreadsheetBuffer,
   parseCsvBuffer,
+  parseExcelBuffer,
   normalizeProductCode,
   generateAutoCode,
 } = require("./productSpreadsheetParser");
+const XLSX = require("xlsx");
 
 const FIXTURES_DIR = path.resolve(
   __dirname,
@@ -72,6 +74,53 @@ describe("productSpreadsheetParser", () => {
     const csv = "codigo,nome,preco,estoque\nF1,Frete,145,0";
     const result = parseCsvBuffer(Buffer.from(csv, "utf8"));
     expect(result.products[0].stock).toBe(0);
+  });
+
+  test("reconhece cabeçalhos longos do ERP no Excel e ignora a linha de cabeçalho", () => {
+    const sheet = XLSX.utils.aoa_to_sheet([
+      [
+        "Código do Produto (SKU / Referência)",
+        "Nome do Produto / Descrição",
+        "Preço de Tabela (R$)",
+        "Categoria",
+        "Marca",
+        "Fornecedor",
+        "Unidade",
+        "Peso",
+        "Localização",
+        "Quantidade em Estoque (un.)",
+      ],
+      ["ABC-1", "Produto real", "19,90", "", "", "", "", "", "", "7"],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Produtos");
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    const result = parseExcelBuffer(buffer, { codePrefix: "TST" });
+
+    expect(result.profile).toBe("generic");
+    expect(result.products).toEqual([
+      expect.objectContaining({
+        productCode: "ABC-1",
+        name: "Produto real",
+        price: 19.9,
+        stock: 7,
+      }),
+    ]);
+  });
+
+  test("gera códigos diferentes para produtos sem código e nome repetido", () => {
+    const csv = [
+      "codigo,nome,preco,estoque",
+      ",Produto repetido,5,1",
+      ",Produto repetido,5,2",
+    ].join("\n");
+    const result = parseCsvBuffer(Buffer.from(csv, "utf8"), { codePrefix: "TST" });
+
+    expect(result.products[0].productCode).toBe("TST_PRODUTO_REPETIDO");
+    expect(result.products[1].productCode).toBe("TST_PRODUTO_REPETIDO_2");
+    expect(result.stats.autoCodeCount).toBe(2);
+    expect(result.stats.duplicateCodeCount).toBe(0);
   });
 
   test("fixture zagonel.csv real", () => {

@@ -34,6 +34,7 @@ export default function ProductImportSection({
   const [successMessage, setSuccessMessage] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [profile, setProfile] = useState("");
+  const [stats, setStats] = useState(null);
   const [createConfirm, setCreateConfirm] = useState(null);
   const [mergeConfirm, setMergeConfirm] = useState(null);
 
@@ -95,6 +96,7 @@ export default function ProductImportSection({
 
       setWarnings(preview.warnings || []);
       setProfile(preview.profile || "");
+      setStats(preview.stats || null);
       setUserProducts(catalogProducts);
       setParsedItems(preMappedItems);
     } catch (err) {
@@ -182,6 +184,12 @@ export default function ProductImportSection({
     const rows = [...parsedItems];
     const codes = getDuplicateProductCodesFromItems(rows);
     if (codes.length > 0) {
+      if (stockMode === "replace") {
+        setError(
+          `A planilha tem códigos repetidos: ${codes.join(", ")}. Corrija os códigos na revisão antes de sincronizar o catálogo.`,
+        );
+        return;
+      }
       setMergeConfirm({ rows, codes });
       return;
     }
@@ -268,6 +276,22 @@ export default function ProductImportSection({
           {parsedItems.length} produto(s) encontrados
           {profile ? ` (perfil: ${profile})` : ""}.
         </p>
+        {stats ? (
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            <div className="rounded-lg bg-white/70 px-3 py-2">
+              <span className="font-semibold">{stats.autoCodeCount || 0}</span>{" "}
+              código(s) gerado(s)
+            </div>
+            <div className="rounded-lg bg-white/70 px-3 py-2">
+              <span className="font-semibold">{stats.duplicateCodeCount || 0}</span>{" "}
+              código(s) repetido(s)
+            </div>
+            <div className="rounded-lg bg-white/70 px-3 py-2">
+              <span className="font-semibold">{stats.zeroPriceCount || 0}</span>{" "}
+              preço(s) zerado(s)
+            </div>
+          </div>
+        ) : null}
         {warnings.length > 0 ? (
           <ul className="mt-2 list-disc pl-5 text-sm text-amber-900">
             {warnings.slice(0, 5).map((w, i) => (
@@ -280,7 +304,10 @@ export default function ProductImportSection({
         ) : null}
         {duplicateProductCodes.length > 0 ? (
           <p className="mt-2 text-sm font-medium text-amber-900">
-            Códigos repetidos: {duplicateProductCodes.join(", ")}
+            Códigos repetidos: {duplicateProductCodes.join(", ")}.{" "}
+            {stockMode === "replace"
+              ? "Corrija cada código antes de sincronizar."
+              : "Na entrada de estoque, você pode unificar as linhas."}
           </p>
         ) : null}
       </div>
@@ -299,12 +326,14 @@ export default function ProductImportSection({
           setParsedItems([]);
           setFile(null);
           setError(null);
+          setWarnings([]);
+          setStats(null);
         }}
         onConfirm={handleConfirm}
         isLoading={isLoading}
         confirmLabel="Confirmar importação"
         secondaryAction={
-          duplicateProductCodes.length > 0
+          stockMode === "add" && duplicateProductCodes.length > 0
             ? {
                 label: "Unificar códigos duplicados",
                 onClick: () => {
@@ -319,7 +348,7 @@ export default function ProductImportSection({
 
       <ConfirmationModal
         show={!!mergeConfirm}
-        title="Unificar códigos duplicados?"
+        title="Unificar códigos duplicados da entrada?"
         tone="primary"
         confirmText="Unificar e continuar"
         message={

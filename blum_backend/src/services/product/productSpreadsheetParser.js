@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const XLSX = require("xlsx");
-const { getValueByHeader, parseCsvLine } = require("../purchase/csvParseHelpers");
+const { parseCsvLine } = require("../purchase/csvParseHelpers");
 const MAX_IMPORT_ROWS = parseInt(process.env.MAX_IMPORT_ROWS || "50000", 10);
 const MAX_IMPORT_SHEETS = parseInt(process.env.MAX_IMPORT_SHEETS || "10", 10);
 
@@ -65,6 +65,29 @@ function normHeader(h) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+function compactHeader(h) {
+  return normHeader(h).replace(/[^a-z0-9]/g, "");
+}
+
+const HEADER_PREFIXES = {
+  code: ["codigo", "codigodoproduto", "sku", "productcode", "ean", "code"],
+  name: ["nome", "nomedoproduto", "descricao", "name", "product", "produto"],
+  price: ["preco", "precodetabela", "price", "valor", "precounitario"],
+  stock: ["estoque", "quantidadeemestoque", "stock", "quantidade", "qtd", "quantity"],
+  minStock: ["estoqueminimo", "minstock"],
+};
+
+function headerMatches(header, aliases) {
+  const compact = compactHeader(header);
+  return aliases.some((alias) => compact === alias || compact.startsWith(alias));
+}
+
+function valueForHeader(headers, values, aliases) {
+  const index = headers.findIndex((header) => headerMatches(header, aliases));
+  if (index < 0 || values[index] == null) return "";
+  return String(values[index]).trim();
 }
 
 function normalizeProductCode(value) {
@@ -180,9 +203,13 @@ function parseCsvLineWithDelimiter(line, delimiter) {
 }
 
 function headersLookGeneric(headers) {
-  const normalized = headers.map(normHeader).filter(Boolean);
+  const normalized = headers.filter((header) => compactHeader(header));
   if (normalized.length === 0) return false;
-  const hits = normalized.filter((h) => GENERIC_HEADER_KEYS.has(h));
+  const semanticHits = Object.values(HEADER_PREFIXES).filter((aliases) =>
+    normalized.some((header) => headerMatches(header, aliases)),
+  );
+  if (semanticHits.length >= 2) return true;
+  const hits = normalized.map(normHeader).filter((h) => GENERIC_HEADER_KEYS.has(h));
   return hits.length >= 2;
 }
 
@@ -203,15 +230,12 @@ function rowFromErpExport(row) {
 }
 
 function rowFromGeneric(headers, values) {
-  const h = headers.map(normHeader);
   return {
-    productCode: normalizeProductCode(
-      getValueByHeader(h, values, CODE_ALIASES),
-    ),
-    name: getValueByHeader(h, values, NAME_ALIASES),
-    price: parseNumber(getValueByHeader(h, values, PRICE_ALIASES), 0),
-    stock: parseInteger(getValueByHeader(h, values, STOCK_ALIASES), 0),
-    minStock: parseInteger(getValueByHeader(h, values, MIN_STOCK_ALIASES), 0),
+    productCode: normalizeProductCode(valueForHeader(headers, values, HEADER_PREFIXES.code)),
+    name: valueForHeader(headers, values, HEADER_PREFIXES.name),
+    price: parseNumber(valueForHeader(headers, values, HEADER_PREFIXES.price), 0),
+    stock: parseInteger(valueForHeader(headers, values, HEADER_PREFIXES.stock), 0),
+    minStock: parseInteger(valueForHeader(headers, values, HEADER_PREFIXES.minStock), 0),
   };
 }
 
@@ -220,6 +244,9 @@ function normalizeRows(rawRows, options = {}) {
   const warnings = [];
   const products = [];
   let autoCodeCount = 0;
+  const usedCodes = new Set();
+  const duplicateCodes = new Set();
+  let zeroPriceCount = 0;
 
   for (const row of rawRows) {
     if (!row.name || String(row.name).trim() === "") continue;
@@ -228,12 +255,23 @@ function normalizeRows(rawRows, options = {}) {
     if (!productCode) {
       productCode = generateAutoCode(row.name, codePrefix);
       if (productCode) {
+        const baseCode = productCode;
+        let suffix = 2;
+        while (usedCodes.has(productCode.toLocaleLowerCase("pt-BR"))) {
+          productCode = `${baseCode}_${suffix}`;
+          suffix++;
+        }
         autoCodeCount++;
         warnings.push(`Código gerado para "${row.name.slice(0, 40)}": ${productCode}`);
       }
     }
 
     if (!productCode) continue;
+
+    const normalizedCodeKey = productCode.toLocaleLowerCase("pt-BR");
+    if (usedCodes.has(normalizedCodeKey)) duplicateCodes.add(productCode);
+    usedCodes.add(normalizedCodeKey);
+    if (Number(row.price ?? 0) === 0) zeroPriceCount++;
 
     products.push({
       productCode,
@@ -248,7 +286,26 @@ function normalizeRows(rawRows, options = {}) {
     warnings.unshift(`${autoCodeCount} produto(s) sem código — códigos gerados automaticamente.`);
   }
 
-  return { products, warnings };
+  if (duplicateCodes.size > 0) {
+    warnings.unshift(
+      `${duplicateCodes.size} código(s) repetido(s) na planilha: ${[...duplicateCodes].slice(0, 10).join(", ")}.`,
+    );
+  }
+
+  if (zeroPriceCount > 0) {
+    warnings.push(`${zeroPriceCount} produto(s) estão com preço zero.`);
+  }
+
+  return {
+    products,
+    warnings,
+    stats: {
+      autoCodeCount,
+      duplicateCodeCount: duplicateCodes.size,
+      duplicateCodes: [...duplicateCodes],
+      zeroPriceCount,
+    },
+  };
 }
 
 function parseCsvBuffer(buffer, options = {}) {
@@ -276,10 +333,11 @@ function parseCsvBuffer(buffer, options = {}) {
     }
   }
 
-  const { products, warnings } = normalizeRows(rawRows, options);
+  const { products, warnings, stats } = normalizeRows(rawRows, options);
   return {
     products,
     warnings,
+    stats,
     profile: useGeneric ? "generic" : "erp_export",
   };
 }
@@ -327,10 +385,11 @@ function parseExcelBuffer(buffer, options = {}) {
     }
   }
 
-  const { products, warnings } = normalizeRows(rawRows, options);
+  const { products, warnings, stats } = normalizeRows(rawRows, options);
   return {
     products,
     warnings,
+    stats,
     profile: useGeneric ? "generic" : "erp_export",
   };
 }

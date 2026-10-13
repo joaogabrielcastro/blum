@@ -22,8 +22,9 @@ exports.previewImport = async (req, res) => {
 
     res.json(preview);
   } catch (error) {
-    console.error("previewImport error:", error);
-    res.status(500).json({ error: error.message || "Erro ao processar planilha." });
+    const status = error.status || error.statusCode || 500;
+    if (status >= 500) console.error("previewImport error:", error);
+    res.status(status).json({ error: error.message || "Erro ao processar planilha." });
   }
 };
 

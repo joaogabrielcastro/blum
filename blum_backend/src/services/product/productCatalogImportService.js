@@ -17,6 +17,7 @@ function previewFromBuffer(buffer, options = {}) {
     items,
     warnings: result.warnings,
     profile: result.profile,
+    stats: result.stats,
     rowCount: items.length,
   };
 }
