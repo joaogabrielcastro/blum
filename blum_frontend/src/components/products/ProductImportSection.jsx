@@ -250,8 +250,8 @@ export default function ProductImportSection({
         />
 
         {onClose ? (
-          <div className="mt-4 flex justify-end">
-            <SecondaryButton type="button" onClick={onClose}>
+          <div className="mt-4 flex justify-stretch md:hidden">
+            <SecondaryButton type="button" onClick={onClose} className="w-full">
               Fechar
             </SecondaryButton>
           </div>

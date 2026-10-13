@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
+const PAGE_SIZE = 40;
 
 const VerificationTable = ({
   items = [],
@@ -8,8 +10,24 @@ const VerificationTable = ({
   description = "",
   source = "PDF",
 }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const visibleItems = useMemo(
+    () => items.slice(pageStart, pageStart + PAGE_SIZE),
+    [items, pageStart],
+  );
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   const handleChange = (index, field, value) => {
     onItemChange(index, field, value);
+  };
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.min(totalPages, Math.max(1, page)));
   };
 
   return (
@@ -22,6 +40,11 @@ const VerificationTable = ({
           {description && (
             <p className="text-sm text-gray-600">{description}</p>
           )}
+          {items.length > PAGE_SIZE ? (
+            <p className="mt-1 text-xs font-medium text-gray-500">
+              Exibindo {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, items.length)} de {items.length}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -30,21 +53,23 @@ const VerificationTable = ({
       ) : (
         <>
           <div className="space-y-3 md:hidden">
-            {items.map((it, idx) => (
+            {visibleItems.map((it, idx) => {
+              const itemIndex = pageStart + idx;
+              return (
               <section
-                key={idx}
+                key={it.id ?? itemIndex}
                 className="rounded-xl border border-gray-200 bg-gray-50/70 p-3"
-                aria-label={`Produto ${idx + 1}`}
+                aria-label={`Produto ${itemIndex + 1}`}
               >
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Produto {idx + 1}
+                  Produto {itemIndex + 1}
                 </p>
                 <div className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700">
                     Código
                     <input
                       value={it.productCode || ""}
-                      onChange={(e) => handleChange(idx, "productCode", e.target.value)}
+                      onChange={(e) => handleChange(itemIndex, "productCode", e.target.value)}
                       className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
                     />
                   </label>
@@ -52,7 +77,7 @@ const VerificationTable = ({
                     Descrição
                     <input
                       value={it.description || ""}
-                      onChange={(e) => handleChange(idx, "description", e.target.value)}
+                      onChange={(e) => handleChange(itemIndex, "description", e.target.value)}
                       className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
                     />
                   </label>
@@ -63,7 +88,7 @@ const VerificationTable = ({
                         type="number"
                         step="any"
                         value={it.quantity ?? ""}
-                        onChange={(e) => handleChange(idx, "quantity", e.target.value)}
+                        onChange={(e) => handleChange(itemIndex, "quantity", e.target.value)}
                         className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
                       />
                     </label>
@@ -73,7 +98,7 @@ const VerificationTable = ({
                         type="number"
                         step="any"
                         value={it.unitPrice ?? ""}
-                        onChange={(e) => handleChange(idx, "unitPrice", e.target.value)}
+                        onChange={(e) => handleChange(itemIndex, "unitPrice", e.target.value)}
                         className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
                       />
                     </label>
@@ -82,7 +107,7 @@ const VerificationTable = ({
                     Vínculo no catálogo
                     <select
                       value={it.mappedProductId || ""}
-                      onChange={(e) => handleChange(idx, "mappedProductId", e.target.value)}
+                      onChange={(e) => handleChange(itemIndex, "mappedProductId", e.target.value)}
                       className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
                     >
                       <option value="">-- Novo produto --</option>
@@ -95,7 +120,8 @@ const VerificationTable = ({
                   </label>
                 </div>
               </section>
-            ))}
+              );
+            })}
           </div>
 
           <div className="hidden overflow-x-auto md:block">
@@ -110,13 +136,15 @@ const VerificationTable = ({
               </tr>
             </thead>
             <tbody>
-              {items.map((it, idx) => (
-                <tr key={idx} className="border-t">
+              {visibleItems.map((it, idx) => {
+                const itemIndex = pageStart + idx;
+                return (
+                <tr key={it.id ?? itemIndex} className="border-t">
                   <td className="px-3 py-2 align-top">
                     <input
                       value={it.productCode || ""}
                       onChange={(e) =>
-                        handleChange(idx, "productCode", e.target.value)
+                        handleChange(itemIndex, "productCode", e.target.value)
                       }
                       className="w-32 p-1 border rounded"
                     />
@@ -125,7 +153,7 @@ const VerificationTable = ({
                     <input
                       value={it.description || ""}
                       onChange={(e) =>
-                        handleChange(idx, "description", e.target.value)
+                        handleChange(itemIndex, "description", e.target.value)
                       }
                       className="w-64 p-1 border rounded"
                     />
@@ -136,7 +164,7 @@ const VerificationTable = ({
                       step="any"
                       value={it.quantity ?? ""}
                       onChange={(e) =>
-                        handleChange(idx, "quantity", e.target.value)
+                        handleChange(itemIndex, "quantity", e.target.value)
                       }
                       className="w-20 p-1 border rounded"
                     />
@@ -147,7 +175,7 @@ const VerificationTable = ({
                       step="any"
                       value={it.unitPrice ?? ""}
                       onChange={(e) =>
-                        handleChange(idx, "unitPrice", e.target.value)
+                        handleChange(itemIndex, "unitPrice", e.target.value)
                       }
                       className="w-28 p-1 border rounded"
                     />
@@ -156,7 +184,7 @@ const VerificationTable = ({
                     <select
                       value={it.mappedProductId || ""}
                       onChange={(e) =>
-                        handleChange(idx, "mappedProductId", e.target.value)
+                        handleChange(itemIndex, "mappedProductId", e.target.value)
                       }
                       className="w-48 p-1 border rounded"
                     >
@@ -169,10 +197,39 @@ const VerificationTable = ({
                     </select>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>
+          {totalPages > 1 ? (
+            <nav
+              className="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between"
+              aria-label="Paginação da revisão"
+            >
+              <p className="text-center text-sm text-gray-600 sm:text-left">
+                Página {currentPage} de {totalPages}
+              </p>
+              <div className="grid grid-cols-2 gap-2 sm:flex">
+                <button
+                  type="button"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Próxima
+                </button>
+              </div>
+            </nav>
+          ) : null}
         </>
       )}
     </div>

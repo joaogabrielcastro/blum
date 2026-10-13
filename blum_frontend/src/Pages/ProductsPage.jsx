@@ -262,7 +262,7 @@ const ProductsPage = ({ userRole, subscription }) => {
             onClose={() => setShowImport(false)}
             title="Importar produtos"
             description="Escolha a representada e envie uma planilha Excel ou CSV"
-            widthClass="max-w-5xl"
+            widthClass="max-w-4xl"
           >
             <ProductImportSection
               brands={brands}
@@ -538,7 +538,7 @@ const ProductsPage = ({ userRole, subscription }) => {
           onClose={() => setShowImport(false)}
           title="Importar produtos"
           description="Envie uma planilha Excel ou CSV"
-          widthClass="max-w-5xl"
+          widthClass="max-w-4xl"
         >
           <ProductImportSection
             brands={brands}
