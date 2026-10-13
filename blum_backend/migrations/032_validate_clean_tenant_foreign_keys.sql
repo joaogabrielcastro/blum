@@ -6,6 +6,41 @@
 -- ao tenant `default`, pois ainda não reconciliava o tenant pelo produto.
 -- Preserva esses históricos corrigindo o tenant a partir do produto real e
 -- registra cada movimentação antes de validar a FK composta.
+-- Históricos cujo produto já foi removido também são preservados: somente a
+-- referência órfã é anulada e o ocorrido fica registrado na auditoria.
+INSERT INTO audit_logs (
+  tenant_id,
+  actor_user_id,
+  action,
+  resource_type,
+  resource_id,
+  metadata
+)
+SELECT
+  ph.tenant_id,
+  NULL,
+  'migration.price_history_orphan_product_detach',
+  'price_history',
+  ph.id::text,
+  jsonb_build_object(
+    'migration', '032_validate_clean_tenant_foreign_keys.sql',
+    'tenantId', ph.tenant_id,
+    'orphanProductId', ph.product_id
+  )
+FROM price_history ph
+LEFT JOIN products p ON p.id = ph.product_id
+WHERE ph.product_id IS NOT NULL
+  AND p.id IS NULL;
+
+UPDATE price_history ph
+SET product_id = NULL
+WHERE ph.product_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM products p
+    WHERE p.id = ph.product_id
+  );
+
 INSERT INTO audit_logs (
   tenant_id,
   actor_user_id,
