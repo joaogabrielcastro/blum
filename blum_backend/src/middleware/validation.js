@@ -28,8 +28,8 @@ exports.validateProduct = [
     .withMessage("Preço deve ser maior que zero"),
 
   body("stock")
-    .isInt({ min: 0 })
-    .withMessage("Estoque deve ser um número inteiro positivo"),
+    .isInt()
+    .withMessage("Estoque deve ser um número inteiro"),
 
   body("brand").trim().notEmpty().withMessage("Marca é obrigatória"),
 
@@ -63,8 +63,8 @@ exports.validateProductUpdate = [
 
   body("stock")
     .optional()
-    .isInt({ min: 0 })
-    .withMessage("Estoque deve ser um número inteiro positivo"),
+    .isInt()
+    .withMessage("Estoque deve ser um número inteiro"),
 
   body("brand")
     .optional()

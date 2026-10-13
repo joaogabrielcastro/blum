@@ -9,13 +9,27 @@ export default function OrderFormProductSearch({
   onResetSearch,
   onOpenMobilePicker,
   onProductSelect,
+  canCreateProduct = false,
+  onCreateProduct,
 }) {
   return (
     <div className="space-y-5 pt-1">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Buscar produto (várias palavras, sem precisar igual ao cadastro)
-        </label>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <label className="block text-sm font-medium text-gray-700">
+            Buscar produto (várias palavras, sem precisar igual ao cadastro)
+          </label>
+          {canCreateProduct ? (
+            <button
+              type="button"
+              onClick={onCreateProduct}
+              disabled={!selectedBrand}
+              className="shrink-0 rounded-lg border border-brand/30 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              + Cadastrar produto
+            </button>
+          ) : null}
+        </div>
 
         <button
           type="button"

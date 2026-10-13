@@ -415,7 +415,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         message={
           modalAction.type === "delete"
             ? "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
-            : "Confirmar finalização da entrega? O estoque será baixado e o status ficará como Entregue."
+            : "Confirmar finalização da entrega? O estoque já foi baixado na confirmação do pedido."
         }
       />
       <ConfirmationModal

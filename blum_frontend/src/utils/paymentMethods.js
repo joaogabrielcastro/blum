@@ -28,7 +28,6 @@ export function canFinalizeDelivery(order) {
   if (!hasPaymentMethod(order.paymentMethod ?? order.payment_method)) {
     return false;
   }
-  if (order.hasStockWarning || order.has_stock_warning) return false;
   return true;
 }
 
@@ -54,9 +53,6 @@ export function finalizeDeliveryBlockReason(order) {
   if (order.status === "Entregue") return "Este pedido já foi finalizado.";
   if (!hasPaymentMethod(order.paymentMethod ?? order.payment_method)) {
     return "Defina a forma de pagamento antes de finalizar a entrega.";
-  }
-  if (order.hasStockWarning || order.has_stock_warning) {
-    return "Este pedido tem itens sem estoque. A entrega fica bloqueada até haver estoque.";
   }
   return null;
 }

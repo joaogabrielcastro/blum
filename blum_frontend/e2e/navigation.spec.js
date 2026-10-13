@@ -42,6 +42,6 @@ const runE2e = process.env.RUN_E2E === "1";
 
     await expect(page.getByText("Período", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Total de Pedidos")).toBeVisible();
-    await expect(page.getByText("Total de Comissões")).toBeVisible();
+    await expect(page.getByText("Comissões previstas")).toBeVisible();
   });
 });

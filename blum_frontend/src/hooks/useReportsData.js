@@ -4,6 +4,7 @@ import { useAppData } from "../context/AppDataProvider";
 import {
   monthYearKey,
   getPreviousCalendarMonth,
+  orderDocumentType,
 } from "../utils/orderApiFields";
 
 const now = new Date();
@@ -66,10 +67,10 @@ export function useReportsData({ userRole, userId }) {
         }
         setUsersById(teamMap);
 
-        const finishedOrders = ordersData.filter(
-          (order) => order.status === "Entregue",
+        const confirmedOrders = ordersData.filter(
+          (order) => orderDocumentType(order) === "pedido",
         );
-        setAllOrders(finishedOrders);
+        setAllOrders(confirmedOrders);
         setMonthlySummaries(Array.isArray(summariesData) ? summariesData : []);
       } catch (error) {
         console.error("Erro ao buscar relatórios:", error);

@@ -45,7 +45,11 @@ async function updateOrderCore(executor, payload) {
           document_type = $7,
           payment_method = $8,
           createdat = COALESCE($9, createdat),
-          has_stock_warning = $10
+          has_stock_warning = $10,
+          stock_committed_at = CASE
+            WHEN $7 = 'pedido' THEN COALESCE(stock_committed_at, NOW())
+            ELSE NULL
+          END
       WHERE id = $11 AND tenant_id = $12
       RETURNING *
     `,
@@ -123,7 +127,6 @@ async function decreaseProductStock(executor, { productId, quantity, tenantId: t
       SET stock = stock - $1::integer
       WHERE id = $2
         AND tenant_id = $3
-        AND stock >= $1::integer
       RETURNING id
     `,
     [qInt, productId, tenantId],

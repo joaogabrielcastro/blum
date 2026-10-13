@@ -2,11 +2,12 @@ import { useEffect, useRef } from "react";
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function useAccessibleDialog(onClose) {
+export default function useAccessibleDialog(onClose, active = true) {
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
+    if (!active) return undefined;
     const dialog = dialogRef.current;
     const opener = document.activeElement;
     const previousOverflow = document.body.style.overflow;
@@ -29,6 +30,6 @@ export default function useAccessibleDialog(onClose) {
       document.body.style.overflow = previousOverflow;
       if (opener instanceof HTMLElement) opener.focus();
     };
-  }, []);
+  }, [active]);
   return dialogRef;
 }

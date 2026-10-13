@@ -21,7 +21,7 @@ describe("paymentMethods", () => {
     expect(needsPaymentRegistration("boleto")).toBe(false);
   });
 
-  it("bloqueia finalizar entrega sem pagamento ou sem estoque", () => {
+  it("bloqueia sem pagamento, mas permite finalizar sem estoque", () => {
     expect(
       canFinalizeDelivery({
         documentType: "pedido",
@@ -42,7 +42,7 @@ describe("paymentMethods", () => {
         paymentMethod: "boleto",
         hasStockWarning: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       finalizeDeliveryBlockReason({
         documentType: "pedido",
@@ -55,7 +55,7 @@ describe("paymentMethods", () => {
         paymentMethod: "pix",
         hasStockWarning: true,
       }),
-    ).toMatch(/sem estoque/);
+    ).toBeNull();
   });
 
   it("restringe PIX/dinheiro quando há desconto geral", () => {

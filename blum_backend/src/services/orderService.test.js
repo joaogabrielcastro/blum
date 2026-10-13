@@ -34,14 +34,14 @@ describe("orderService", () => {
     await expect(orderService.delete(999, 1)).rejects.toThrow(/não encontrado/i);
   });
 
-  test("updateStatus não permite contornar a baixa de estoque", async () => {
+  test("updateStatus não permite contornar a finalização da entrega", async () => {
     await expect(orderService.updateStatus(1, "Entregue", 1)).rejects.toMatchObject({
       statusCode: 400,
     });
     expect(sql).not.toHaveBeenCalled();
   });
 
-  test("finalize faz rollback quando o estoque é insuficiente", async () => {
+  test("finalize apenas marca a entrega, sem baixar estoque novamente", async () => {
     jest.spyOn(orderService, "findById").mockResolvedValueOnce({
       id: 8,
       document_type: "pedido",
@@ -50,17 +50,47 @@ describe("orderService", () => {
     pool.connect.mockResolvedValueOnce(client);
     const repository = require("../repositories/orderRepository");
     jest.spyOn(repository, "markOrderDelivered").mockResolvedValueOnce([{ id: 8 }]);
-    jest.spyOn(repository, "getOrderLinesForStock").mockResolvedValueOnce([
-      { product_id: 5, quantity: 2, brand: "Marca" },
-    ]);
-    jest.spyOn(repository, "decreaseProductStock").mockResolvedValueOnce([]);
+    jest.spyOn(repository, "decreaseProductStock");
 
-    await expect(orderService.finalize(8, 1)).rejects.toMatchObject({
-      statusCode: 409,
+    await expect(orderService.finalize(8, 1)).resolves.toEqual({
+      message: "Pedido finalizado com sucesso",
     });
-    expect(client.query).toHaveBeenCalledWith("ROLLBACK");
-    expect(client.query).not.toHaveBeenCalledWith("COMMIT");
+    expect(repository.decreaseProductStock).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenCalledWith("COMMIT");
     expect(client.release).toHaveBeenCalled();
+  });
+
+  test("converter orçamento em pedido baixa o estoque mesmo ficando negativo", async () => {
+    jest.spyOn(orderService, "findById")
+      .mockResolvedValueOnce({
+        id: 8,
+        document_type: "orcamento",
+        status: "Em aberto",
+        discount: 0,
+        items: [{ productId: 5, quantity: 2, brand: "Marca" }],
+      })
+      .mockResolvedValueOnce({ id: 8, document_type: "pedido" });
+    jest.spyOn(orderService, "loadProductStockMap").mockResolvedValueOnce(
+      new Map([["5", { stock: 0, name: "Produto", brand: "Marca", price: 10 }]]),
+    );
+    jest.spyOn(orderService, "calculateItemsCommission").mockResolvedValueOnce({
+      finalTotal: 20,
+      totalCommission: 2,
+      items: [{ productId: 5, quantity: 2, brand: "Marca", price: 10 }],
+    });
+    jest.spyOn(orderService, "persistOrderItemsWithClient").mockResolvedValueOnce();
+    const client = { query: jest.fn().mockResolvedValue({ rows: [] }), release: jest.fn() };
+    pool.connect.mockResolvedValueOnce(client);
+    const repository = require("../repositories/orderRepository");
+    jest.spyOn(repository, "decreaseProductStock").mockResolvedValueOnce([{ id: 5, stock: -2 }]);
+
+    await orderService.convertToPedido(8, 1, { confirm_stock_warning: true });
+
+    expect(repository.decreaseProductStock).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ productId: "5", quantity: 2, tenantId: 1 }),
+    );
+    expect(client.query).toHaveBeenCalledWith("COMMIT");
   });
 
   test("vendedor usa preço, nome e marca oficiais do catálogo", () => {

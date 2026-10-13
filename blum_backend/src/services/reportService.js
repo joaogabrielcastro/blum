@@ -13,7 +13,7 @@ class ReportService {
         SUM(o.totalprice) AS "totalSales"
       FROM orders o
       JOIN users u ON u.id = o.user_ref
-      WHERE o.status = 'Entregue' AND o.tenant_id = ${tenantId}
+      WHERE o.document_type = 'pedido' AND o.tenant_id = ${tenantId}
       GROUP BY u.id, u.username, u.name
       ORDER BY "totalSales" DESC
     `;
@@ -30,7 +30,7 @@ class ReportService {
         COALESCE(COUNT(id), 0) AS "totalOrders",
         COALESCE(SUM(totalprice), 0) AS "totalSales"
       FROM orders
-      WHERE status = 'Entregue' AND tenant_id = ${tenantId}
+      WHERE document_type = 'pedido' AND tenant_id = ${tenantId}
     `;
     const params = [];
 
@@ -67,7 +67,7 @@ class ReportService {
         SUM(o.total_commission) as total_commission
       FROM orders o
       JOIN users u ON u.id = o.user_ref
-      WHERE o.status = 'Entregue' AND o.tenant_id = ${tenantId}
+      WHERE o.document_type = 'pedido' AND o.tenant_id = ${tenantId}
     `;
 
     if (startDate) {
@@ -94,7 +94,7 @@ class ReportService {
     tenantId = requireTenantId(tenantId);
 
     let conditions = [
-      "o.status = 'Entregue'",
+      "o.document_type = 'pedido'",
       `o.tenant_id = ${tenantId}`,
     ];
     const params = [];
@@ -171,7 +171,7 @@ class ReportService {
         COUNT(o.id)::int AS order_count,
         NOW()
       FROM orders o
-      WHERE o.status = 'Entregue'
+      WHERE o.document_type = 'pedido'
         AND o.tenant_id = ${tenantId}
         AND o.createdat IS NOT NULL
       GROUP BY o.tenant_id, year, month, o.user_ref
@@ -193,7 +193,7 @@ class ReportService {
         COUNT(o.id)::int AS order_count,
         NOW()
       FROM orders o
-      WHERE o.status = 'Entregue'
+      WHERE o.document_type = 'pedido'
         AND o.tenant_id = ${tenantId}
         AND o.createdat IS NOT NULL
       GROUP BY o.tenant_id, year, month

@@ -15,8 +15,8 @@ const ProductsForm = ({
     productcode: "",
     price: "",
     brand: "",
-    stock: "",
-    minstock: "",
+    stock: "0",
+    minstock: "0",
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,8 +38,8 @@ const ProductsForm = ({
         productcode: "",
         price: "",
         brand: defaultBrand || "",
-        stock: "",
-        minstock: "",
+        stock: "0",
+        minstock: "0",
       });
     }
   }, [product, defaultBrand]);
@@ -52,10 +52,8 @@ const ProductsForm = ({
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
-    if (formData.stock === "" || parseInt(formData.stock, 10) < 0)
-      newErrors.stock = "Estoque não pode ser negativo";
-    if (formData.minstock === "" || parseInt(formData.minstock, 10) < 0)
-      newErrors.minstock = "Estoque mínimo não pode ser negativo";
+    if (formData.stock === "" || !Number.isInteger(Number(formData.stock)))
+      newErrors.stock = "Informe um saldo inteiro";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -191,26 +189,14 @@ const ProductsForm = ({
         )}
       </FormField>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div>
         <FormField label="Estoque" required error={errors.stock}>
           <input
             type="number"
-            min="0"
             name="stock"
             value={formData.stock}
             onChange={handleChange}
             className={inputClassName(Boolean(errors.stock))}
-            placeholder="0"
-          />
-        </FormField>
-        <FormField label="Estoque mínimo" required error={errors.minstock}>
-          <input
-            type="number"
-            min="0"
-            name="minstock"
-            value={formData.minstock}
-            onChange={handleChange}
-            className={inputClassName(Boolean(errors.minstock))}
             placeholder="0"
           />
         </FormField>

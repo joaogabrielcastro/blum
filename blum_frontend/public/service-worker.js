@@ -1,4 +1,6 @@
-const CACHE_NAME = "blum-static-v5";
+// Alterar a versão em releases que mudam regras de exibição força a remoção
+// do bundle anterior em instalações PWA/offline.
+const CACHE_NAME = "blum-static-v6-reports-period";
 
 const PRECACHE_URLS = [
   "/",

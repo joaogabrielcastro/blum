@@ -25,6 +25,10 @@ export function orderTotalCommission(order) {
   return parseFloat(v) || 0;
 }
 
+export function orderDocumentType(order) {
+  return order.documentType ?? order.document_type ?? "orcamento";
+}
+
 export function orderClientId(order) {
   return order.clientId ?? order.clientid ?? order.client_id;
 }

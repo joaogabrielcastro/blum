@@ -200,6 +200,18 @@ export function useReportsMetrics({
     0,
   );
 
+  const deliveredOrders = ordersToDisplay.filter(
+    (order) => order.status === "Entregue",
+  );
+  const realizedSales = deliveredOrders.reduce(
+    (acc, order) => acc + amountForScope(order),
+    0,
+  );
+  const realizedCommissions = deliveredOrders.reduce(
+    (acc, order) => acc + commissionForScope(order),
+    0,
+  );
+
   const salesByRepresentadaMap = useMemo(
     () => accumulateSalesByRepresentada(ordersToDisplay),
     [ordersToDisplay],
@@ -270,6 +282,9 @@ export function useReportsMetrics({
     chartData,
     totalSales,
     totalCommissions,
+    realizedSales,
+    realizedCommissions,
+    deliveredOrderCount: deliveredOrders.length,
     brandBars,
     marcasComVenda,
     mediaPorRepresentada,

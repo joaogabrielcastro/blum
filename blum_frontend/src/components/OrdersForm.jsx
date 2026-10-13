@@ -40,6 +40,8 @@ import {
   SecondaryButton,
   GhostButton,
 } from "./ui/Surface";
+import ProductsForm from "./ProductsForm";
+import useAccessibleDialog from "../hooks/useAccessibleDialog";
 
 const LAST_BRAND_KEY = "blum.lastOrderBrandId";
 
@@ -111,6 +113,11 @@ const OrdersForm = ({
     toDateTimeLocalValue(new Date()),
   );
   const [stockWarningModalOpen, setStockWarningModalOpen] = useState(false);
+  const [productCreateOpen, setProductCreateOpen] = useState(false);
+  const productCreateDialogRef = useAccessibleDialog(
+    () => setProductCreateOpen(false),
+    productCreateOpen,
+  );
 
   const documentType = editingOrder
     ? editingOrder.documentType === "pedido"
@@ -144,6 +151,18 @@ const OrdersForm = ({
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
   const canEditUnitPrice = userRole === "admin";
+
+  const createProductInsideOrder = async (productData) => {
+    const created = await apiService.createProduct({
+      ...productData,
+      brand: selectedBrand,
+      stock: Number(productData.stock) || 0,
+      minstock: 0,
+    });
+    setProductCreateOpen(false);
+    handleProductSelect(created);
+    toast.success("Produto cadastrado e pronto para adicionar ao pedido.");
+  };
 
   useEffect(() => {
     const orderKey =
@@ -684,7 +703,7 @@ const OrdersForm = ({
             </p>
             <p className="mt-1 text-sm text-amber-900/90">
               {documentType === "pedido"
-                ? "Ao salvar o pedido será necessária confirmação. A entrega fica bloqueada até haver estoque."
+                ? "O pedido pode ser salvo e faturado; ao finalizar, a baixa será automática e o saldo poderá ficar negativo."
                 : "Você pode salvar o orçamento; o aviso ficará registrado."}
             </p>
           </div>
@@ -732,6 +751,8 @@ const OrdersForm = ({
                     onResetSearch={resetProductSearch}
                     onOpenMobilePicker={() => setMobileProductPickerOpen(true)}
                     onProductSelect={handleProductSelect}
+                    canCreateProduct={userRole === "admin"}
+                    onCreateProduct={() => setProductCreateOpen(true)}
                   />
                   <OrderFormProductStaging
                     stagingItem={stagingItem}
@@ -837,7 +858,7 @@ const OrdersForm = ({
         }
         description={
           documentType === "pedido"
-            ? "Confirme apenas se o cliente está ciente. A finalização da entrega continuará bloqueada enquanto faltar estoque."
+            ? "Confirme para continuar. A entrega poderá ser finalizada e a baixa automática poderá deixar o saldo negativo."
             : "O orçamento será salvo com aviso visível para o admin e para você."
         }
         lines={stockWarningLines}
@@ -850,6 +871,32 @@ const OrdersForm = ({
         onConfirm={handleConfirmStockWarningSave}
         onCancel={() => setStockWarningModalOpen(false)}
       />
+
+      {productCreateOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div
+            ref={productCreateDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cadastrar produto no pedido"
+            tabIndex={-1}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[1.5rem] border border-edge bg-surface p-5 shadow-2xl sm:p-6"
+          >
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-ink">Cadastrar produto</h2>
+              <p className="mt-1 text-sm text-ink-muted">
+                O produto será cadastrado em {selectedBrand} e adicionado ao fluxo deste pedido.
+              </p>
+            </div>
+            <ProductsForm
+              brands={brands}
+              defaultBrand={selectedBrand}
+              onSubmit={createProductInsideOrder}
+              onCancel={() => setProductCreateOpen(false)}
+            />
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };

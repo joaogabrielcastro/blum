@@ -669,9 +669,10 @@ class OrderService {
         `INSERT INTO orders
           (clientid, user_ref, tenant_id, description, discount, totalprice,
            total_commission, status, createdat, document_type, payment_method,
-           has_stock_warning, client_request_id)
+           has_stock_warning, client_request_id, stock_committed_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'Em aberto',
-                 COALESCE($8, NOW()), $9, $10, $11, $12)
+                 COALESCE($8, NOW()), $9, $10, $11, $12,
+                 CASE WHEN $9 = 'pedido' THEN NOW() ELSE NULL END)
          RETURNING id`,
         [
           clientid,
@@ -695,6 +696,23 @@ class OrderService {
         calculated.items,
         tenantId,
       );
+      if (docType === "pedido") {
+        const orderedStock = aggregateControlledStockQuantities(calculated.items);
+        for (const [productId, quantity] of orderedStock) {
+          const updatedStock = await orderRepository.decreaseProductStock(client, {
+            productId,
+            quantity,
+            tenantId,
+          });
+          if (updatedStock.length === 0) {
+            const err = new Error(
+              `Produto #${productId} não encontrado ao baixar o estoque.`,
+            );
+            err.statusCode = 404;
+            throw err;
+          }
+        }
+      }
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
@@ -735,8 +753,8 @@ class OrderService {
     );
     const existingDoc =
       existing.document_type ?? existing.documentType ?? null;
-    const isDeliveredPedido =
-      existing.status === "Entregue" && existingDoc === "pedido";
+    const hadStockCommitted =
+      existingDoc === "pedido" && Boolean(existing.stock_committed_at);
     const previousControlledStock = aggregateControlledStockQuantities(
       existing.items || [],
     );
@@ -761,7 +779,7 @@ class OrderService {
       canOverridePrice: authUser.role === "admin",
     });
     const itemsWithStock = this.enrichItemsWithStockWarnings(catalogItems, stockMap, {
-      previousControlledStock: isDeliveredPedido
+      previousControlledStock: hadStockCommitted
         ? previousControlledStock
         : new Map(),
     });
@@ -812,10 +830,10 @@ class OrderService {
         tenantId,
       );
 
-      if (isDeliveredPedido) {
-        const nextControlledStock = aggregateControlledStockQuantities(
-          calculated.items || [],
-        );
+      if (hadStockCommitted || docType === "pedido") {
+        const nextControlledStock = docType === "pedido"
+          ? aggregateControlledStockQuantities(calculated.items || [])
+          : new Map();
         const productIds = new Set([
           ...previousControlledStock.keys(),
           ...nextControlledStock.keys(),
@@ -838,9 +856,9 @@ class OrderService {
             );
             if (updatedStock.length === 0) {
               const err = new Error(
-                `Estoque insuficiente ao ajustar o pedido entregue para o produto #${productId}.`,
+                `Produto #${productId} não encontrado ao ajustar o estoque.`,
               );
-              err.statusCode = 409;
+              err.statusCode = 404;
               throw err;
             }
           } else {
@@ -1044,7 +1062,8 @@ class OrderService {
       await client.query(
         `
           UPDATE orders
-          SET document_type = 'pedido', has_stock_warning = $1
+          SET document_type = 'pedido', has_stock_warning = $1,
+              stock_committed_at = NOW()
           WHERE id = $2 AND tenant_id = $3
         `,
         [hasStockWarning, id, tenantId],
@@ -1055,6 +1074,21 @@ class OrderService {
         calculated.items,
         tenantId,
       );
+      const orderedStock = aggregateControlledStockQuantities(calculated.items);
+      for (const [productId, quantity] of orderedStock) {
+        const updatedStock = await orderRepository.decreaseProductStock(client, {
+          productId,
+          quantity,
+          tenantId,
+        });
+        if (updatedStock.length === 0) {
+          const err = new Error(
+            `Produto #${productId} não encontrado ao baixar o estoque.`,
+          );
+          err.statusCode = 404;
+          throw err;
+        }
+      }
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK");
@@ -1073,7 +1107,7 @@ class OrderService {
     }
     if (status === "Entregue") {
       const err = new Error(
-        "Use a finalização do pedido para marcar como Entregue e baixar o estoque.",
+        "Use a finalização do pedido para marcar como Entregue.",
       );
       err.statusCode = 400;
       throw err;
@@ -1095,10 +1129,32 @@ class OrderService {
 
   async delete(id, tenantId) {
     tenantId = requireTenantId(tenantId);
-    const result = await sql`DELETE FROM orders WHERE id = ${id} AND tenant_id = ${tenantId} RETURNING *`;
-
-    if (result.length === 0) {
-      throw new Error("Pedido não encontrado");
+    const current = await this.findById(id, tenantId);
+    const currentDoc = current.document_type ?? current.documentType ?? null;
+    const committedStock = currentDoc === "pedido" && current.stock_committed_at
+      ? aggregateControlledStockQuantities(current.items || [])
+      : new Map();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const [productId, quantity] of committedStock) {
+        await orderRepository.increaseProductStock(client, {
+          productId,
+          quantity,
+          tenantId,
+        });
+      }
+      const result = await client.query(
+        "DELETE FROM orders WHERE id = $1 AND tenant_id = $2 RETURNING id",
+        [id, tenantId],
+      );
+      if (result.rows.length === 0) throw new Error("Pedido não encontrado");
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
   }
 
@@ -1128,37 +1184,6 @@ class OrderService {
         const err = new Error("Pedido já foi finalizado");
         err.statusCode = 409;
         throw err;
-      }
-
-      const lines = await orderRepository.getOrderLinesForStock(client, id, tenantId);
-      const itemsArray = lines.map((r) => ({
-        productId: r.product_id,
-        quantity: r.quantity,
-        brand: r.brand,
-      }));
-
-      for (const item of itemsArray) {
-        if (
-          item.productId &&
-          item.quantity &&
-          controlsStockByBrand(item.brand)
-        ) {
-          const updatedStock = await orderRepository.decreaseProductStock(
-            client,
-            {
-              productId: item.productId,
-              quantity: item.quantity,
-              tenantId,
-            },
-          );
-          if (updatedStock.length === 0) {
-            const err = new Error(
-              `Estoque insuficiente ao finalizar pedido para o produto #${item.productId}.`,
-            );
-            err.statusCode = 409;
-            throw err;
-          }
-        }
       }
 
       await client.query("COMMIT");
