@@ -72,6 +72,7 @@ router.put(
   authenticate,
   validateId,
   normalizeOrderPayloadBody,
+  validateOrder,
   ordersController.update,
 );
 router.delete(

@@ -11,11 +11,13 @@ import {
   rowSellerName,
   rowUnitPrice,
 } from "../utils/clientItemPriceHistoryDisplay";
+import useAccessibleDialog from "../hooks/useAccessibleDialog";
 
 const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState("");
+  const dialogRef = useAccessibleDialog(onClose);
 
   useEffect(() => {
     const run = async () => {
@@ -45,8 +47,8 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
   const latest = useMemo(() => rows[0] || null, [rows]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico do cliente para este item" tabIndex={-1} className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-edge bg-surface shadow-2xl">
         <div className="border-b border-gray-200 px-5 py-4">
           <h3 className="text-lg font-bold text-gray-900">
             Histórico do cliente para este item

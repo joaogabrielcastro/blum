@@ -1,5 +1,6 @@
 jest.mock("../config/database", () => ({
   sql: jest.fn().mockResolvedValue([]),
+  pool: { connect: jest.fn() },
 }));
 
 jest.mock("../config/env", () => ({
@@ -7,7 +8,7 @@ jest.mock("../config/env", () => ({
 }));
 
 const jwt = require("jsonwebtoken");
-const { sql } = require("../config/database");
+const { sql, pool } = require("../config/database");
 const refreshTokenService = require("./refreshTokenService");
 
 describe("refreshTokenService", () => {
@@ -38,20 +39,26 @@ describe("refreshTokenService", () => {
       tenantId: 1,
       userId: 2,
     });
-    sql.mockResolvedValueOnce([
-      {
-        id: 99,
-        tenant_id: 1,
-        user_id: 2,
-      },
-    ]);
-    sql.mockResolvedValueOnce([]);
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ rows: [{ id: 99 }] })
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({}),
+      release: jest.fn(),
+    };
+    pool.connect.mockResolvedValueOnce(client);
 
     const rotated = await refreshTokenService.rotateRefreshToken({
       refreshToken: issued,
     });
     expect(rotated.refreshToken).toBeTruthy();
     expect(rotated.tenantId).toBe(1);
+    expect(client.query).toHaveBeenCalledWith("COMMIT");
+    expect(client.release).toHaveBeenCalled();
   });
 
   test("revokeRefreshToken ignora token inválido", async () => {

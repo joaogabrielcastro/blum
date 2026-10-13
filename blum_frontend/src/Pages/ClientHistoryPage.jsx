@@ -88,10 +88,10 @@ const ClientHistoryPage = ({ clients }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-full bg-transparent p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div className="mb-7 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div>
             <button
               type="button"
@@ -114,7 +114,7 @@ const ClientHistoryPage = ({ clients }) => {
               Voltar para clientes
             </button>
             <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold text-gray-800">
+              <h1 className="text-2xl font-bold tracking-[-0.025em] text-ink sm:text-3xl">
                 Histórico de Pedidos
               </h1>
               <button
@@ -152,7 +152,7 @@ const ClientHistoryPage = ({ clients }) => {
         )}
 
         {/* Lista de Pedidos */}
-        <div className="bg-surface rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+        <div className="overflow-hidden rounded-[1.25rem] border border-edge/80 bg-surface/95 shadow-soft backdrop-blur-xl">
           {orders.length === 0 ? (
             <div className="text-center py-12 px-6">
               <div className="text-4xl mb-4">📦</div>

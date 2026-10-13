@@ -37,7 +37,7 @@ module.exports = {
         ],
       },
       boxShadow: {
-        glass: "0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06)",
+        glass: "0 1px 2px rgba(15,23,42,0.04), 0 16px 40px rgba(30,64,175,0.08)",
         soft: "var(--shadow-soft)",
       },
       animation: {

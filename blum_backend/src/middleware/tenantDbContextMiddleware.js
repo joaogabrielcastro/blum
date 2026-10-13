@@ -3,6 +3,7 @@ const { runWithDbContext } = require("../config/database");
 
 const BYPASS_PATH_PREFIXES = [
   "/api/v2/platform/",
+  "/api/v2/auth/refresh",
   "/api/v2/tenants/signup",
   "/api/v2/billing/webhook",
 ];
@@ -36,6 +37,10 @@ function tenantMismatchError() {
 function tenantDbContextMiddleware(req, res, next) {
   const run = async () => {
     const path = req.originalUrl || req.url || "";
+
+    if (path.startsWith("/api/v2/auth/login") && !requestSlug(req)) {
+      return runWithDbContext({ bypassRls: true }, () => next());
+    }
 
     if (pathBypassesRls(path)) {
       return runWithDbContext({ bypassRls: true }, () => next());

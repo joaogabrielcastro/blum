@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import apiService from '../services/apiService';
 import LoadingSpinner from './LoadingSpinner';
+import useAccessibleDialog from '../hooks/useAccessibleDialog';
 
 const PriceHistoryModal = ({ product, onClose }) => {
   const [priceHistory, setPriceHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const dialogRef = useAccessibleDialog(onClose);
 
   useEffect(() => {
     const fetchPriceHistory = async () => {
@@ -44,10 +46,10 @@ const PriceHistoryModal = ({ product, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico de preços" tabIndex={-1} className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface shadow-2xl">
         {/* Cabeçalho */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
+        <div className="bg-gradient-to-br from-slate-950 via-blue-950 to-blue-700 p-6 text-white">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold mb-2">Histórico de Preços</h2>

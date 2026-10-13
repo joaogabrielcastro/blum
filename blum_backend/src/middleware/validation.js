@@ -160,6 +160,13 @@ exports.validateOrder = [
     .isISO8601()
     .withMessage("Data de criação inválida"),
 
+  body("client_request_id")
+    .optional({ values: "falsy" })
+    .isString()
+    .isLength({ min: 8, max: 120 })
+    .matches(/^[a-zA-Z0-9_-]+$/)
+    .withMessage("Identificador idempotente inválido"),
+
   body("document_type")
     .optional()
     .isIn(["orcamento", "pedido"])

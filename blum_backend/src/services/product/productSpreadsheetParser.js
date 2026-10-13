@@ -1,6 +1,15 @@
 const crypto = require("crypto");
 const XLSX = require("xlsx");
 const { getValueByHeader, parseCsvLine } = require("../purchase/csvParseHelpers");
+const MAX_IMPORT_ROWS = parseInt(process.env.MAX_IMPORT_ROWS || "50000", 10);
+const MAX_IMPORT_SHEETS = parseInt(process.env.MAX_IMPORT_SHEETS || "10", 10);
+
+function importLimitError(message) {
+  const error = new Error(message);
+  error.statusCode = 413;
+  error.expose = true;
+  return error;
+}
 
 const CODE_ALIASES = ["codigo", "sku", "productcode", "código", "ean", "code"];
 const NAME_ALIASES = [
@@ -245,6 +254,9 @@ function normalizeRows(rawRows, options = {}) {
 function parseCsvBuffer(buffer, options = {}) {
   const text = stripBom(buffer.toString("utf8"));
   const lines = splitCsvLines(text).filter((l) => l.trim());
+  if (lines.length - 1 > MAX_IMPORT_ROWS) {
+    throw importLimitError(`A importação excede o limite de ${MAX_IMPORT_ROWS} linhas.`);
+  }
   if (lines.length === 0) {
     return { products: [], warnings: [], profile: "empty" };
   }
@@ -273,7 +285,15 @@ function parseCsvBuffer(buffer, options = {}) {
 }
 
 function parseExcelBuffer(buffer, options = {}) {
-  const workbook = XLSX.read(buffer, { type: "buffer", cellDates: false });
+  const workbook = XLSX.read(buffer, {
+    type: "buffer",
+    cellDates: false,
+    sheets: 0,
+    sheetRows: MAX_IMPORT_ROWS + 2,
+  });
+  if (workbook.SheetNames.length > MAX_IMPORT_SHEETS) {
+    throw importLimitError(`A planilha excede o limite de ${MAX_IMPORT_SHEETS} abas.`);
+  }
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const matrix = XLSX.utils.sheet_to_json(sheet, {
@@ -281,6 +301,9 @@ function parseExcelBuffer(buffer, options = {}) {
     defval: "",
     raw: false,
   });
+  if (matrix.length - 1 > MAX_IMPORT_ROWS) {
+    throw importLimitError(`A importação excede o limite de ${MAX_IMPORT_ROWS} linhas.`);
+  }
 
   if (!matrix.length) {
     return { products: [], warnings: [], profile: "empty" };

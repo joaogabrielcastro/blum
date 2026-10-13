@@ -248,14 +248,14 @@ function NavItem({ to, label, icon, onNavigate }) {
       to={to}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
+        `group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
           isActive
-            ? "bg-brand-50 text-brand-700 dark:bg-brand/20 dark:text-brand"
-            : "text-ink-muted hover:bg-surface-muted hover:text-ink"
+            ? "bg-white text-slate-950 shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+            : "text-slate-300 hover:bg-white/10 hover:text-white"
         }`
       }
     >
-      <span className="shrink-0 opacity-80">{icon}</span>
+      <span className="shrink-0 opacity-80 transition-transform duration-200 group-hover:scale-105">{icon}</span>
       <span className="truncate">{label}</span>
     </NavLink>
   );
@@ -284,30 +284,31 @@ const Sidebar = ({
     <aside
       className={`
         fixed inset-y-0 left-0 z-40 flex w-4/5 max-w-xs transform flex-col
-        border-r border-edge bg-surface
+        border-r border-white/10 bg-slate-950 text-white shadow-[16px_0_48px_rgba(15,23,42,0.12)]
         transition-transform duration-300 ease-in-out
         md:relative md:w-64 md:max-w-none md:translate-x-0
         ${isOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       aria-label="Navegação principal"
     >
-      <div className="flex items-center gap-2.5 border-b border-edge px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white">
+      <div className="relative flex items-center gap-3 overflow-hidden border-b border-white/10 px-5 py-5">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-brand/25 blur-3xl" />
+        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-black text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] ring-1 ring-white/20">
           B
         </div>
-        <div className="min-w-0">
-          <div className="truncate text-base font-semibold tracking-tight text-ink">
+        <div className="relative min-w-0">
+          <div className="truncate text-base font-bold tracking-tight text-white">
             Blum
           </div>
-          <div className="truncate text-xs text-ink-muted">Gestão comercial</div>
+          <div className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">Gestão comercial</div>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
         <ul className="space-y-5">
           {groups.map((group) => (
             <li key={group.id}>
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
                 {group.label}
               </p>
               <ul className="space-y-0.5">
@@ -327,26 +328,26 @@ const Sidebar = ({
         </ul>
       </nav>
 
-      <div className="mt-auto border-t border-edge p-3">
+      <div className="mt-auto border-t border-white/10 bg-black/10 p-3">
         <div className="mb-2 px-1">
-          <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+          <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
             Aparência
           </p>
-          <ThemeToggle className="w-full justify-between" />
+          <ThemeToggle className="w-full justify-between border-white/10 bg-white/5 text-slate-300" />
         </div>
-        <div className="mb-2 flex items-center gap-3 rounded-xl px-2 py-2">
+        <div className="mb-2 flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 px-2.5 py-2.5">
           <Avatar name={name} size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-ink">{name}</p>
+            <p className="truncate text-sm font-semibold text-white">{name}</p>
             {roleLabel ? (
-              <p className="truncate text-xs text-ink-muted">{roleLabel}</p>
+              <p className="truncate text-xs text-slate-400">{roleLabel}</p>
             ) : null}
           </div>
         </div>
         <button
           type="button"
           onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-300"
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
         >
           {Icon.logout}
           Sair

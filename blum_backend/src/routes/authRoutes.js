@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require("../controllers/authController");
 const userBrandController = require("../controllers/userBrandController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
+const { attachRefreshToken } = require("../utils/refreshCookie");
 const {
   validateLogin,
   validateUserCreate,
@@ -15,11 +16,11 @@ const {
 
 // Rotas públicas
 router.post("/login", validateLogin, authController.login);
-router.post("/refresh", validateRefreshToken, authController.refresh);
+router.post("/refresh", attachRefreshToken, validateRefreshToken, authController.refresh);
 
 // Rotas protegidas
 router.get("/verify", authenticate, authController.verifyToken);
-router.post("/logout", authenticate, validateRefreshToken, authController.logout);
+router.post("/logout", authenticate, attachRefreshToken, validateRefreshToken, authController.logout);
 router.post(
   "/password",
   authenticate,

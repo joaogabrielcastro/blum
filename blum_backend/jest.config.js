@@ -35,5 +35,4 @@ module.exports = {
   },
   coveragePathIgnorePatterns: ["/node_modules/"],
   clearMocks: true,
-  forceExit: true,
 };

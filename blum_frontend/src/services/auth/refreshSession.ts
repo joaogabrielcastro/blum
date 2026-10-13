@@ -13,17 +13,13 @@ export async function refreshAccessToken(): Promise<string> {
   }
 
   refreshInFlight = (async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
-    if (!refreshToken) {
-      throw new Error("Sessão expirada");
-    }
-
     let response: Response;
     try {
       response = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
+        credentials: "include",
+        body: "{}",
       });
     } catch {
       throw new Error("Sem ligação ao servidor para renovar a sessão");

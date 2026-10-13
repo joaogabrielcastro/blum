@@ -3,6 +3,7 @@ const { pathToFileURL } = require("url");
 const fs = require("fs").promises;
 const { Poppler } = require("node-poppler");
 const { fallbackTextExtraction } = require("./pdfTextExtractionService");
+const MAX_PDF_PAGES = parseInt(process.env.MAX_PDF_PAGES || "100", 10);
 
 async function loadPdfJs() {
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -69,6 +70,11 @@ async function processPdf(req, res) {
         const data = new Uint8Array(req.file.buffer);
         const loadingTask = pdfjsLib.getDocument({ data });
         const pdfDocument = await loadingTask.promise;
+        if (pdfDocument.numPages > MAX_PDF_PAGES) {
+          const error = new Error(`O PDF excede o limite de ${MAX_PDF_PAGES} páginas.`);
+          error.statusCode = 413;
+          throw error;
+        }
 
         for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
           const page = await pdfDocument.getPage(pageNum);

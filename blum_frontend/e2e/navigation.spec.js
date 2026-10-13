@@ -25,7 +25,8 @@ const runE2e = process.env.RUN_E2E === "1";
     await expect(page).toHaveURL(/\/reports/, { timeout: 15_000 });
     await expect(
       page.getByRole("heading", {
-        name: "Relatórios de Vendas e Comissões",
+        name: "Relatórios",
+        exact: true,
       }),
     ).toBeVisible();
   });
@@ -34,11 +35,12 @@ const runE2e = process.env.RUN_E2E === "1";
     await openSidebarNav(page, "Relatórios");
     await expect(
       page.getByRole("heading", {
-        name: "Relatórios de Vendas e Comissões",
+        name: "Relatórios",
+        exact: true,
       }),
     ).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.getByText("Mês calendário:")).toBeVisible();
+    await expect(page.getByText("Período", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Total de Pedidos")).toBeVisible();
     await expect(page.getByText("Total de Comissões")).toBeVisible();
   });

@@ -22,6 +22,9 @@ function normalizeOrderPayloadBody(req, res, next) {
   if (b.createdat == null && b.createdAt != null) {
     b.createdat = b.createdAt;
   }
+  if (b.client_request_id == null && b.clientRequestId != null) {
+    b.client_request_id = b.clientRequestId;
+  }
   next();
 }
 

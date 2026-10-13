@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.13"
           cache: npm
           cache-dependency-path: |
             blum_backend/package-lock.json
@@ -32,3 +32,100 @@ jobs:
           npm ci
           npm run test:ci
           npm run build
+
+  control-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+          cache-dependency-path: control_plane/package-lock.json
+
+      - name: Control Plane — install & test
+        working-directory: control_plane
+        env:
+          # Pool do pg é lazy; testes unitários não abrem conexão.
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/agent_control_test
+        run: |
+          npm ci
+          npm test
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: blum
+          POSTGRES_USER: blum
+          POSTGRES_PASSWORD: blum
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U blum -d blum"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_ADMIN_URL: postgresql://blum:blum@127.0.0.1:5432/blum
+      DATABASE_URL: postgresql://blum_runtime:runtime@127.0.0.1:5432/blum
+      DATABASE_RUNTIME_USER: blum_runtime
+      DATABASE_RUNTIME_PASSWORD: runtime
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: integration-jwt-secret-with-at-least-32-characters
+      JWT_REFRESH_SECRET: integration-refresh-secret-with-at-least-32-characters
+      SEED_ADMIN_EMAIL: admin@jwsoftware.com.br
+      SEED_ADMIN_PASSWORD: BlumAdmin2025!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+          cache-dependency-path: blum_backend/package-lock.json
+      - name: Backend — PostgreSQL, Redis, migrations and integration
+        working-directory: blum_backend
+        run: |
+          npm ci
+          npm run test:integration
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+          cache-dependency-path: blum_frontend/package-lock.json
+      - name: Start complete stack
+        run: docker compose up -d --build --wait
+      - name: Install Playwright
+        working-directory: blum_frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Browser end-to-end tests
+        working-directory: blum_frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:8080
+        run: npm run test:e2e
+      - name: Collect container logs
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

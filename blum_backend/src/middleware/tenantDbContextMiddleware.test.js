@@ -26,6 +26,22 @@ describe("tenantDbContextMiddleware", () => {
     expect(next).toHaveBeenCalled();
   });
 
+  test("bypass RLS no login sem slug para localizar o tenant", async () => {
+    const req = { originalUrl: "/api/v2/auth/login", body: {}, headers: {} };
+    const next = jest.fn();
+    await new Promise((resolve) => {
+      tenantDbContextMiddleware(req, {}, () => {
+        next();
+        resolve();
+      });
+    });
+    expect(runWithDbContext).toHaveBeenCalledWith(
+      { bypassRls: true },
+      expect.any(Function),
+    );
+    expect(tenantRepository.findBySlug).not.toHaveBeenCalled();
+  });
+
   test("usa tenantId do JWT quando autenticado", async () => {
     const req = {
       originalUrl: "/api/v2/clients",

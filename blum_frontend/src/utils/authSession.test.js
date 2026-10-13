@@ -12,14 +12,14 @@ describe("authSession", () => {
     jest.clearAllMocks();
   });
 
-  it("persiste token, user e refreshToken", () => {
+  it("persiste access token e usuário, mas nunca o refresh token", () => {
     const user = persistAuthSession({
       token: "jwt",
       refreshToken: "refresh",
       user: { id: 1, username: "a@test.com", tenantSlug: "acme" },
     });
     expect(localStorage.getItem("token")).toBe("jwt");
-    expect(localStorage.getItem("refreshToken")).toBe("refresh");
+    expect(localStorage.getItem("refreshToken")).toBeNull();
     expect(JSON.parse(localStorage.getItem("user")).username).toBe("a@test.com");
     expect(setStoredTenantSlug).toHaveBeenCalledWith("acme");
     expect(user.tenantSlug).toBe("acme");

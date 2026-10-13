@@ -151,16 +151,6 @@ function sql(firstArg, ...rest) {
   return execute(firstArg, rest[0] || []);
 }
 
-pool
-  .connect()
-  .then((client) => {
-    console.log("Conectado ao banco de dados PostgreSQL na VPS!");
-    client.release();
-  })
-  .catch((err) => {
-    console.error("Erro de conexao com PostgreSQL:", err.stack);
-  });
-
 module.exports = {
   pool,
   sql,

@@ -43,6 +43,13 @@ import {
 
 const LAST_BRAND_KEY = "blum.lastOrderBrandId";
 
+function createClientRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `order_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 const OrdersForm = ({
   userId,
   userRole,
@@ -58,6 +65,7 @@ const OrdersForm = ({
   const hydratedOrderKeyRef = useRef(null);
   /** Evita que o 2º clique de um double-click no "Continuar" dispare "Criar orçamento". */
   const blockSaveUntilRef = useRef(0);
+  const clientRequestIdRef = useRef(createClientRequestId());
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -135,8 +143,7 @@ const OrdersForm = ({
   });
   const canApplyGeneralDiscount =
     paymentMethod === "pix" || paymentMethod === "dinheiro";
-  const canEditUnitPrice =
-    userRole === "admin" || userRole === "salesperson";
+  const canEditUnitPrice = userRole === "admin";
 
   useEffect(() => {
     const orderKey =
@@ -406,6 +413,9 @@ const OrdersForm = ({
       totalprice: parseFloat(netTotal) || 0,
       document_type: documentType,
       confirmStockWarning,
+      ...(!editingOrder
+        ? { clientRequestId: clientRequestIdRef.current }
+        : {}),
     };
 
     orderData.payment_method = paymentMethod || null;

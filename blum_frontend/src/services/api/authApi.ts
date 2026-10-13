@@ -59,6 +59,7 @@ export const login = async (
     response = await fetch(`${API_URL}/auth/login`, {
       method: "POST",
       headers,
+      credentials: "include",
       body: JSON.stringify(body),
     });
   } catch {
@@ -184,20 +185,18 @@ export const verifyToken = async (): Promise<VerifyTokenResponse> =>
   apiRequest<VerifyTokenResponse>(`${API_URL}/auth/verify`);
 
 export const logout = async (): Promise<void> => {
-  const refreshToken = localStorage.getItem("refreshToken");
   try {
-    if (refreshToken) {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(localStorage.getItem("token")
-            ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
-            : {}),
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-    }
+    await fetch(`${API_URL}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("token")
+          ? { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          : {}),
+      },
+      body: "{}",
+    });
   } catch {
     /* ignore — limpa sessão local mesmo se API falhar */
   }

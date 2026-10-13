@@ -1,6 +1,7 @@
 const path = require("path");
 const { pathToFileURL } = require("url");
 const smartExtractor = require("../../../scripts/smart_extractor");
+const MAX_PDF_PAGES = parseInt(process.env.MAX_PDF_PAGES || "100", 10);
 
 function configurePdfWorker(pdfjsLib) {
   const workerPath = path.join(
@@ -20,6 +21,11 @@ async function fallbackTextExtraction(pdfBuffer) {
     const data = new Uint8Array(pdfBuffer);
     const loadingTask = pdfjsLib.getDocument({ data });
     const pdfDocument = await loadingTask.promise;
+    if (pdfDocument.numPages > MAX_PDF_PAGES) {
+      const error = new Error(`O PDF excede o limite de ${MAX_PDF_PAGES} páginas.`);
+      error.statusCode = 413;
+      throw error;
+    }
 
     let fullText = "";
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {

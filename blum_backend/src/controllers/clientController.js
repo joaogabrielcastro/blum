@@ -7,6 +7,17 @@ const {
 exports.getAll = async (req, res) => {
   try {
     const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    if (req.query.page != null || req.query.limit != null) {
+      const result = await clientService.findPage(
+        req.user.tenantId,
+        req.query.page,
+        req.query.limit,
+      );
+      return res.status(200).json({
+        data: mapClientsPayload(result.data, mapOptions),
+        pagination: result.pagination,
+      });
+    }
     const clients = await clientService.findAll(req.user.tenantId);
     res.status(200).json(mapClientsPayload(clients, mapOptions));
   } catch (error) {

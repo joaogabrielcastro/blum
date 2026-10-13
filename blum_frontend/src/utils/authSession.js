@@ -6,9 +6,7 @@ export function persistAuthSession(authResponse) {
   }
   localStorage.setItem("token", authResponse.token);
   localStorage.setItem("user", JSON.stringify(authResponse.user));
-  if (authResponse.refreshToken) {
-    localStorage.setItem("refreshToken", authResponse.refreshToken);
-  }
+  localStorage.removeItem("refreshToken");
   if (authResponse.user.tenantSlug) {
     setStoredTenantSlug(authResponse.user.tenantSlug);
   }

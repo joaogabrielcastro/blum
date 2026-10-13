@@ -4,8 +4,10 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const { getJwtSecret } = require("./config/env");
 const purchaseRoutes = require("./routes/purchaseRoutes");
 const { sql } = require("./config/database");
+const { checkCacheReady } = require("./config/cache");
 const {
   authenticate,
   authorize,
@@ -31,6 +33,22 @@ const {
   getRelease,
   getEnvironment,
 } = require("./observability");
+
+function rateLimitKey(req) {
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith("Bearer ")) {
+    try {
+      const decoded = jwt.verify(auth.slice(7), getJwtSecret());
+      const uid = decoded?.userId ?? decoded?.id ?? decoded?.sub;
+      if (uid != null && decoded?.tenantId != null) {
+        return `user:${decoded.tenantId}:${uid}`;
+      }
+    } catch {
+      // Token inválido não pode influenciar a chave do rate limit.
+    }
+  }
+  return req.ip || req.socket?.remoteAddress || "unknown";
+}
 
 /**
  * Cria a aplicação Express (sem abrir porta). Usado em testes de integração.
@@ -62,6 +80,7 @@ function createApp() {
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080",
+        "http://127.0.0.1:8080",
         process.env.FRONTEND_URL,
         ...corsExtra,
       ].filter(Boolean),
@@ -125,24 +144,6 @@ function createApp() {
   );
 
   const skipPreflight = (req) => req.method === "OPTIONS";
-
-  const rateLimitKey = (req) => {
-    const auth = req.headers.authorization;
-    if (auth && auth.startsWith("Bearer ")) {
-      try {
-        const decoded = jwt.decode(auth.slice(7));
-        const uid = decoded?.userId ?? decoded?.id ?? decoded?.sub;
-        if (uid != null) return `user:${uid}`;
-      } catch {
-        /* ignore invalid token for rate-limit key */
-      }
-    }
-    const xff = req.headers["x-forwarded-for"];
-    if (typeof xff === "string" && xff.trim()) {
-      return xff.split(",")[0].trim();
-    }
-    return req.ip || "unknown";
-  };
 
   const apiRateLimitMax =
     parseInt(process.env.API_RATE_LIMIT_MAX, 10) || 5000;
@@ -228,6 +229,37 @@ function createApp() {
 
   app.get("/health", (req, res) => {
     res.status(200).json({ status: "ok" });
+  });
+
+  app.get("/ready", async (req, res) => {
+    const checks = { database: false, migrations: false, cache: false };
+    try {
+      const db = await sql`SELECT 1 AS ok`;
+      checks.database = db[0]?.ok === 1;
+      const required = [
+        "030_order_idempotency.sql",
+        "031_tenant_scoped_foreign_keys.sql",
+        "032_validate_clean_tenant_foreign_keys.sql",
+        "033_validate_orders_user_tenant_fk.sql",
+      ];
+      const applied = await sql`
+        SELECT filename FROM schema_migrations WHERE filename = ANY(${required})
+      `;
+      checks.migrations = new Set(applied.map((row) => row.filename)).size === required.length;
+      const cache = await checkCacheReady();
+      checks.cache = cache.ok;
+      const ready = Object.values(checks).every(Boolean);
+      return res.status(ready ? 200 : 503).json({
+        status: ready ? "ready" : "not_ready",
+        checks: { ...checks, cacheProvider: cache.provider },
+      });
+    } catch (error) {
+      return res.status(503).json({
+        status: "not_ready",
+        checks,
+        error: process.env.NODE_ENV === "production" ? undefined : error.message,
+      });
+    }
   });
 
   app.get("/api/v2/observability", (req, res) => {
@@ -384,4 +416,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, rateLimitKey };

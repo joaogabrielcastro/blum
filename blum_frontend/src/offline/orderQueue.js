@@ -18,7 +18,10 @@ export async function enqueuePendingOrder({
   const entry = {
     id,
     queuedAt: new Date().toISOString(),
-    payload,
+    payload: {
+      ...payload,
+      clientRequestId: payload?.clientRequestId || id,
+    },
     clientLabel: clientLabel || "Cliente",
     totalPrice: totalPrice || 0,
   };

@@ -50,13 +50,13 @@ export default function AuthShell({
   const year = new Date().getFullYear();
 
   return (
-    <div className="min-h-screen bg-surface-page lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <aside className="relative hidden overflow-hidden bg-zinc-900 px-12 py-14 text-white lg:flex lg:flex-col lg:justify-between">
+    <div className="min-h-screen bg-surface-page lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+      <aside className="relative hidden overflow-hidden bg-slate-950 px-12 py-14 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.12]"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 28% 18%, #2563EB 0%, transparent 52%), radial-gradient(circle at 88% 78%, #1D4ED8 0%, transparent 42%)",
+              "radial-gradient(circle at 22% 15%, #2563EB 0%, transparent 44%), radial-gradient(circle at 88% 82%, #0EA5E9 0%, transparent 38%)",
           }}
         />
 
@@ -69,7 +69,8 @@ export default function AuthShell({
         </div>
 
         <div className="relative z-10 max-w-md">
-          <h2 className="text-3xl font-semibold leading-tight tracking-tight">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-blue-300">Operação comercial, simplificada</p>
+          <h2 className="text-4xl font-bold leading-[1.12] tracking-[-0.035em] xl:text-5xl">
             {headline}
           </h2>
           <p className="mt-4 text-base leading-relaxed text-zinc-300">
@@ -123,7 +124,8 @@ export default function AuthShell({
           <ThemeToggle className={themeToggleOnDark} />
         </div>
 
-        <div className="flex flex-1 flex-col justify-center px-4 py-8 sm:px-8 lg:px-16 lg:py-10">
+        <div className="relative flex flex-1 flex-col justify-center overflow-hidden px-4 py-8 sm:px-8 lg:px-14 lg:py-10 xl:px-20">
+          <div className="pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-brand/5 blur-3xl" aria-hidden />
           <div className="mx-auto w-full max-w-md">{children}</div>
           <p className="mt-6 text-center text-xs text-ink-muted lg:hidden">
             © {year} JW Soluções · Blum

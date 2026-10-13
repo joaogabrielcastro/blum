@@ -1,7 +1,10 @@
 const NodeCache = require("node-cache");
 
 const TTL_SECONDS = parseInt(process.env.CACHE_TTL_SECONDS || "300", 10);
-const memCache = new NodeCache({ stdTTL: TTL_SECONDS, checkperiod: 60 });
+const memCache = new NodeCache({
+  stdTTL: TTL_SECONDS,
+  checkperiod: process.env.NODE_ENV === "test" ? 0 : 60,
+});
 
 let redisClient = null;
 try {
@@ -42,6 +45,16 @@ async function cacheSet(key, value, ttlSec = TTL_SECONDS) {
     }
   }
   memCache.set(key, value, ttlSec);
+}
+
+async function checkCacheReady() {
+  if (!redisClient) return { ok: true, provider: "memory" };
+  try {
+    const pong = await redisClient.ping();
+    return { ok: pong === "PONG", provider: "redis" };
+  } catch (error) {
+    return { ok: false, provider: "redis", error: error.message };
+  }
 }
 
 function productsCachePrefix(tenantId) {
@@ -91,9 +104,20 @@ function cacheKeyProducts(tenantId, filters) {
   return `${productsCachePrefix(tenantId)}${JSON.stringify(filters || {})}`;
 }
 
+async function closeCache() {
+  if (redisClient) {
+    const client = redisClient;
+    redisClient = null;
+    await client.quit();
+  }
+  memCache.close();
+}
+
 module.exports = {
   cacheGet,
   cacheSet,
   invalidateProductsCache,
   cacheKeyProducts,
+  checkCacheReady,
+  closeCache,
 };

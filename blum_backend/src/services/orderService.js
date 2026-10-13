@@ -116,13 +116,15 @@ function buildStockWarningError(message, items = []) {
 }
 
 class OrderService {
-  async loadCommissionRatesByBrandNames(brandNames) {
+  async loadCommissionRatesByBrandNames(brandNames, tenantId) {
+    tenantId = requireTenantId(tenantId);
     const unique = [...new Set((brandNames || []).filter(Boolean))];
     if (unique.length === 0) {
       return new Map();
     }
     const rows = await sql`
-      SELECT name, commission_rate FROM brands WHERE name = ANY(${unique})
+      SELECT name, commission_rate FROM brands
+      WHERE name = ANY(${unique}) AND tenant_id = ${tenantId}
     `;
     const map = new Map();
     for (const r of rows) {
@@ -143,15 +145,44 @@ class OrderService {
     if (!intIds.length) return new Map();
 
     const rows = await sql`
-      SELECT id, stock, name FROM products
+      SELECT id, stock, name, price, brand, brand_id FROM products
       WHERE id = ANY(${intIds}) AND tenant_id = ${tenantId}
     `;
     return new Map(
       rows.map((r) => [
         String(r.id),
-        { stock: parseInt(r.stock, 10) || 0, name: r.name },
+        {
+          stock: parseInt(r.stock, 10) || 0,
+          name: r.name,
+          price: parseFloat(r.price) || 0,
+          brand: r.brand,
+          brandId: r.brand_id ?? null,
+        },
       ]),
     );
+  }
+
+  reconcileItemsWithCatalog(items, productMap, { canOverridePrice = false } = {}) {
+    return (items || []).map((item) => {
+      const productInfo = productMap.get(String(item.productId));
+      if (!productInfo) {
+        throw new Error(
+          `Produto "${item.productName || item.productId}" não encontrado`,
+        );
+      }
+      const submittedPrice = parseFloat(item.price);
+      const price =
+        canOverridePrice && Number.isFinite(submittedPrice) && submittedPrice >= 0
+          ? submittedPrice
+          : productInfo.price;
+      return {
+        ...item,
+        productName: productInfo.name,
+        brand: productInfo.brand,
+        brandId: productInfo.brandId,
+        price,
+      };
+    });
   }
 
   enrichItemsWithStockWarnings(
@@ -225,9 +256,10 @@ class OrderService {
     return Math.min(100, Math.max(0, n));
   }
 
-  async calculateItemsCommission(items, discount = 0) {
+  async calculateItemsCommission(items, discount = 0, tenantId) {
     const rateMap = await this.loadCommissionRatesByBrandNames(
       items.map((i) => i.brand),
+      tenantId,
     );
     const orderDiscPct = parseFloat(discount) || 0;
     const orderFactor = 1 - orderDiscPct / 100;
@@ -557,6 +589,9 @@ class OrderService {
     const createdAt = parseCreatedAt(
       orderData.createdat ?? orderData.createdAt,
     );
+    const clientRequestId = String(
+      orderData.client_request_id ?? orderData.clientRequestId ?? "",
+    ).trim() || null;
 
     if (
       !clientid ||
@@ -573,7 +608,16 @@ class OrderService {
       items.map((item) => item.productId),
       tenantId,
     );
-    const itemsWithStock = this.enrichItemsWithStockWarnings(items, stockMap);
+    const requestedProductIds = new Set(
+      items.map((item) => String(item.productId)).filter(Boolean),
+    );
+    if (stockMap.size !== requestedProductIds.size) {
+      throw new Error("Um ou mais produtos não existem nesta empresa");
+    }
+    const catalogItems = this.reconcileItemsWithCatalog(items, stockMap, {
+      canOverridePrice: authUser.role === "admin",
+    });
+    const itemsWithStock = this.enrichItemsWithStockWarnings(catalogItems, stockMap);
     const hasStockWarning = computeHasStockWarning(itemsWithStock);
     this.enforceStockWarningConfirmation(docType, hasStockWarning, {
       ...orderData,
@@ -583,27 +627,91 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(
       itemsWithStock,
       discount,
+      tenantId,
     );
 
-    const sellerRow =
-      await sql`SELECT id FROM users WHERE id = ${sellerUserId} AND tenant_id = ${tenantId}`;
-    if (sellerRow.length === 0) {
-      throw new Error("Vendedor não encontrado");
+    const client = await pool.connect();
+    let orderId;
+    try {
+      await client.query("BEGIN");
+
+      if (clientRequestId) {
+        const existing = await client.query(
+          `SELECT id FROM orders
+           WHERE tenant_id = $1 AND client_request_id = $2
+           LIMIT 1`,
+          [tenantId, clientRequestId],
+        );
+        if (existing.rows.length) {
+          orderId = existing.rows[0].id;
+          await client.query("COMMIT");
+          return this.findById(orderId, tenantId);
+        }
+      }
+
+      const sellerRow = await client.query(
+        "SELECT id FROM users WHERE id = $1 AND tenant_id = $2",
+        [sellerUserId, tenantId],
+      );
+      if (sellerRow.rows.length === 0) {
+        throw new Error("Vendedor não encontrado");
+      }
+
+      const clientRow = await client.query(
+        "SELECT id FROM clients WHERE id = $1 AND tenant_id = $2",
+        [clientid, tenantId],
+      );
+      if (clientRow.rows.length === 0) {
+        throw new Error("Cliente não encontrado");
+      }
+
+      const result = await client.query(
+        `INSERT INTO orders
+          (clientid, user_ref, tenant_id, description, discount, totalprice,
+           total_commission, status, createdat, document_type, payment_method,
+           has_stock_warning, client_request_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'Em aberto',
+                 COALESCE($8, NOW()), $9, $10, $11, $12)
+         RETURNING id`,
+        [
+          clientid,
+          sellerUserId,
+          tenantId,
+          description || "",
+          discount || 0,
+          calculated.finalTotal,
+          calculated.totalCommission,
+          createdAt,
+          docType,
+          payment,
+          hasStockWarning,
+          clientRequestId,
+        ],
+      );
+      orderId = result.rows[0].id;
+      await this.persistOrderItemsWithClient(
+        client,
+        orderId,
+        calculated.items,
+        tenantId,
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      if (error.code === "23505" && clientRequestId) {
+        const existing = await sql`
+          SELECT id FROM orders
+          WHERE tenant_id = ${tenantId} AND client_request_id = ${clientRequestId}
+          LIMIT 1
+        `;
+        if (existing.length) return this.findById(existing[0].id, tenantId);
+      }
+      throw error;
+    } finally {
+      client.release();
     }
 
-    const result = await sql`
-      INSERT INTO orders
-        (clientid, user_ref, tenant_id, description, discount, totalprice, total_commission, status, createdat, document_type, payment_method, has_stock_warning)
-      VALUES
-        (${clientid}, ${sellerUserId}, ${tenantId}, ${description || ""},
-         ${discount || 0}, ${calculated.finalTotal}, ${calculated.totalCommission},
-         'Em aberto', COALESCE(${createdAt}, NOW()), ${docType}, ${payment}, ${hasStockWarning})
-      RETURNING *
-    `;
-
-    await this.persistOrderItems(result[0].id, calculated.items, tenantId);
-
-    return this.findById(result[0].id, tenantId);
+    return this.findById(orderId, tenantId);
   }
 
   async update(id, orderData, authUser) {
@@ -643,7 +751,16 @@ class OrderService {
       items.map((item) => item.productId),
       tenantId,
     );
-    const itemsWithStock = this.enrichItemsWithStockWarnings(items, stockMap, {
+    const requestedProductIds = new Set(
+      items.map((item) => String(item.productId)).filter(Boolean),
+    );
+    if (stockMap.size !== requestedProductIds.size) {
+      throw new Error("Um ou mais produtos não existem nesta empresa");
+    }
+    const catalogItems = this.reconcileItemsWithCatalog(items, stockMap, {
+      canOverridePrice: authUser.role === "admin",
+    });
+    const itemsWithStock = this.enrichItemsWithStockWarnings(catalogItems, stockMap, {
       previousControlledStock: isDeliveredPedido
         ? previousControlledStock
         : new Map(),
@@ -657,6 +774,7 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(
       itemsWithStock,
       discount,
+      tenantId,
     );
 
     const sellerRow =
@@ -806,6 +924,7 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(
       itemsWithStock,
       discountToCopy,
+      tenantId,
     );
     const inserted = await sql`
       INSERT INTO orders
@@ -916,6 +1035,7 @@ class OrderService {
     const calculated = await this.calculateItemsCommission(
       itemsWithStock,
       sourceDiscount,
+      tenantId,
     );
 
     const client = await pool.connect();
@@ -950,6 +1070,13 @@ class OrderService {
     tenantId = requireTenantId(tenantId);
     if (!status) {
       throw new Error("Status é obrigatório");
+    }
+    if (status === "Entregue") {
+      const err = new Error(
+        "Use a finalização do pedido para marcar como Entregue e baixar o estoque.",
+      );
+      err.statusCode = 400;
+      throw err;
     }
 
     const result = await sql`

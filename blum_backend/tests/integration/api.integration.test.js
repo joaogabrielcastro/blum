@@ -32,10 +32,20 @@ describeIntegration("API v2 integration", () => {
     const { runMigrations } = require("../../src/db/migrate");
     const { seedDefaultUsers } = require("../../src/bootstrap/seedDefaultUsers");
     await runMigrations();
-    await seedDefaultUsers({ onlyIfDatabaseEmpty: true });
+    const { runWithDbContext } = require("../../src/config/database");
+    await runWithDbContext({ bypassRls: true }, () =>
+      seedDefaultUsers({ onlyIfDatabaseEmpty: true }),
+    );
 
     const { createApp } = require("../../src/createApp");
     app = createApp();
+  });
+
+  afterAll(async () => {
+    const { closeCache } = require("../../src/config/cache");
+    const { pool } = require("../../src/config/database");
+    await closeCache();
+    await pool.end();
   });
 
   it("GET /api/v2/status inclui x-api-version", async () => {
@@ -45,17 +55,18 @@ describeIntegration("API v2 integration", () => {
   });
 
   it("login v2 + verify + orders + refresh + logout", async () => {
-    const loginRes = await request(app)
+    const agent = request.agent(app);
+    const loginRes = await agent
       .post("/api/v2/auth/login")
       .send({ username: user, password, tenantSlug })
       .expect(200);
 
     expect(loginRes.body.token).toBeTruthy();
-    expect(loginRes.body.refreshToken).toBeTruthy();
+    expect(loginRes.body.refreshToken).toBeUndefined();
+    expect(loginRes.headers["set-cookie"]?.join(";")).toMatch(/blum_refresh=.*HttpOnly/i);
     expect(loginRes.body.user?.tenantId).toBeDefined();
 
     const token = loginRes.body.token;
-    const refreshToken = loginRes.body.refreshToken;
 
     const verifyRes = await request(app)
       .get("/api/v2/auth/verify")
@@ -69,26 +80,25 @@ describeIntegration("API v2 integration", () => {
       .expect(200);
     expect(Array.isArray(ordersRes.body)).toBe(true);
 
-    const refreshRes = await request(app)
+    const refreshRes = await agent
       .post("/api/v2/auth/refresh")
-      .send({ refreshToken })
+      .send({})
       .expect(200);
     expect(refreshRes.body.token).toBeTruthy();
-    expect(refreshRes.body.refreshToken).toBeTruthy();
+    expect(refreshRes.body.refreshToken).toBeUndefined();
 
     const token2 = refreshRes.body.token;
-    const refreshToken2 = refreshRes.body.refreshToken;
 
-    await request(app)
+    await agent
       .post("/api/v2/auth/logout")
       .set("Authorization", `Bearer ${token2}`)
-      .send({ refreshToken: refreshToken2 })
+      .send({})
       .expect(200);
 
-    await request(app)
+    await agent
       .post("/api/v2/auth/refresh")
-      .send({ refreshToken: refreshToken2 })
-      .expect(401);
+      .send({})
+      .expect(400);
   });
 
   it("GET /api/v2/products/by-code retorna 404 para código inexistente", async () => {

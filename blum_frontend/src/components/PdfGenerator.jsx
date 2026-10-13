@@ -8,6 +8,7 @@ import {
   downloadPdfFile,
   sharePdfFile,
 } from "../utils/pdfDownload";
+import useAccessibleDialog from "../hooks/useAccessibleDialog";
 
 const PAYMENT_PDF_LABELS = {
   carteira: "Carteira (em aberto)",
@@ -47,6 +48,7 @@ const formatCnpj = (cnpj) => {
 };
 
 const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => {
+  const dialogRef = useAccessibleDialog(onClose);
   const [selectedPdfBrand, setSelectedPdfBrand] = useState("");
   const [imageLoaded, setImageLoaded] = useState(false);
   const [headerImage, setHeaderImage] = useState(null);
@@ -556,8 +558,8 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-slate-950/60 backdrop-blur-sm">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Gerar PDF" tabIndex={-1} className="mx-4 w-full max-w-md rounded-[1.5rem] border border-edge bg-surface p-6 shadow-2xl">
         <h3 className="text-xl font-bold mb-4 text-center">
           Gerar PDF ({order?.documentType === "orcamento" ? "Orçamento" : "Pedido"})
         </h3>

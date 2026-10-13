@@ -228,7 +228,7 @@ async function handleUnauthorized<T>(
   retryFn: () => Promise<T>,
   internal: RequestInternal,
 ): Promise<T> {
-  if (internal._authRetried || !localStorage.getItem("refreshToken")) {
+  if (internal._authRetried) {
     forceLogout(401);
     return parseErrorResponse(response);
   }
@@ -250,6 +250,7 @@ export const apiRequest = async <T = unknown>(
   try {
     response = await fetch(url, {
       ...options,
+      credentials: "include",
       headers: {
         ...getAuthHeaders(),
         ...(options.headers as Record<string, string> | undefined),

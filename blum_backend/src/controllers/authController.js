@@ -12,6 +12,7 @@ const {
 const billingService = require("../services/billingService");
 const { resolvePlatformAdminFlag } = require("../utils/platformAdmin");
 const { assertCanAddUser } = require("../services/planLimitsService");
+const { setRefreshCookie, clearRefreshCookie } = require("../utils/refreshCookie");
 const {
   resolveLoginTenantSlug,
   findUsersForLogin,
@@ -70,9 +71,9 @@ async function issueLoginSuccess(req, res, user, mapOptions) {
     metadata: { username: user.username },
   });
 
+  setRefreshCookie(res, refreshToken);
   res.json({
     token,
-    refreshToken,
     user: buildUserResponse(user, mapOptions),
   });
 }
@@ -447,9 +448,9 @@ exports.refresh = async (req, res) => {
       requestId: req.requestId,
       metadata: null,
     });
+    setRefreshCookie(res, rotated.refreshToken);
     return res.status(200).json({
       token: accessToken,
-      refreshToken: rotated.refreshToken,
       user: buildUserResponse(user, mapOptions),
     });
   } catch (error) {
@@ -465,6 +466,7 @@ exports.logout = async (req, res) => {
     if (refreshToken) {
       await refreshTokenService.revokeRefreshToken(refreshToken);
     }
+    clearRefreshCookie(res);
     await logAuditEvent({
       tenantId: req.user?.tenantId ?? null,
       actorUserId: req.user?.userId || null,

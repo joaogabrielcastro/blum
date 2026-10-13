@@ -23,7 +23,10 @@ const setupDatabase = async () => {
     console.log("Conectando ao banco de dados PostgreSQL...");
     await runMigrations();
     console.log("Migrações aplicadas.");
-    await seedDefaultUsers({ onlyIfDatabaseEmpty: true });
+    const { runWithDbContext } = require("./src/config/database");
+    await runWithDbContext({ bypassRls: true }, () =>
+      seedDefaultUsers({ onlyIfDatabaseEmpty: true }),
+    );
   } catch (error) {
     console.error("Erro ao configurar o banco de dados:", error);
     process.exit(1);

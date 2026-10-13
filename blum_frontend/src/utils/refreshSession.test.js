@@ -13,12 +13,10 @@ describe("refreshAccessToken", () => {
   });
 
   it("renova token e persiste sessão", async () => {
-    localStorage.setItem("refreshToken", "rt_old");
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         token: "jwt_new",
-        refreshToken: "rt_new",
         user: { id: 1, username: "a@test.com", role: "admin" },
       }),
     });
@@ -27,11 +25,15 @@ describe("refreshAccessToken", () => {
     expect(token).toBe("jwt_new");
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/auth/refresh"),
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({ method: "POST", credentials: "include", body: "{}" }),
     );
   });
 
-  it("falha sem refresh token armazenado", async () => {
+  it("falha quando o cookie de refresh não é aceito pelo servidor", async () => {
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Sessão expirada" }),
+    });
     await expect(refreshAccessToken()).rejects.toThrow(/expirada/i);
   });
 });

@@ -15,6 +15,26 @@ class ClientService {
     return mapClients(rows);
   }
 
+  async findPage(tenantId, page = 1, limit = 50) {
+    tenantId = requireTenantId(tenantId);
+    const safePage = Math.max(1, parseInt(page, 10) || 1);
+    const safeLimit = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const result = await clientRepository.findPageByTenant(
+      tenantId,
+      safeLimit,
+      (safePage - 1) * safeLimit,
+    );
+    return {
+      data: mapClients(result.rows),
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total: result.total,
+        totalPages: Math.ceil(result.total / safeLimit),
+      },
+    };
+  }
+
   async findById(id, tenantId) {
     tenantId = requireTenantId(tenantId);
     if (!id || isNaN(parseInt(id))) {

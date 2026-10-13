@@ -64,7 +64,7 @@ function AuthenticatedApp({
   const { clientsMap, brands } = useAppData();
 
   return (
-    <div className="min-h-screen bg-surface-page font-sans text-ink antialiased">
+    <div className="app-shell min-h-screen bg-surface-page font-sans text-ink antialiased">
       <div className="relative flex h-screen flex-col overflow-hidden md:flex-row">
         <Sidebar
           isOpen={isSidebarOpen}
@@ -85,7 +85,7 @@ function AuthenticatedApp({
         )}
 
         <div className="flex w-full max-w-full flex-1 flex-col overflow-y-auto">
-          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-edge bg-surface/95 px-3 py-2 backdrop-blur md:hidden">
+          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-edge/80 bg-surface/90 px-3 py-2.5 shadow-[0_1px_12px_rgba(15,23,42,0.04)] backdrop-blur-xl md:hidden">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -109,9 +109,13 @@ function AuthenticatedApp({
                 />
               </svg>
             </button>
-            <span className="text-sm font-semibold tracking-tight text-ink">
-              Blum
-            </span>
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+              <div>
+                <span className="block text-sm font-bold tracking-tight text-ink">Blum</span>
+                <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-ink-muted">Gestão comercial</span>
+              </div>
+              <span className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" : "bg-amber-500"}`} aria-label={isOnline ? "Online" : "Offline"} />
+            </div>
           </header>
 
           {!isOnline ? (
@@ -129,7 +133,7 @@ function AuthenticatedApp({
 
           <StarterUpgradeBanner subscription={subscription} />
 
-          <main className="max-w-full flex-1 bg-surface-page p-3 pb-24 sm:p-4 sm:pb-6 md:p-6">
+          <main className="app-main page-enter max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-6 md:p-5 lg:p-6">
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route
@@ -248,7 +252,7 @@ function AuthenticatedApp({
             </Suspense>
           </main>
 
-          <footer className="mt-auto border-t border-edge bg-surface px-6 py-4">
+          <footer className="mt-auto border-t border-edge/70 bg-surface/70 px-6 py-4 backdrop-blur">
             <div className="text-center text-sm text-ink-muted">
               Blum © {new Date().getFullYear()}
             </div>

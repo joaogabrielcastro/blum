@@ -1,6 +1,7 @@
 import { useState } from "react";
 import formatCurrency from "../../utils/format";
 import apiService from "../../services/apiService";
+import useAccessibleDialog from "../../hooks/useAccessibleDialog";
 
 export default function BulkPriceAdjustModal({
   brandName,
@@ -16,6 +17,7 @@ export default function BulkPriceAdjustModal({
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const dialogRef = useAccessibleDialog(onClose);
 
   const buildPayload = (dryRun) => {
     const pct = parseFloat(String(percentage).replace(",", "."));
@@ -60,8 +62,8 @@ export default function BulkPriceAdjustModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Reajuste de preços" tabIndex={-1} className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[1.5rem] border border-edge bg-surface shadow-2xl">
         <div className="p-5 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-800">Reajuste de preços</h2>
           <p className="text-sm text-gray-600 mt-1">

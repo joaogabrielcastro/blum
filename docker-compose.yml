@@ -53,7 +53,10 @@ services:
     environment:
       NODE_ENV: development
       PORT: "3011"
-      DATABASE_URL: postgresql://blum:blum_docker_dev@postgres:5432/blum
+      DATABASE_URL: postgresql://blum_runtime:blum_runtime_docker_dev@postgres:5432/blum
+      DATABASE_ADMIN_URL: postgresql://blum:blum_docker_dev@postgres:5432/blum
+      DATABASE_RUNTIME_USER: blum_runtime
+      DATABASE_RUNTIME_PASSWORD: blum_runtime_docker_dev
       JWT_SECRET: ${JWT_SECRET:-blum_docker_jwt_change_before_production}
       FRONTEND_URL: http://localhost:8080
       TENANT_BASE_DOMAIN: blum.jwsoftware.com.br

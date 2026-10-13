@@ -138,7 +138,7 @@ const Login = ({ onLogin }) => {
 
   return (
     <AuthShell>
-      <div className="rounded-2xl border border-edge bg-surface p-6 shadow-soft sm:p-8 lg:p-10">
+      <div className="relative rounded-[1.5rem] border border-edge/80 bg-surface/95 p-6 shadow-glass backdrop-blur-xl sm:p-8 lg:p-10">
         <div className="mb-6 lg:mb-8">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">
             Entrar

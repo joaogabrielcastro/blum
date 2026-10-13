@@ -4,6 +4,14 @@ async function findAllByTenant(tenantId) {
   return sql`SELECT * FROM clients WHERE tenant_id = ${tenantId} ORDER BY id DESC`;
 }
 
+async function findPageByTenant(tenantId, limit, offset) {
+  const [rows, totals] = await Promise.all([
+    sql`SELECT * FROM clients WHERE tenant_id = ${tenantId} ORDER BY id DESC LIMIT ${limit} OFFSET ${offset}`,
+    sql`SELECT COUNT(*)::int AS total FROM clients WHERE tenant_id = ${tenantId}`,
+  ]);
+  return { rows, total: totals[0]?.total || 0 };
+}
+
 async function findByIdAndTenant(id, tenantId) {
   return sql`SELECT * FROM clients WHERE id = ${id} AND tenant_id = ${tenantId}`;
 }
@@ -41,6 +49,7 @@ async function deleteClient(id, tenantId) {
 
 module.exports = {
   findAllByTenant,
+  findPageByTenant,
   findByIdAndTenant,
   findByCnpjAndTenant,
   insertClient,
