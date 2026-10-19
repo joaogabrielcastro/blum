@@ -111,6 +111,10 @@ jobs:
           node-version: "22.13"
           cache: npm
           cache-dependency-path: blum_frontend/package-lock.json
+      - name: Prepare compose env files
+        run: |
+          cp blum_backend/.env.example blum_backend/.env
+          cp control_plane/.env.example control_plane/.env
       - name: Start complete stack
         run: docker compose up -d --build --wait
       - name: Install Playwright

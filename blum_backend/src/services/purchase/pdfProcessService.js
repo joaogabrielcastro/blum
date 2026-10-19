@@ -15,7 +15,17 @@ async function loadPdfJs() {
   return pdfjsLib;
 }
 
-const poppler = new Poppler();
+/** Lazy: `new Poppler()` no load quebra CI/dev sem binários do sistema. */
+let popplerInstance;
+function getPoppler() {
+  if (popplerInstance !== undefined) return popplerInstance;
+  try {
+    popplerInstance = new Poppler();
+  } catch {
+    popplerInstance = null;
+  }
+  return popplerInstance;
+}
 
 async function processPdf(req, res) {
   const tempDir = path.join(__dirname, "..", "..", "temp");
@@ -47,6 +57,10 @@ async function processPdf(req, res) {
 
     try {
       try {
+        const poppler = getPoppler();
+        if (!poppler) {
+          throw new Error("Poppler binaries unavailable");
+        }
         await poppler.pdfToCairo(tempPdfPath, out_path_prefix, {
           pngFile: true,
         });

@@ -665,14 +665,15 @@ class OrderService {
         throw new Error("Cliente não encontrado");
       }
 
+      // Evita reutilizar $9 no CASE (PostgreSQL: "inconsistent types deduced for parameter $9").
+      const stockCommittedAt = docType === "pedido" ? new Date() : null;
       const result = await client.query(
         `INSERT INTO orders
           (clientid, user_ref, tenant_id, description, discount, totalprice,
            total_commission, status, createdat, document_type, payment_method,
            has_stock_warning, client_request_id, stock_committed_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'Em aberto',
-                 COALESCE($8, NOW()), $9, $10, $11, $12,
-                 CASE WHEN $9 = 'pedido' THEN NOW() ELSE NULL END)
+                 COALESCE($8, NOW()), $9, $10, $11, $12, $13)
          RETURNING id`,
         [
           clientid,
@@ -687,6 +688,7 @@ class OrderService {
           payment,
           hasStockWarning,
           clientRequestId,
+          stockCommittedAt,
         ],
       );
       orderId = result.rows[0].id;
