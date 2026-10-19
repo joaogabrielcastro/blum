@@ -170,4 +170,50 @@ describe("orderService", () => {
     expect(client.query).not.toHaveBeenCalledWith("COMMIT");
     expect(client.release).toHaveBeenCalled();
   });
+
+  test("create passa stock_committed_at como $13 sem reutilizar document_type no CASE", async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({}) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // idempotency check
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // seller
+        .mockResolvedValueOnce({ rows: [{ id: 10 }] }) // client
+        .mockResolvedValueOnce({ rows: [{ id: 99 }] }) // INSERT
+        .mockResolvedValueOnce({}), // COMMIT
+      release: jest.fn(),
+    };
+    pool.connect.mockResolvedValueOnce(client);
+    jest.spyOn(orderService, "loadProductStockMap").mockResolvedValueOnce(
+      new Map([["5", { stock: 10, name: "Produto" }]]),
+    );
+    jest.spyOn(orderService, "calculateItemsCommission").mockResolvedValueOnce({
+      finalTotal: 10,
+      totalCommission: 1,
+      items: [{ productId: 5, productName: "Produto", brand: "Marca", quantity: 1, price: 10 }],
+    });
+    jest.spyOn(orderService, "persistOrderItemsWithClient").mockResolvedValueOnce();
+    jest.spyOn(orderService, "findById").mockResolvedValueOnce({ id: 99 });
+
+    await orderService.create(
+      {
+        clientid: 10,
+        userid: 1,
+        items: [{ productId: 5, productName: "Produto", brand: "Marca", quantity: 1, price: 10 }],
+        document_type: "orcamento",
+        clientRequestId: "request_abcdef12",
+      },
+      authUser,
+    );
+
+    const insertCall = client.query.mock.calls.find(
+      ([sql]) => typeof sql === "string" && sql.includes("INSERT INTO orders"),
+    );
+    expect(insertCall).toBeDefined();
+    const [insertSql, insertParams] = insertCall;
+    expect(insertSql).toContain("$13");
+    expect(insertSql).not.toMatch(/CASE WHEN \$9/);
+    expect(insertParams[8]).toBe("orcamento");
+    expect(insertParams[12]).toBeNull();
+  });
 });

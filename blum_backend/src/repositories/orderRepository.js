@@ -33,6 +33,9 @@ async function updateOrderCore(executor, payload) {
   } = payload;
   const tenantId = requireTenantId(tenantIdInput);
 
+  // $13 separado de $7: reutilizar o mesmo parâmetro no CASE causa
+  // "inconsistent types deduced for parameter $N" no PostgreSQL.
+  const commitStock = docType === "pedido";
   const result = await db.query(
     `
       UPDATE orders
@@ -47,7 +50,7 @@ async function updateOrderCore(executor, payload) {
           createdat = COALESCE($9, createdat),
           has_stock_warning = $10,
           stock_committed_at = CASE
-            WHEN $7 = 'pedido' THEN COALESCE(stock_committed_at, NOW())
+            WHEN $13 THEN COALESCE(stock_committed_at, NOW())
             ELSE NULL
           END
       WHERE id = $11 AND tenant_id = $12
@@ -66,6 +69,7 @@ async function updateOrderCore(executor, payload) {
       hasStockWarning,
       id,
       tenantId,
+      commitStock,
     ],
   );
 
