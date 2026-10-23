@@ -38,6 +38,10 @@ export async function listPendingOrders() {
   return getAllPendingOrders();
 }
 
+export async function discardPendingOrder(offlinePendingId) {
+  await deletePendingOrder(offlinePendingId);
+}
+
 export async function syncPendingOrders(api) {
   const pending = await getAllPendingOrders();
   const result = { synced: 0, failed: [] };

@@ -48,11 +48,11 @@ export function finalizeDeliveryBlockReason(order) {
   if (!order) return "Pedido inválido.";
   const doc = order.documentType ?? order.document_type;
   if (doc === "orcamento") {
-    return "Converta o orçamento em pedido antes de finalizar a entrega.";
+    return "Primeiro confirme o pedido (botão Confirmar pedido). Depois defina o pagamento e finalize a entrega.";
   }
   if (order.status === "Entregue") return "Este pedido já foi finalizado.";
   if (!hasPaymentMethod(order.paymentMethod ?? order.payment_method)) {
-    return "Defina a forma de pagamento antes de finalizar a entrega.";
+    return "Defina a forma de pagamento para poder finalizar a entrega.";
   }
   return null;
 }

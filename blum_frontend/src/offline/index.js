@@ -5,7 +5,12 @@ import { isBrowserOnline } from "./network";
 export { syncOfflineCatalog, getOfflineCatalogMeta, syncPendingOrders, getPendingOrdersCount };
 export { getCachedClients } from "./catalogSync";
 export { searchOfflineProducts, lookupOfflineProductByCode } from "./localCatalogSearch";
-export { enqueuePendingOrder, listPendingOrders, pendingOrderToListItem } from "./orderQueue";
+export {
+  enqueuePendingOrder,
+  listPendingOrders,
+  discardPendingOrder,
+  pendingOrderToListItem,
+} from "./orderQueue";
 export { isBrowserOnline } from "./network";
 
 export async function runOnlineSync(api, brands = []) {
