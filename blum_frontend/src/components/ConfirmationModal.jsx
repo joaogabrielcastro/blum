@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   PrimaryButton,
   SecondaryButton,
@@ -14,13 +16,27 @@ const ConfirmationModal = ({
   cancelText = "Cancelar",
   tone = "danger",
 }) => {
+  useEffect(() => {
+    if (!show) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") onCancel?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [show, onCancel]);
+
   if (!show) return null;
 
   const ConfirmBtn = tone === "danger" ? DangerButton : PrimaryButton;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 dark:bg-black/50"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-900/40 p-4 dark:bg-black/50"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
@@ -42,7 +58,8 @@ const ConfirmationModal = ({
           </ConfirmBtn>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

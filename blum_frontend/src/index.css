@@ -134,9 +134,12 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  /* Opacity-only: a lingering transform on .page-enter (fill-mode both)
+     would make position:fixed descendants attach to <main> instead of the
+     viewport, so confirmation dialogs can render off-screen under a dim overlay. */
   @keyframes pageEnter {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 

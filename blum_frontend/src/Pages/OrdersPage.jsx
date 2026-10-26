@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import apiService from "../services/apiService";
 import ListPageSkeleton from "../components/ListPageSkeleton";
@@ -241,6 +242,22 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         : order?.paymentMethod || "",
     );
   };
+
+  useEffect(() => {
+    if (!paymentDialogOrder) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape" && !updatingPayment) {
+        setPaymentDialogOrder(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [paymentDialogOrder, updatingPayment]);
 
   const handleRequestFinalize = (order) => {
     const reason = finalizeDeliveryBlockReason(order);
@@ -509,80 +526,85 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         }
       />
 
-      {paymentDialogOrder ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
-          <div className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-soft sm:rounded-2xl">
-            <h3 className="text-lg font-semibold text-ink">
-              {hasPaymentMethod(paymentDialogOrder.paymentMethod)
-                ? `Registrar pagamento #${paymentDialogOrder.id}`
-                : `Definir pagamento #${paymentDialogOrder.id}`}
-            </h3>
-            <p className="mt-1 text-sm text-ink-muted">
-              {Number(paymentDialogOrder.discount) > 0
-                ? "Este pedido tem desconto geral. Só PIX ou dinheiro são permitidos — ou zere o desconto ao editar."
-                : paymentDialogOrder.paymentMethod === "carteira"
-                  ? "Como o cliente quitou o pedido em carteira?"
-                  : "Escolha a forma de pagamento para poder finalizar a entrega."}
-            </p>
-            <div className="mt-4">
-              <PaymentMethodPicker
-                value={paymentDialogMethod}
-                onChange={setPaymentDialogMethod}
-                options={paymentOptionsForOrder(paymentDialogOrder)}
-                disabled={updatingPayment}
-              />
-            </div>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <SecondaryButton
-                type="button"
-                onClick={() => setPaymentDialogOrder(null)}
-                disabled={updatingPayment}
-                className="!min-h-11 w-full sm:w-auto"
-              >
-                Cancelar
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                onClick={() => handleConfirmPaymentMethod()}
-                disabled={
-                  updatingPayment || !hasPaymentMethod(paymentDialogMethod)
-                }
-                className="!min-h-11 w-full sm:w-auto"
-              >
-                {updatingPayment ? "Salvando…" : "Só salvar pagamento"}
-              </SecondaryButton>
-              {paymentDialogOrder.documentType !== "orcamento" &&
-              paymentDialogOrder.status !== "Entregue" ? (
-                <PrimaryButton
-                  type="button"
-                  onClick={() =>
-                    handleConfirmPaymentMethod({ finalizeAfter: true })
-                  }
-                  disabled={
-                    updatingPayment || !hasPaymentMethod(paymentDialogMethod)
-                  }
-                  className="!min-h-11 w-full sm:w-auto"
-                >
-                  {updatingPayment
-                    ? "Salvando…"
-                    : "Salvar e finalizar entrega"}
-                </PrimaryButton>
-              ) : (
-                <PrimaryButton
-                  type="button"
-                  onClick={() => handleConfirmPaymentMethod()}
-                  disabled={
-                    updatingPayment || !hasPaymentMethod(paymentDialogMethod)
-                  }
-                  className="!min-h-11 w-full sm:w-auto"
-                >
-                  {updatingPayment ? "Salvando…" : "Salvar pagamento"}
-                </PrimaryButton>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {paymentDialogOrder
+        ? createPortal(
+            <div className="fixed inset-0 z-[80] flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
+              <div className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-soft sm:rounded-2xl">
+                <h3 className="text-lg font-semibold text-ink">
+                  {hasPaymentMethod(paymentDialogOrder.paymentMethod)
+                    ? `Registrar pagamento #${paymentDialogOrder.id}`
+                    : `Definir pagamento #${paymentDialogOrder.id}`}
+                </h3>
+                <p className="mt-1 text-sm text-ink-muted">
+                  {Number(paymentDialogOrder.discount) > 0
+                    ? "Este pedido tem desconto geral. Só PIX ou dinheiro são permitidos — ou zere o desconto ao editar."
+                    : paymentDialogOrder.paymentMethod === "carteira"
+                      ? "Como o cliente quitou o pedido em carteira?"
+                      : "Escolha a forma de pagamento para poder finalizar a entrega."}
+                </p>
+                <div className="mt-4">
+                  <PaymentMethodPicker
+                    value={paymentDialogMethod}
+                    onChange={setPaymentDialogMethod}
+                    options={paymentOptionsForOrder(paymentDialogOrder)}
+                    disabled={updatingPayment}
+                  />
+                </div>
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => setPaymentDialogOrder(null)}
+                    disabled={updatingPayment}
+                    className="!min-h-11 w-full sm:w-auto"
+                  >
+                    Cancelar
+                  </SecondaryButton>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => handleConfirmPaymentMethod()}
+                    disabled={
+                      updatingPayment || !hasPaymentMethod(paymentDialogMethod)
+                    }
+                    className="!min-h-11 w-full sm:w-auto"
+                  >
+                    {updatingPayment ? "Salvando…" : "Só salvar pagamento"}
+                  </SecondaryButton>
+                  {paymentDialogOrder.documentType !== "orcamento" &&
+                  paymentDialogOrder.status !== "Entregue" ? (
+                    <PrimaryButton
+                      type="button"
+                      onClick={() =>
+                        handleConfirmPaymentMethod({ finalizeAfter: true })
+                      }
+                      disabled={
+                        updatingPayment ||
+                        !hasPaymentMethod(paymentDialogMethod)
+                      }
+                      className="!min-h-11 w-full sm:w-auto"
+                    >
+                      {updatingPayment
+                        ? "Salvando…"
+                        : "Salvar e finalizar entrega"}
+                    </PrimaryButton>
+                  ) : (
+                    <PrimaryButton
+                      type="button"
+                      onClick={() => handleConfirmPaymentMethod()}
+                      disabled={
+                        updatingPayment ||
+                        !hasPaymentMethod(paymentDialogMethod)
+                      }
+                      className="!min-h-11 w-full sm:w-auto"
+                    >
+                      {updatingPayment ? "Salvando…" : "Salvar pagamento"}
+                    </PrimaryButton>
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       <PageHeader
         title="Pedidos"
