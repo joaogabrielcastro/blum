@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function OrderStockWarningModal({
   open,
@@ -12,13 +13,30 @@ export default function OrderStockWarningModal({
 }) {
   const [acknowledged, setAcknowledged] = useState(false);
 
+  useEffect(() => {
+    if (!open) {
+      setAcknowledged(false);
+      return undefined;
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => {
+      if (e.key === "Escape") onCancel?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const canConfirm = !requireExplicitConfirm || acknowledged;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-3 sm:p-4"
+      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50 p-3 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="stock-warning-title"
@@ -91,6 +109,7 @@ export default function OrderStockWarningModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
