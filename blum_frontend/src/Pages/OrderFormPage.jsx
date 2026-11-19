@@ -133,7 +133,7 @@ const OrderFormPage = ({ userId, userRole, brands, isOnline = true }) => {
 
   if (loading) {
     return (
-      <div className="p-3 sm:p-6 md:p-8">
+      <div>
         <ListPageSkeleton variant="list" />
         <p className="mt-4 text-center text-sm text-ink-muted">
           Carregando pedido…
@@ -144,7 +144,7 @@ const OrderFormPage = ({ userId, userRole, brands, isOnline = true }) => {
 
   if (orderId && (loadError || !editingOrder)) {
     return (
-      <div className="mx-auto max-w-lg p-6 text-center">
+      <div className="mx-auto max-w-lg py-10 text-center">
         <h1 className="text-lg font-semibold text-ink">
           Pedido indisponível
         </h1>
@@ -163,7 +163,7 @@ const OrderFormPage = ({ userId, userRole, brands, isOnline = true }) => {
   }
 
   return (
-    <div className="w-full min-w-0 max-w-none px-2 sm:px-3 md:px-4">
+    <div className="w-full min-w-0">
       <div className="mb-4">
         <OfflineSyncBar
           isOnline={isOnline}

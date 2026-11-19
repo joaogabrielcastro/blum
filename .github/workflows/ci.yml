@@ -103,7 +103,8 @@ jobs:
           npm run test:integration
 
   e2e:
-    runs-on: ubuntu-latest
+    # Fixado: o Playwright em uso não suporta Chromium no ubuntu-latest (26.04).
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

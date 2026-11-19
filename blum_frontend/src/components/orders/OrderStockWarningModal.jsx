@@ -103,7 +103,7 @@ export default function OrderStockWarningModal({
               onConfirm();
               setAcknowledged(false);
             }}
-            className="flex-1 min-h-11 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-h-11 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {confirmLabel}
           </button>

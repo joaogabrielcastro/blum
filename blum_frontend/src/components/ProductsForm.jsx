@@ -78,7 +78,7 @@ const ProductsForm = ({
       await onSubmit(productData);
     } catch (error) {
       console.error("Erro no formulário:", error);
-      let errorMessage = "Não foi possível guardar o produto. Tente novamente.";
+      let errorMessage = "Não foi possível salvar o produto. Tente novamente.";
 
       if (
         error.message &&
@@ -93,7 +93,7 @@ const ProductsForm = ({
               `${err.path || err.param || "Campo"}: ${err.msg || err.message}`,
           )
           .join("\n");
-        errorMessage = `Não foi possível guardar o produto.\n${fieldErrors}`;
+        errorMessage = `Não foi possível salvar o produto.\n${fieldErrors}`;
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -215,7 +215,7 @@ const ProductsForm = ({
           disabled={isSubmitting || !brands || brands.length === 0}
         >
           {isSubmitting
-            ? "A guardar…"
+            ? "Salvando…"
             : product
               ? "Atualizar produto"
               : "Adicionar produto"}

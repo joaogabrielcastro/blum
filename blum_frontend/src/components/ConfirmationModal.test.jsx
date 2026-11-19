@@ -40,7 +40,9 @@ describe("ConfirmationModal", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeTruthy();
-    expect(dialog.parentElement).toBe(document.body);
+    // Portal: o diálogo fica fora do container com animação/transform.
+    expect(document.getElementById("app-root").contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
     expect(screen.getByRole("heading", { name: "Excluir pedido" })).toBeTruthy();
     expect(
       screen.getByText("Tem certeza que deseja excluir este pedido?"),

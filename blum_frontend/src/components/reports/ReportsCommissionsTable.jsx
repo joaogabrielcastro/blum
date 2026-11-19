@@ -43,7 +43,7 @@ const ReportsCommissionsTable = ({
             type="button"
             onClick={onExportSalesExcel}
             disabled={exportingExcel || exportingPdf != null}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 bg-surface px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-60"
             title={canExcel ? undefined : "Disponível no plano Profissional"}
           >
             {exportingExcel
@@ -56,7 +56,7 @@ const ReportsCommissionsTable = ({
             type="button"
             onClick={onExportAllCommissionsPdf}
             disabled={exportingPdf != null || exportingExcel}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-60"
             title={
               canCommissionPdf ? undefined : "Disponível no plano Profissional"
             }
@@ -73,7 +73,7 @@ const ReportsCommissionsTable = ({
           type="button"
           onClick={onExportAllCommissionsPdf}
           disabled={exportingPdf != null}
-          className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+          className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-60"
           title={
             canCommissionPdf ? undefined : "Disponível no plano Profissional"
           }
@@ -87,7 +87,7 @@ const ReportsCommissionsTable = ({
       ) : null}
     </div>
 
-    <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200">
+    <div className="bg-surface rounded-2xl shadow-md p-6 border border-gray-200">
       {showRepresentantesSummaryTable ? (
         <div className="overflow-x-auto max-w-full min-h-[150px]">
           <table className="min-w-full divide-y divide-gray-200">
@@ -116,7 +116,7 @@ const ReportsCommissionsTable = ({
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-surface divide-y divide-gray-200">
               {commissionsByRep.map((sale) => (
                 <tr key={sale.userId}>
                   <td className="px-4 py-4 text-sm text-gray-900">

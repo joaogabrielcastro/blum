@@ -50,7 +50,7 @@ const VerificationTable = ({
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+    <div className="mb-6 rounded-xl border border-gray-200 bg-surface p-4 shadow-sm sm:p-6">
       <div className="mb-3 flex items-center justify-between">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold text-gray-800">
@@ -94,7 +94,7 @@ const VerificationTable = ({
                     <input
                       value={it.productCode || ""}
                       onChange={(e) => handleChange(itemIndex, "productCode", e.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base"
                     />
                   </label>
                   <label className="block text-sm font-medium text-gray-700">
@@ -102,7 +102,7 @@ const VerificationTable = ({
                     <input
                       value={it.description || ""}
                       onChange={(e) => handleChange(itemIndex, "description", e.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base"
                     />
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -113,7 +113,7 @@ const VerificationTable = ({
                         step="any"
                         value={it.quantity ?? ""}
                         onChange={(e) => handleChange(itemIndex, "quantity", e.target.value)}
-                        className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                        className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base"
                       />
                     </label>
                     <label className="block min-w-0 text-sm font-medium text-gray-700">
@@ -123,7 +123,7 @@ const VerificationTable = ({
                         step="any"
                         value={it.unitPrice ?? ""}
                         onChange={(e) => handleChange(itemIndex, "unitPrice", e.target.value)}
-                        className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                        className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base"
                       />
                     </label>
                   </div>
@@ -132,7 +132,7 @@ const VerificationTable = ({
                     <select
                       value={it.mappedProductId || ""}
                       onChange={(e) => handleChange(itemIndex, "mappedProductId", e.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-base"
+                      className="mt-1 min-h-11 w-full rounded-lg border border-gray-300 bg-surface px-3 py-2 text-base"
                     >
                       <option value="">-- Novo produto --</option>
                       {userProducts.map((p) => (
@@ -243,7 +243,7 @@ const VerificationTable = ({
                   type="button"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="min-h-11 rounded-lg border border-gray-300 bg-surface px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Anterior
                 </button>
@@ -251,7 +251,7 @@ const VerificationTable = ({
                   type="button"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="min-h-11 rounded-lg border border-gray-300 bg-surface px-4 py-2 text-sm font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Próxima
                 </button>

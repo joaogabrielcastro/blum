@@ -2,7 +2,7 @@
 export function ListPageSkeleton({ cards = 6, variant = "grid", rows = 8 }) {
   if (variant === "table") {
     return (
-      <div className="overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft backdrop-blur-md animate-pulse">
+      <div className="overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft animate-pulse">
         <div className="border-b border-edge bg-surface-muted/80 px-4 py-3">
           <div className="flex gap-6">
             <div className="h-3 w-28 rounded bg-zinc-200/80" />
@@ -46,7 +46,7 @@ export function ListPageSkeleton({ cards = 6, variant = "grid", rows = 8 }) {
       {[...Array(cards)].map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl border border-edge bg-surface/80 p-5 shadow-soft backdrop-blur-md"
+          className="rounded-2xl border border-edge bg-surface/80 p-5 shadow-soft"
         >
           <div className="mb-4 flex gap-3">
             <div className="h-10 w-10 rounded-full bg-zinc-200/80" />

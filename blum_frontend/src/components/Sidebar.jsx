@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import Avatar from "./ui/Avatar";
 import ThemeToggle from "./ui/ThemeToggle";
 
-const Icon = {
+export const Icon = {
   panel: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -248,17 +248,25 @@ function NavItem({ to, label, icon, onNavigate }) {
       to={to}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+        `group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
           isActive
-            ? "bg-white text-slate-950 shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
-            : "text-slate-300 hover:bg-white/10 hover:text-white"
+            ? "bg-surface-muted text-ink [&_svg]:text-brand"
+            : "text-ink-muted hover:bg-surface-muted/70 hover:text-ink"
         }`
       }
     >
-      <span className="shrink-0 opacity-80 transition-transform duration-200 group-hover:scale-105">{icon}</span>
+      <span className="shrink-0 [&_svg]:h-[18px] [&_svg]:w-[18px]">{icon}</span>
       <span className="truncate">{label}</span>
     </NavLink>
   );
+}
+
+export function roleLabelFor(userRole) {
+  if (userRole === "admin") return "Administrador";
+  if (["salesperson", "seller", "representante"].includes(userRole)) {
+    return "Vendedor";
+  }
+  return userRole || "";
 }
 
 const Sidebar = ({
@@ -269,46 +277,45 @@ const Sidebar = ({
   isPlatformAdmin,
   username,
   displayName,
+  companyName,
 }) => {
   const groups = buildNavGroups({ userRole, isPlatformAdmin });
-  const name =
-    String(displayName || username || "").trim() || "Utilizador";
-  const roleLabel =
-    userRole === "admin"
-      ? "Administrador"
-      : userRole === "seller" || userRole === "representante"
-        ? "Representante"
-        : userRole || "";
+  const name = String(displayName || username || "").trim() || "Usuário";
+  const roleLabel = roleLabelFor(userRole);
 
   return (
     <aside
       className={`
         fixed inset-y-0 left-0 z-40 flex w-4/5 max-w-xs transform flex-col
-        border-r border-white/10 bg-slate-950 text-white shadow-[16px_0_48px_rgba(15,23,42,0.12)]
-        transition-transform duration-300 ease-in-out
-        md:relative md:w-64 md:max-w-none md:translate-x-0
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
+        border-r border-edge bg-surface text-ink
+        transition-transform duration-200 ease-out
+        md:relative md:w-60 md:max-w-none md:translate-x-0
+        ${isOpen ? "translate-x-0 shadow-pop" : "-translate-x-full"}
       `}
       aria-label="Navegação principal"
     >
-      <div className="relative flex items-center gap-3 overflow-hidden border-b border-white/10 px-5 py-5">
-        <div className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-brand/25 blur-3xl" />
-        <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-black text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] ring-1 ring-white/20">
+      <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white">
           B
         </div>
-        <div className="relative min-w-0">
-          <div className="truncate text-base font-bold tracking-tight text-white">
-            Blum
+        <div className="min-w-0">
+          <div
+            className="truncate text-sm font-semibold leading-tight text-ink"
+            title={companyName || undefined}
+          >
+            {companyName || "Blum"}
           </div>
-          <div className="truncate text-[10px] font-medium uppercase tracking-[0.16em] text-slate-400">Gestão comercial</div>
+          <div className="truncate text-xs text-ink-muted">
+            {companyName ? "Blum · Gestão comercial" : "Gestão comercial"}
+          </div>
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
-        <ul className="space-y-5">
+      <nav className="flex-1 overflow-y-auto px-2.5 py-3">
+        <ul className="space-y-4">
           {groups.map((group) => (
             <li key={group.id}>
-              <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              <p className="mb-1 px-2.5 text-[11px] font-medium text-ink-muted/80">
                 {group.label}
               </p>
               <ul className="space-y-0.5">
@@ -328,30 +335,26 @@ const Sidebar = ({
         </ul>
       </nav>
 
-      <div className="mt-auto border-t border-white/10 bg-black/10 p-3">
-        <div className="mb-2 px-1">
-          <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            Aparência
-          </p>
-          <ThemeToggle className="w-full justify-between border-white/10 bg-white/5 text-slate-300" />
-        </div>
-        <div className="mb-2 flex items-center gap-3 rounded-xl border border-white/5 bg-white/5 px-2.5 py-2.5">
+      <div className="safe-bottom mt-auto space-y-2 border-t border-edge p-2.5">
+        <ThemeToggle className="w-full [&>button]:flex-1" />
+        <div className="flex items-center gap-2.5 rounded-xl px-1.5 py-1.5">
           <Avatar name={name} size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">{name}</p>
+            <p className="truncate text-sm font-medium text-ink">{name}</p>
             {roleLabel ? (
-              <p className="truncate text-xs text-slate-400">{roleLabel}</p>
+              <p className="truncate text-xs text-ink-muted">{roleLabel}</p>
             ) : null}
           </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Sair"
+            aria-label="Sair"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 [&_svg]:h-[18px] [&_svg]:w-[18px]"
+          >
+            {Icon.logout}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-        >
-          {Icon.logout}
-          Sair
-        </button>
       </div>
     </aside>
   );

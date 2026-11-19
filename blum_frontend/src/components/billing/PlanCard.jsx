@@ -8,8 +8,8 @@ const PlanCard = ({
   <div
     className={`relative flex flex-col rounded-2xl border p-6 shadow-sm transition-shadow hover:shadow-md ${
       plan.highlighted
-        ? "border-blue-500 ring-2 ring-blue-100 bg-white"
-        : "border-gray-200 bg-white"
+        ? "border-blue-500 ring-2 ring-blue-100 bg-surface"
+        : "border-gray-200 bg-surface"
     }`}
   >
     {plan.highlighted ? (
@@ -51,11 +51,11 @@ const PlanCard = ({
         isCurrent
           ? "bg-gray-100 text-gray-500 cursor-default"
           : plan.highlighted
-            ? "bg-blue-600 text-white hover:bg-blue-700"
-            : "bg-gray-900 text-white hover:bg-gray-800"
+            ? "bg-blue-600 text-white hover:bg-blue-500"
+            : "bg-ink text-surface hover:bg-ink/90"
       } disabled:opacity-60`}
     >
-      {isCurrent ? "Plano atual" : loading ? "A processar…" : actionLabel}
+      {isCurrent ? "Plano atual" : loading ? "Processando…" : actionLabel}
     </button>
   </div>
 );

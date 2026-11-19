@@ -25,7 +25,7 @@ const PurchaseActions = ({
       Cancelar
     </SecondaryButton>
     <PrimaryButton type="button" onClick={onConfirm} disabled={isLoading}>
-      {isLoading ? "A processar…" : confirmLabel}
+      {isLoading ? "Processando…" : confirmLabel}
     </PrimaryButton>
   </div>
 );

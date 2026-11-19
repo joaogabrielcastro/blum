@@ -455,7 +455,7 @@ const OrdersForm = ({
         totalPrice: netTotal,
       });
       toast.success(
-        "Orçamento guardado neste aparelho. Será enviado automaticamente quando houver internet.",
+        "Orçamento salvo neste aparelho. Será enviado automaticamente quando houver internet.",
       );
       onOrderAdded();
       return;
@@ -493,7 +493,7 @@ const OrdersForm = ({
     if (!hasPaymentMethod(paymentMethod)) {
       toast.warning(
         documentType === "pedido"
-          ? "Selecione a forma de pagamento para guardar o pedido."
+          ? "Selecione a forma de pagamento para salvar o pedido."
           : "Selecione a forma de pagamento para criar o orçamento.",
       );
       return;
@@ -514,7 +514,7 @@ const OrdersForm = ({
     }
     if (!userId) {
       toast.warning(
-        "Sessão inválida. Faça login novamente para guardar o pedido.",
+        "Sessão inválida. Faça login novamente para salvar o pedido.",
       );
       return;
     }
@@ -664,9 +664,9 @@ const OrdersForm = ({
           }}
         >
           {saving
-            ? "A guardar…"
+            ? "Salvando…"
             : editingOrder
-              ? "Guardar alterações"
+              ? "Salvar alterações"
               : "Criar orçamento"}
         </PrimaryButton>
       )}
@@ -873,14 +873,14 @@ const OrdersForm = ({
       />
 
       {productCreateOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-overlay/50 p-4">
           <div
             ref={productCreateDialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="Cadastrar produto no pedido"
             tabIndex={-1}
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[1.5rem] border border-edge bg-surface p-5 shadow-2xl sm:p-6"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge bg-surface p-5 shadow-2xl sm:p-6"
           >
             <div className="mb-5">
               <h2 className="text-xl font-bold text-ink">Cadastrar produto</h2>

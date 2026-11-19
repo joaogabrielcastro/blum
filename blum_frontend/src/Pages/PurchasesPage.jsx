@@ -208,7 +208,7 @@ const PurchasesPage = ({ subscription }) => {
   };
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div>
       <div className="mx-auto max-w-7xl">
         <PageHeader
           title="Compras"
@@ -238,7 +238,7 @@ const PurchasesPage = ({ subscription }) => {
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center">
-                  <LoadingSpinner message="A processar…" />
+                  <LoadingSpinner message="Processando…" />
                 </div>
               </div>
             ) : activeTab === "csv" ? (

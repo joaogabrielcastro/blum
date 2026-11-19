@@ -58,7 +58,7 @@ export function useOrdersList({ sharedClientsList, toast, userId, userRole }) {
     if (!cached.length) return false;
     applyClientsList(cached);
     toast.info(
-      "Sem internet — usando clientes guardados neste aparelho para o orçamento.",
+      "Sem internet — usando clientes salvos neste aparelho para o orçamento.",
     );
     return true;
   }, [applyClientsList, toast]);

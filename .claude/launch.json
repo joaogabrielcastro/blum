@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "blum-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd blum_frontend && npx cross-env REACT_APP_API_URL=/api/v2 BROWSER=none PORT=3000 react-scripts start"
+      ],
+      "port": 3000
+    }
+  ]
+}

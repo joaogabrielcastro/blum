@@ -1,4 +1,4 @@
-const { pool } = require("../../config/database");
+const { pool, beginTenantTransaction } = require("../../config/database");
 const { parseSpreadsheetBuffer } = require("../product/productSpreadsheetParser");
 
 async function processCsvData(csvText, selectedBrand) {
@@ -50,7 +50,7 @@ async function importProductsToDatabase(products, tenantId) {
 
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await beginTenantTransaction(client);
 
     const payloadJson = JSON.stringify(normalized);
     const existingRows = await client.query(

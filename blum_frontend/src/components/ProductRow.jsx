@@ -102,8 +102,8 @@ const ProductRow = ({
       deleteId === product.id ? (
         <tr>
           <td colSpan={selectable ? 6 : 5} className="p-0">
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-sm rounded-2xl border border-edge bg-surface/95 p-6 shadow-glass backdrop-blur-md">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+              <div className="w-full max-w-sm rounded-2xl border border-edge bg-surface/95 p-6 shadow-glass">
                 <h3 className="text-lg font-semibold text-ink">
                   Excluir produto?
                 </h3>
@@ -122,7 +122,7 @@ const ProductRow = ({
                   <button
                     type="button"
                     onClick={() => onConfirmDelete(product.id)}
-                    className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-700 active:scale-[0.98]"
+                    className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-500 active:scale-[0.98]"
                   >
                     Excluir
                   </button>

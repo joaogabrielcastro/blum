@@ -47,8 +47,8 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
   const latest = useMemo(() => rows[0] || null, [rows]);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico do cliente para este item" tabIndex={-1} className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-edge bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-overlay/50 p-4">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico do cliente para este item" tabIndex={-1} className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl border border-edge bg-surface shadow-2xl">
         <div className="border-b border-gray-200 px-5 py-4">
           <h3 className="text-lg font-bold text-gray-900">
             Histórico do cliente para este item
@@ -152,7 +152,7 @@ const ClientItemPriceHistoryModal = ({ clientId, item, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+            className="rounded-lg border border-edge bg-surface text-ink hover:bg-surface-muted px-4 py-2 text-sm font-semibold"
           >
             Fechar
           </button>

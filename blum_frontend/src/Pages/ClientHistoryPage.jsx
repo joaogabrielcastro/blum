@@ -88,7 +88,7 @@ const ClientHistoryPage = ({ clients }) => {
   }
 
   return (
-    <div className="min-h-full bg-transparent p-3 sm:p-6">
+    <div>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-7 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
@@ -152,7 +152,7 @@ const ClientHistoryPage = ({ clients }) => {
         )}
 
         {/* Lista de Pedidos */}
-        <div className="overflow-hidden rounded-[1.25rem] border border-edge/80 bg-surface/95 shadow-soft backdrop-blur-xl">
+        <div className="overflow-hidden rounded-2xl border border-edge/80 bg-surface/95 shadow-soft">
           {orders.length === 0 ? (
             <div className="text-center py-12 px-6">
               <div className="text-4xl mb-4">📦</div>
@@ -274,7 +274,7 @@ const OrderDetailsModal = ({
   const total = order.totalPrice ?? order.totalprice ?? 0;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-overlay/50 flex items-center justify-center p-4 z-50">
       <div className="bg-surface rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -452,7 +452,7 @@ const OrderDetailsModal = ({
         <div className="mt-6 flex justify-end">
           <button
             onClick={onClose}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500"
           >
             Fechar
           </button>

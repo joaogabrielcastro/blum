@@ -53,7 +53,7 @@ export default function OfflineSyncBar({  isOnline,
                 ) : null}
                 . Última atualização: {formatSyncedAt(meta.catalogSyncedAt)}.
                 <span className="block mt-1 text-gray-500">
-                  Os dados ficam guardados neste aparelho — não precisa baixar
+                  Os dados ficam salvos neste aparelho — não precisa baixar
                   toda vez, só atualizar quando quiser preços e clientes novos.
                 </span>
               </>
@@ -82,10 +82,10 @@ export default function OfflineSyncBar({  isOnline,
             type="button"
             disabled={!isOnline || syncing}
             onClick={onDownload}
-            className="min-h-10 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            className="min-h-10 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
           >
             {syncing
-              ? "A sincronizar…"
+              ? "Sincronizando…"
               : hasCatalog
                 ? "Atualizar dados offline"
                 : "Baixar dados offline"}

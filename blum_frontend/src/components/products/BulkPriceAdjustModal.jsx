@@ -62,8 +62,8 @@ export default function BulkPriceAdjustModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Reajuste de preços" tabIndex={-1} className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-[1.5rem] border border-edge bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Reajuste de preços" tabIndex={-1} className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-edge bg-surface shadow-2xl">
         <div className="p-5 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-800">Reajuste de preços</h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -193,7 +193,7 @@ export default function BulkPriceAdjustModal({
             type="button"
             onClick={handlePreview}
             disabled={busy || !percentage}
-            className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
           >
             {busy ? "Aguarde..." : "Pré-visualizar"}
           </button>
@@ -201,7 +201,7 @@ export default function BulkPriceAdjustModal({
             type="button"
             onClick={handleApply}
             disabled={busy || !percentage || !preview?.items?.length}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-500 disabled:opacity-50"
           >
             Aplicar reajuste
           </button>

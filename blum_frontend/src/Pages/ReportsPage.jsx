@@ -277,14 +277,14 @@ const ReportsPage = ({ userRole, userId, subscription }) => {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 md:p-8">
+      <div>
         <ListPageSkeleton variant="list" />
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div>
       <PageHeader
         title="Relatórios"
         description={`Período: ${periodLabel}`}

@@ -1,6 +1,7 @@
 jest.mock("../config/database", () => ({
   sql: jest.fn(),
   pool: { query: jest.fn(), connect: jest.fn() },
+  beginTenantTransaction: jest.fn((client) => client.query("BEGIN")),
 }));
 
 const orderService = require("./orderService");

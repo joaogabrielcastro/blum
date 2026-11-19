@@ -83,14 +83,14 @@ const PlatformAdminPage = () => {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 md:p-8">
+      <div>
         <ListPageSkeleton variant="table" rows={6} />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Plataforma"
         description="Gerencie todas as empresas cadastradas no Blum."
@@ -191,7 +191,7 @@ const PlatformAdminPage = () => {
       </Surface>
 
       {detail || detailLoading ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-edge bg-surface p-5 shadow-soft sm:p-6">
             <div className="mb-4 flex items-start justify-between gap-4">
               <h2 className="text-lg font-semibold text-ink">
@@ -206,7 +206,7 @@ const PlatformAdminPage = () => {
               </GhostButton>
             </div>
             {detailLoading ? (
-              <LoadingSpinner message="A carregar…" />
+              <LoadingSpinner message="Carregando…" />
             ) : detail ? (
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <dt className="text-ink-muted">Nome</dt>

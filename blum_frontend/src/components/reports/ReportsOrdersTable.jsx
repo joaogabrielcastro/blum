@@ -22,7 +22,7 @@ const ReportsOrdersTable = ({
       Detalhes dos Pedidos (entregues no período)
     </h2>
 
-    <div className="bg-white rounded-2xl shadow-md p-6 border border-gray-200 mb-8">
+    <div className="bg-surface rounded-2xl shadow-md p-6 border border-gray-200 mb-8">
       {ordersToDisplay.length > 0 ? (
         <div className="overflow-x-auto max-w-full min-h-[150px]">
           <table className="min-w-full divide-y divide-gray-200">
@@ -51,7 +51,7 @@ const ReportsOrdersTable = ({
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-surface divide-y divide-gray-200">
               {ordersToDisplay.map((order) => {
                 const repKey = orderSellerUserKey(order);
                 const team = usersById[repKey];

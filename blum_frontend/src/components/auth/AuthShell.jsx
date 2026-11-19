@@ -8,7 +8,7 @@ const FEATURES = [
 ];
 
 const themeToggleOnDark =
-  "border-white/20 bg-white/10 [&_button]:text-zinc-300 [&_button[aria-pressed=true]]:bg-white [&_button[aria-pressed=true]]:text-zinc-900 [&_button[aria-pressed=true]]:shadow-none";
+  "border-white/20 bg-white/10 [&_button]:text-slate-300 [&_button[aria-pressed=true]]:bg-white [&_button[aria-pressed=true]]:text-slate-900 [&_button[aria-pressed=true]]:shadow-none";
 
 export function AuthBrandMark({ size = "md" }) {
   const [logoError, setLogoError] = useState(false);
@@ -52,37 +52,30 @@ export default function AuthShell({
   return (
     <div className="min-h-screen bg-surface-page lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
       <aside className="relative hidden overflow-hidden bg-slate-950 px-12 py-14 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.12]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 22% 15%, #2563EB 0%, transparent 44%), radial-gradient(circle at 88% 82%, #0EA5E9 0%, transparent 38%)",
-          }}
-        />
 
         <div className="relative z-10 flex items-center gap-3">
           <AuthBrandMark size="md" />
           <div>
             <p className="text-2xl font-semibold tracking-tight">Blum</p>
-            <p className="text-sm text-zinc-300">Gestão comercial</p>
+            <p className="text-sm text-slate-300">Gestão comercial</p>
           </div>
         </div>
 
         <div className="relative z-10 max-w-md">
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-blue-300">Operação comercial, simplificada</p>
-          <h2 className="text-4xl font-bold leading-[1.12] tracking-[-0.035em] xl:text-5xl">
+          <h2 className="text-4xl font-semibold leading-[1.15] tracking-[-0.03em]">
             {headline}
           </h2>
-          <p className="mt-4 text-base leading-relaxed text-zinc-300">
+          <p className="mt-4 text-base leading-relaxed text-slate-300">
             {description}
           </p>
           <ul className="mt-8 space-y-3">
             {FEATURES.map((feature) => (
               <li
                 key={feature}
-                className="flex items-start gap-3 text-sm text-zinc-200"
+                className="flex items-start gap-3 text-sm text-slate-200"
               >
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/25 text-brand-100">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-500/25 text-blue-200">
                   <svg
                     className="h-3 w-3"
                     fill="none"
@@ -105,7 +98,7 @@ export default function AuthShell({
         </div>
 
         <div className="relative z-10 flex items-center justify-between gap-4">
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-slate-500">
             © {year} JW Soluções · Blum
           </p>
           <ThemeToggle className={themeToggleOnDark} />
@@ -113,19 +106,18 @@ export default function AuthShell({
       </aside>
 
       <div className="flex min-h-screen flex-col">
-        <div className="flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900 px-6 py-7 text-white lg:hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-6 py-7 text-white lg:hidden">
           <div className="flex items-center gap-3">
             <AuthBrandMark size="sm" />
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Blum</h1>
-              <p className="text-sm text-zinc-300">Gestão comercial</p>
+              <p className="text-sm text-slate-300">Gestão comercial</p>
             </div>
           </div>
           <ThemeToggle className={themeToggleOnDark} />
         </div>
 
         <div className="relative flex flex-1 flex-col justify-center overflow-hidden px-4 py-8 sm:px-8 lg:px-14 lg:py-10 xl:px-20">
-          <div className="pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-brand/5 blur-3xl" aria-hidden />
           <div className="mx-auto w-full max-w-md">{children}</div>
           <p className="mt-6 text-center text-xs text-ink-muted lg:hidden">
             © {year} JW Soluções · Blum

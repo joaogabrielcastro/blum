@@ -1,11 +1,11 @@
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import {
-  PrimaryButton,
-  SecondaryButton,
-  DangerButton,
-} from "./ui/Surface";
+import { useEffect, useRef, useState } from "react";
+import Dialog from "./ui/Dialog";
+import Button from "./ui/Button";
 
+/**
+ * Confirmação de ação. Se `onConfirm` retornar uma Promise, o botão fica em
+ * estado "processando" até ela terminar — impede clique duplo.
+ */
 const ConfirmationModal = ({
   show,
   onConfirm,
@@ -15,51 +15,58 @@ const ConfirmationModal = ({
   confirmText = "Confirmar",
   cancelText = "Cancelar",
   tone = "danger",
+  loading = false,
 }) => {
+  const [busy, setBusy] = useState(false);
+  const mountedRef = useRef(true);
+
   useEffect(() => {
-    if (!show) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e) => {
-      if (e.key === "Escape") onCancel?.();
-    };
-    window.addEventListener("keydown", onKey);
+    mountedRef.current = true;
     return () => {
-      document.body.style.overflow = prev;
-      window.removeEventListener("keydown", onKey);
+      mountedRef.current = false;
     };
-  }, [show, onCancel]);
+  }, []);
 
-  if (!show) return null;
+  useEffect(() => {
+    if (!show) setBusy(false);
+  }, [show]);
 
-  const ConfirmBtn = tone === "danger" ? DangerButton : PrimaryButton;
+  const isBusy = busy || loading;
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-900/40 p-4 dark:bg-black/50"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-modal-title"
-    >
-      <div className="w-full max-w-sm rounded-2xl border border-edge bg-surface p-6 shadow-soft">
-        <h3
-          id="confirm-modal-title"
-          className="text-lg font-semibold tracking-tight text-ink"
-        >
-          {title}
-        </h3>
-        <p className="mt-2 text-sm leading-relaxed text-ink-muted">{message}</p>
-        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <SecondaryButton onClick={onCancel} className="w-full sm:w-auto">
+  const handleConfirm = async () => {
+    if (isBusy) return;
+    setBusy(true);
+    try {
+      await onConfirm?.();
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={show}
+      onClose={isBusy ? undefined : onCancel}
+      dismissible={!isBusy}
+      title={title}
+      description={message}
+      size="sm"
+      footer={
+        <>
+          <Button onClick={onCancel} disabled={isBusy} className="w-full sm:w-auto">
             {cancelText}
-          </SecondaryButton>
-          <ConfirmBtn onClick={onConfirm} className="w-full sm:w-auto">
+          </Button>
+          <Button
+            variant={tone === "danger" ? "danger" : "primary"}
+            onClick={handleConfirm}
+            loading={isBusy}
+            className="w-full sm:w-auto"
+          >
             {confirmText}
-          </ConfirmBtn>
-        </div>
-      </div>
-    </div>,
-    document.body,
+          </Button>
+        </>
+      }
+    />
   );
 };
 

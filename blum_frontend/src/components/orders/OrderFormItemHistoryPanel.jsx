@@ -160,7 +160,7 @@ export default function OrderFormItemHistoryPanel({
               <th className="px-2 py-1.5 text-left font-semibold">Pagamento</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 bg-white">
+          <tbody className="divide-y divide-gray-100 bg-surface">
             {rows.map((row) => (
               <tr key={row.id}>
                 <td className="px-2 py-1.5 text-gray-700 whitespace-nowrap">

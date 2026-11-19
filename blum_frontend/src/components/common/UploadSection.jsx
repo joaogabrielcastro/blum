@@ -1,3 +1,4 @@
+import { useId } from "react";
 import FormField, { inputClassName } from "../ui/FormField";
 import { PrimaryButton } from "../ui/Surface";
 
@@ -14,26 +15,42 @@ const UploadSection = ({
   description = "",
   accept = "*",
   fileType = "file",
+  embedded = false,
 }) => {
+  const fileInputId = useId();
   return (
-    <div className="mb-6 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-soft sm:p-6">
+    <div
+      className={
+        embedded
+          ? ""
+          : "mb-6 rounded-2xl border border-zinc-200/80 bg-surface p-5 shadow-soft sm:p-6"
+      }
+    >
       <h3 className="text-base font-semibold text-zinc-900">{title}</h3>
       {description ? (
         <p className="mt-1 text-sm text-zinc-500">{description}</p>
       ) : null}
 
-      <div className="mt-4 flex flex-col items-stretch gap-4 md:flex-row md:items-end">
-        <div className="min-w-0 flex-1 space-y-4">
-          <FormField
-            label="Arquivo"
-            hint={selectedFile ? selectedFile.name : undefined}
-          >
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)_auto] lg:items-end">
+          <FormField label="Arquivo">
             <input
+              id={fileInputId}
               type="file"
               accept={accept}
               onChange={onFileChange}
-              className="block w-full text-sm text-zinc-700 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100"
+              className="sr-only"
             />
+            <label
+              htmlFor={fileInputId}
+              className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-brand/40 bg-brand-50/60 px-4 py-3 text-sm transition-colors hover:border-brand hover:bg-brand-50"
+            >
+              <span className="shrink-0 rounded-lg bg-surface px-3 py-1.5 font-semibold text-brand shadow-sm">
+                Escolher arquivo
+              </span>
+              <span className="min-w-0 truncate text-ink-muted">
+                {selectedFile?.name || "Nenhum arquivo selecionado"}
+              </span>
+            </label>
           </FormField>
 
           <FormField label="Representada (marca da NF)" required>
@@ -58,19 +75,17 @@ const UploadSection = ({
             )}
           </FormField>
 
-          {error ? (
-            <p className="text-sm text-red-600">{String(error)}</p>
-          ) : null}
-        </div>
-
         <PrimaryButton
           type="button"
           onClick={onUpload}
           disabled={isLoading}
-          className="shrink-0"
+          className="w-full shrink-0 lg:w-auto"
         >
-          {isLoading ? "A enviar…" : `Enviar ${fileType.toUpperCase()}`}
+          {isLoading ? "Enviando…" : `Enviar ${fileType.toUpperCase()}`}
         </PrimaryButton>
+        {error ? (
+          <p className="text-sm text-red-600 lg:col-span-3">{String(error)}</p>
+        ) : null}
       </div>
     </div>
   );

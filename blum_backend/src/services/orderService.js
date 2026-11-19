@@ -1,4 +1,4 @@
-const { sql, pool } = require("../config/database");
+const { sql, pool, beginTenantTransaction } = require("../config/database");
 const orderRepository = require("../repositories/orderRepository");
 const { requireTenantId, tenantIdFromAuth } = require("../utils/tenantContext");
 const {
@@ -389,7 +389,7 @@ class OrderService {
     tenantId = requireTenantId(tenantId);
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
       await this.persistOrderItemsWithClient(
         client,
         orderId,
@@ -633,7 +633,7 @@ class OrderService {
     const client = await pool.connect();
     let orderId;
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
 
       if (clientRequestId) {
         const existing = await client.query(
@@ -805,7 +805,7 @@ class OrderService {
 
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
       const result = await orderRepository.updateOrderCore(client, {
         id,
         clientid,
@@ -1060,7 +1060,7 @@ class OrderService {
 
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
       await client.query(
         `
           UPDATE orders
@@ -1138,7 +1138,7 @@ class OrderService {
       : new Map();
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
       for (const [productId, quantity] of committedStock) {
         await orderRepository.increaseProductStock(client, {
           productId,
@@ -1175,7 +1175,7 @@ class OrderService {
 
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await beginTenantTransaction(client);
       const updated = await orderRepository.markOrderDelivered(client, id, tenantId);
 
       if (updated.length === 0) {

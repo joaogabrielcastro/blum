@@ -2,82 +2,136 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Tokens de design da Blum.
+ * Cores em canais RGB ("R G B") para que o Tailwind aceite `/opacidade`
+ * (ex.: `bg-surface/80`). Ver tailwind.config.js.
+ */
 @layer base {
   :root {
-    --color-brand: #2563eb;
-    --color-brand-hover: #1d4ed8;
-    --color-surface: #ffffff;
-    --color-surface-muted: #f3f6fb;
-    --color-page: #f6f8fc;
-    --color-border: #dfe5ef;
-    --color-text: #172033;
-    --color-text-muted: #647087;
-    --color-elevated: #ffffff;
-    --radius-md: 0.875rem;
-    --radius-lg: 1.25rem;
-    --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px rgba(30, 64, 175, 0.06);
+    /* Marca — usada só em ação principal, foco e item ativo */
+    --brand: 36 87 214; /* #2457D6 */
+    --brand-hover: 29 72 184;
+    --brand-strong: 24 60 156;
+    --brand-50: 238 243 253;
+    --brand-100: 219 229 251;
+
+    /* Superfícies e texto */
+    --color-page: 247 247 248;
+    --color-surface: 255 255 255;
+    --color-surface-muted: 244 244 245;
+    --color-elevated: 255 255 255;
+    --color-border: 228 228 231;
+    --color-text: 24 24 27;
+    --color-text-muted: 107 107 118;
+    --color-overlay: 9 9 11;
+
+    /* Escala neutra usada por gray e zinc */
+    --n-50: 250 250 250;
+    --n-100: 244 244 245;
+    --n-200: 228 228 231;
+    --n-300: 212 212 216;
+    --n-400: 161 161 170;
+    --n-500: 113 113 122;
+    --n-600: 82 82 91;
+    --n-700: 63 63 70;
+    --n-800: 39 39 42;
+    --n-900: 24 24 27;
+    --n-950: 9 9 11;
+
+    --shadow-soft: 0 1px 2px rgba(9, 9, 11, 0.04);
+    --shadow-pop: 0 1px 3px rgba(9, 9, 11, 0.08), 0 12px 32px rgba(9, 9, 11, 0.12);
     color-scheme: light;
   }
 
   html.dark {
-    --color-brand: #3b82f6;
-    --color-brand-hover: #60a5fa;
-    --color-surface: #111827;
-    --color-surface-muted: #182235;
-    --color-page: #0a1020;
-    --color-border: #29364c;
-    --color-text: #f4f7fb;
-    --color-text-muted: #9aa8bd;
-    --color-elevated: #172033;
-    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.32), 0 18px 42px rgba(0, 0, 0, 0.22);
+    --brand: 74 116 232;
+    --brand-hover: 98 136 238;
+    --brand-strong: 160 187 248;
+    --brand-50: 26 33 54;
+    --brand-100: 33 44 76;
+
+    --color-page: 11 11 13;
+    --color-surface: 20 20 23;
+    --color-surface-muted: 28 28 32;
+    --color-elevated: 26 26 30;
+    --color-border: 44 44 50;
+    --color-text: 236 236 239;
+    --color-text-muted: 155 155 165;
+    --color-overlay: 0 0 0;
+
+    /* Escala invertida: componentes legados continuam legíveis */
+    --n-50: 28 28 32;
+    --n-100: 34 34 39;
+    --n-200: 44 44 50;
+    --n-300: 63 63 70;
+    --n-400: 113 113 122;
+    --n-500: 155 155 165;
+    --n-600: 180 180 188;
+    --n-700: 205 205 212;
+    --n-800: 228 228 231;
+    --n-900: 244 244 245;
+    --n-950: 250 250 250;
+
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-pop: 0 1px 3px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.45);
     color-scheme: dark;
   }
 
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    scroll-behavior: smooth;
+    font-feature-settings: "cv11", "ss01";
   }
 
   body {
-    @apply m-0 bg-surface-page font-sans text-ink;
+    @apply m-0 bg-surface-page font-sans text-sm text-ink;
     min-width: 320px;
-    background-image:
-      radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.07), transparent 28rem),
-      radial-gradient(circle at 96% 12%, rgba(14, 165, 233, 0.05), transparent 24rem);
-    background-attachment: fixed;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+    scrollbar-color: rgb(var(--n-400) / 0.5) transparent;
   }
 
   *:focus-visible {
-    outline: 2px solid rgba(37, 99, 235, 0.55);
+    outline: 2px solid rgb(var(--brand) / 0.6);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: rgba(37, 99, 235, 0.18);
-    color: var(--color-text);
+    background: rgb(var(--brand) / 0.18);
   }
 
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
   select,
   textarea {
-    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
   }
 
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
   select:focus,
   textarea:focus {
-    border-color: rgba(37, 99, 235, 0.65) !important;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: rgb(var(--brand) / 0.7) !important;
+    box-shadow: 0 0 0 3px rgb(var(--brand) / 0.12);
     outline: none;
   }
 
-  button, a {
+  /* Campos legados com `bg-white`/sem fundo seguem o tema */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    color: rgb(var(--color-text));
+  }
+
+  html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(:disabled),
+  html.dark select:not(:disabled),
+  html.dark textarea:not(:disabled) {
+    background-color: rgb(var(--color-surface));
+  }
+
+  button,
+  a {
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -92,8 +146,10 @@
     isolation: isolate;
   }
 
-  .app-main {
-    background: linear-gradient(145deg, rgba(255,255,255,0.32), transparent 38%);
+  /* Valores monetários, quantidades e códigos alinhados */
+  .app-main table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 
   .app-main table {
@@ -101,11 +157,11 @@
   }
 
   .app-main thead th {
-    @apply bg-surface-muted text-[11px] font-bold uppercase tracking-[0.08em] text-ink-muted backdrop-blur;
+    @apply bg-surface-muted text-xs font-medium text-ink-muted;
   }
 
   .app-main tbody tr {
-    @apply transition-colors duration-150 hover:bg-brand-50/40 dark:hover:bg-brand/10;
+    @apply transition-colors duration-150 hover:bg-surface-muted/60;
   }
 
   .app-main tbody td {
@@ -113,23 +169,23 @@
   }
 
   .app-main h1 {
-    letter-spacing: -0.025em;
-  }
-
-  .app-main [role="dialog"] {
-    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.24);
+    letter-spacing: -0.02em;
   }
 
   .page-enter {
-    animation: pageEnter 240ms ease-out both;
+    animation: pageEnter 160ms ease-out both;
   }
 
   .data-table thead {
-    @apply sticky top-0 z-10 bg-surface-muted/95 backdrop-blur;
+    @apply sticky top-0 z-10 bg-surface-muted;
   }
 
   .data-table tbody tr {
-    @apply transition-colors duration-150 hover:bg-brand-50/40 dark:hover:bg-brand/10;
+    @apply transition-colors duration-150 hover:bg-surface-muted/60;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

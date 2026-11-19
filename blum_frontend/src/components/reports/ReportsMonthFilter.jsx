@@ -4,7 +4,7 @@ const pillClass = (active) =>
   `min-w-fit rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors ${
     active
       ? "bg-brand text-white"
-      : "bg-surface-muted text-ink hover:bg-zinc-200 dark:hover:bg-zinc-700"
+      : "bg-surface-muted text-ink hover:bg-zinc-200"
   }`;
 
 const selectClass =

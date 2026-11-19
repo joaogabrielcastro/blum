@@ -1,4 +1,4 @@
-const { sql, pool } = require("../config/database");
+const { sql } = require("../config/database");
 const { requireTenantId } = require("../utils/tenantContext");
 
 async function findById(id, tenantId) {
@@ -90,9 +90,9 @@ async function findLowStock(tenantId) {
   `;
 }
 
+/** SQL dinâmico. Passa por `sql()` para herdar o contexto de tenant (RLS). */
 async function queryRaw(text, values) {
-  const result = await pool.query(text, values);
-  return result.rows;
+  return sql(text, values || []);
 }
 
 module.exports = {

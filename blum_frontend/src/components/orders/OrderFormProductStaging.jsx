@@ -54,7 +54,7 @@ export default function OrderFormProductStaging({
 
   return (
     <div
-      className={`rounded-xl border-2 bg-gradient-to-b from-blue-50/80 to-white p-4 sm:p-5 space-y-4 shadow-sm ${
+      className={`rounded-xl border-2 bg-blue-50 p-4 sm:p-5 space-y-4 shadow-sm ${
         isEdit ? "border-indigo-300" : "border-blue-300"
       }`}
     >
@@ -216,7 +216,7 @@ export default function OrderFormProductStaging({
           <button
             type="button"
             onClick={onConfirm}
-            className="min-h-11 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 shadow-sm"
+            className="min-h-11 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-500 shadow-sm"
           >
             {isEdit ? "Salvar alterações" : "Adicionar ao pedido"}
           </button>

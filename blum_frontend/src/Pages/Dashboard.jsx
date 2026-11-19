@@ -8,6 +8,7 @@ import Surface, {
   PageHeader,
   PrimaryButton,
   GhostButton,
+  Stat,
 } from "../components/ui/Surface";
 import {
   orderCreatedAt,
@@ -145,9 +146,9 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
+    <div>
+      <div>
+        <div className="mx-auto w-full max-w-7xl">
           <PageHeader
             title="Painel"
             description={currentDate}
@@ -158,21 +159,15 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
             }
           />
 
-          <div className="mb-7 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {kpis.map((kpi) => (
-              <button
+              <Stat
                 key={kpi.key}
-                type="button"
+                label={kpi.label}
+                value={kpi.value}
+                hint={kpi.hint}
                 onClick={() => onNavigate(kpi.page)}
-                className="group relative overflow-hidden rounded-[1.25rem] border border-edge/80 bg-surface/95 p-5 text-left shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/25 hover:shadow-glass focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
-              >
-                <span className="absolute -right-5 -top-6 h-20 w-20 rounded-full bg-brand/5 transition-transform duration-300 group-hover:scale-125" aria-hidden />
-                <p className="text-sm font-medium text-ink-muted">{kpi.label}</p>
-                <p className="relative mt-2 text-2xl font-bold tracking-tight text-ink">
-                  {kpi.value}
-                </p>
-                <p className="relative mt-1 text-xs font-medium text-ink-muted">{kpi.hint}</p>
-              </button>
+              />
             ))}
           </div>
 

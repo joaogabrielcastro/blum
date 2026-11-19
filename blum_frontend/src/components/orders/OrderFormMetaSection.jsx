@@ -170,7 +170,7 @@ function ConditionsFields({
         required={paymentRequired}
         hint={
           paymentRequired
-            ? "Toque na opção. Obrigatório para guardar. Desconto geral só em PIX ou dinheiro."
+            ? "Toque na opção. Obrigatório para salvar. Desconto geral só em PIX ou dinheiro."
             : "Toque na opção. Desconto geral só em PIX ou dinheiro."
         }
       >
