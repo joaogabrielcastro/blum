@@ -69,8 +69,10 @@ async function navigateFromMobileMenu(page, linkName) {
     await page.getByRole("button", { name: "Abrir menu" }).click();
     const navigation = page.getByRole("complementary", { name: "Navegação principal" });
     await expect(navigation).toBeVisible();
-    await expect(page.getByRole("link", { name: "Produtos", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Produtos", exact: true }).click();
+    // A barra inferior também tem "Produtos"; o teste é sobre o menu lateral.
+    const productsLink = navigation.getByRole("link", { name: "Produtos", exact: true });
+    await expect(productsLink).toBeVisible();
+    await productsLink.click();
     await expect(page).toHaveURL(/\/products/);
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeVisible();
     await expectNoPageOverflow(page, "menu lateral");
@@ -97,7 +99,8 @@ async function navigateFromMobileMenu(page, linkName) {
     await expect(dialog).toBeVisible();
     const box = await dialog.boundingBox();
     expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.width).toBeLessThanOrEqual(390);
+    // +1px: tolerância de subpixel (mesma de expectNoPageOverflow).
+    expect(box.width).toBeLessThanOrEqual(390 + 1);
 
     await dialog.locator('input[type="file"]').setInputFiles(
       path.join(__dirname, "fixtures", "catalog-mobile.csv"),

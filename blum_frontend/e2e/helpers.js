@@ -28,9 +28,26 @@ async function submitLogin(page, { user, password } = {}) {
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
+/**
+ * Idempotente: a limpeza de sessão só roda uma vez por aba (marcador em
+ * sessionStorage). Se a aba já estiver autenticada, /login redireciona para o
+ * painel — nesse caso não há formulário para preencher.
+ */
 async function loginAsAdmin(page, options = {}) {
-  await clearSession(page);
-  await submitLogin(page, options);
+  await page.addInitScript(() => {
+    const marker = "blum.e2e.session-cleared";
+    if (sessionStorage.getItem(marker) !== "1") {
+      localStorage.clear();
+      sessionStorage.clear();
+      sessionStorage.setItem(marker, "1");
+    }
+  });
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  const loginForm = page.locator("#username");
+  await expect(loginForm.or(page.locator("main"))).toBeVisible();
+  if (await loginForm.isVisible()) {
+    await submitLogin(page, options);
+  }
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
 }
 
