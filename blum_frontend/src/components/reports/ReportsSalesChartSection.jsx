@@ -73,7 +73,7 @@ const ReportsSalesChartSection = ({
               <button
                 type="button"
                 onClick={onApplySuggestedTarget}
-                className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-200"
+                className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-200"
               >
                 Usar sugestão
               </button>
@@ -88,7 +88,7 @@ const ReportsSalesChartSection = ({
             </button>
           </div>
           {salesTarget != null && salesTarget > 0 ? (
-            <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <p className="mt-2 text-xs font-medium text-emerald-700">
               Meta salva: {formatCurrency(salesTarget)}
             </p>
           ) : null}

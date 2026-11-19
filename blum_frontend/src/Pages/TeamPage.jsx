@@ -89,7 +89,7 @@ const TeamPage = () => {
       toast.success("Representadas atualizadas.");
       setBrandModalUser(null);
     } catch (e) {
-      const msg = e.message || "Não foi possível guardar as representadas.";
+      const msg = e.message || "Não foi possível salvar as representadas.";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -173,7 +173,7 @@ const TeamPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Equipe"
         description="Crie vendedores, redefina senhas e limite representadas. Sem marcações, o vendedor vê todas."
@@ -221,7 +221,7 @@ const TeamPage = () => {
             />
           </FormField>
           <PrimaryButton type="submit" disabled={creating} className="w-full">
-            {creating ? "A guardar…" : "Cadastrar vendedor"}
+            {creating ? "Salvando…" : "Cadastrar vendedor"}
           </PrimaryButton>
         </form>
       </Surface>
@@ -305,7 +305,7 @@ const TeamPage = () => {
       </Surface>
 
       {brandModalUser ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
           <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-edge bg-surface p-5 shadow-soft">
             <h3 className="text-lg font-semibold text-ink">
               Representadas — {brandModalUser.username}
@@ -344,7 +344,7 @@ const TeamPage = () => {
                 onClick={saveBrands}
                 disabled={savingBrands}
               >
-                {savingBrands ? "A guardar…" : "Guardar"}
+                {savingBrands ? "Salvando…" : "Salvar"}
               </PrimaryButton>
             </div>
           </div>
@@ -352,7 +352,7 @@ const TeamPage = () => {
       ) : null}
 
       {pwdModalUser ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-edge bg-surface p-5 shadow-soft">
             <h3 className="mb-3 text-lg font-semibold text-ink">
               Nova senha — {pwdModalUser.username}
@@ -378,7 +378,7 @@ const TeamPage = () => {
                 onClick={savePassword}
                 disabled={savingPwd}
               >
-                {savingPwd ? "A guardar…" : "Guardar"}
+                {savingPwd ? "Salvando…" : "Salvar"}
               </PrimaryButton>
             </div>
           </div>
@@ -389,7 +389,7 @@ const TeamPage = () => {
         show={!!deleteModalUser}
         title="Excluir vendedor"
         tone="danger"
-        confirmText={deletingUser ? "A excluir…" : "Excluir"}
+        confirmText={deletingUser ? "Excluindo…" : "Excluir"}
         message={
           deleteModalUser
             ? `Tem certeza que deseja excluir ${deleteModalUser.username}? Esta ação não pode ser desfeita. Se houver pedidos vinculados, a exclusão será bloqueada.`

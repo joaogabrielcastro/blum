@@ -118,7 +118,7 @@ const BrandForm = ({ onSubmit, onCancel, initialData }) => {
         </SecondaryButton>
         <PrimaryButton type="submit" disabled={isSubmitting}>
           {isSubmitting
-            ? "A guardar…"
+            ? "Salvando…"
             : initialData
               ? "Atualizar"
               : "Adicionar"}

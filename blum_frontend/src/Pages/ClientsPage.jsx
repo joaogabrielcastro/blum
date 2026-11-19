@@ -118,11 +118,11 @@ const ClientsPage = ({ userRole }) => {
   };
 
   return (
-    <div className="flex min-h-full flex-col bg-surface-muted/70">
-      <div className="flex-shrink-0 border-b border-edge bg-surface/70 px-4 py-4 backdrop-blur-md sm:px-6">
+    <div className="flex flex-col">
+      <div>
         <PageHeader
           title="Clientes"
-          description="Cadastro e contacto das empresas da sua operação"
+          description="Cadastro e contato das empresas que você atende"
           meta={
             !loading && filteredClients.length > 0 ? (
               <span className="inline-flex items-center rounded-lg border border-edge bg-surface-muted/80 px-2.5 py-1 text-xs font-medium text-ink-muted">
@@ -162,15 +162,15 @@ const ClientsPage = ({ userRole }) => {
       </div>
 
       {loadError ? (
-        <div className="flex-shrink-0 px-4 py-2 sm:px-6">
+        <div className="mb-4">
           <div className="rounded-xl border border-red-200/80 bg-red-50/90 px-4 py-3 text-sm text-red-800">
             {loadError}
           </div>
         </div>
       ) : null}
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
-        <div className="mx-auto max-w-7xl">
+      <div>
+        <div>
           {loading ? (
             <ListPageSkeleton variant="table" rows={8} />
           ) : filteredClients.length === 0 ? (
@@ -203,10 +203,10 @@ const ClientsPage = ({ userRole }) => {
               <Surface padded={false} className="hidden overflow-hidden md:block">
                 <div className="max-h-[calc(100vh-13rem)] overflow-auto">
                   <table className="min-w-full text-left text-sm">
-                    <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90 backdrop-blur-md">
+                    <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90">
                       <tr className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         <th className="px-5 py-3.5 font-semibold">Cliente</th>
-                        <th className="px-4 py-3.5 font-semibold">Contacto</th>
+                        <th className="px-4 py-3.5 font-semibold">Contato</th>
                         <th className="px-4 py-3.5 font-semibold">Telefone</th>
                         <th className="px-4 py-3.5 font-semibold">Região</th>
                         <th className="w-14 px-3 py-3.5 text-right font-semibold">
@@ -333,7 +333,7 @@ const ClientsPage = ({ userRole }) => {
                       </div>
                       <dl className="mt-4 space-y-1.5 text-sm">
                         <div className="flex justify-between gap-2">
-                          <dt className="text-ink-muted">Contacto</dt>
+                          <dt className="text-ink-muted">Contato</dt>
                           <dd className="truncate text-ink">
                             {client.contactPerson || "—"}
                           </dd>
@@ -378,8 +378,8 @@ const ClientsPage = ({ userRole }) => {
       </Drawer>
 
       {deleteConfirm ? (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-zinc-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-edge bg-surface/95 p-6 shadow-glass backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-overlay/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-edge bg-surface/95 p-6 shadow-glass animate-fade-in">
             <h3 className="text-lg font-semibold text-ink">
               Excluir cliente?
             </h3>
@@ -407,7 +407,7 @@ const ClientsPage = ({ userRole }) => {
                 type="button"
                 onClick={() => handleDeleteClient(deleteConfirm.id)}
                 disabled={deleting}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-700 active:scale-[0.98] disabled:opacity-50"
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all duration-200 hover:bg-red-500 active:scale-[0.98] disabled:opacity-50"
               >
                 {deleting ? "Excluindo…" : "Excluir"}
               </button>

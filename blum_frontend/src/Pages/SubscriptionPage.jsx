@@ -197,7 +197,7 @@ const SubscriptionPage = () => {
     subscription?.subscriptionStatus === "active";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title="Assinatura"
         description="Planos mensais. Gerencie pagamentos, renovação e forma de pagamento."
@@ -210,7 +210,7 @@ const SubscriptionPage = () => {
           <p className="font-semibold">Bem-vindo ao Blum</p>
           <p className="mt-1">
             {actionLoading
-              ? `A abrir o pagamento do plano ${onboardingPlanSlug}…`
+              ? `Abrindo o pagamento do plano ${onboardingPlanSlug}…`
               : "Sua empresa foi criada. Em instantes você será redirecionado para concluir a assinatura."}
           </p>
         </div>
@@ -270,7 +270,7 @@ const SubscriptionPage = () => {
                 onClick={handlePortal}
                 disabled={Boolean(actionLoading)}
               >
-                {actionLoading === "portal" ? "A abrir…" : "Portal do cliente"}
+                {actionLoading === "portal" ? "Abrindo…" : "Portal do cliente"}
               </SecondaryButton>
             ) : null}
             {canReactivate ? (
@@ -280,7 +280,7 @@ const SubscriptionPage = () => {
                 disabled={Boolean(actionLoading)}
               >
                 {actionLoading === "reactivate"
-                  ? "A processar…"
+                  ? "Processando…"
                   : "Reativar assinatura"}
               </PrimaryButton>
             ) : null}
@@ -309,7 +309,7 @@ const SubscriptionPage = () => {
 
         {plans.length === 0 ? (
           <p className="mt-4 text-gray-600">
-            Nenhum plano configurado no servidor. Contacte o suporte.
+            Nenhum plano configurado no servidor. Fale com o suporte.
           </p>
         ) : (
           <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -339,7 +339,7 @@ const SubscriptionPage = () => {
         title="Cancelar assinatura"
         message="O acesso continuará até o fim do período já pago. Deseja agendar o cancelamento?"
         confirmText={
-          actionLoading === "cancel" ? "A processar…" : "Sim, cancelar"
+          actionLoading === "cancel" ? "Processando…" : "Sim, cancelar"
         }
         onConfirm={handleCancel}
         onCancel={() => setShowCancelModal(false)}

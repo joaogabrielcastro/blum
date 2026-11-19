@@ -73,7 +73,7 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
               ref={menuRef}
               role="menu"
               style={{ top: coords.top, left: coords.left }}
-              className="fixed z-[80] w-[196px] overflow-hidden rounded-xl border border-edge bg-surface/95 p-1 shadow-glass backdrop-blur-md animate-fade-in"
+              className="fixed z-[80] w-[196px] overflow-hidden rounded-xl border border-edge bg-surface/95 p-1 shadow-glass animate-fade-in"
             >
               {items.map((item) => {
                 const tone =

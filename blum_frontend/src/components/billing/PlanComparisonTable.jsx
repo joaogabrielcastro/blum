@@ -87,11 +87,11 @@ function ComparisonSection({ section, plans, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 bg-gray-700 px-4 py-3 text-left text-sm font-semibold text-white hover:bg-gray-800"
+        className="flex w-full items-center justify-between gap-3 bg-surface-muted px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-gray-200"
         aria-expanded={open}
       >
         <span>{section.title}</span>
@@ -104,7 +104,7 @@ function ComparisonSection({ section, plans, defaultOpen }) {
             <div
               key={feature.id}
               className={`grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-4 sm:items-center sm:gap-4 ${
-                rowIndex % 2 === 0 ? "bg-gray-50/80" : "bg-white"
+                rowIndex % 2 === 0 ? "bg-gray-50/80" : "bg-surface"
               }`}
             >
               <div className="sm:col-span-1">
@@ -162,7 +162,7 @@ const PlanComparisonTable = ({ plans = [], currentPlanSlug = null }) => {
       </div>
 
       {/* Cabeçalho das colunas — visível em telas maiores */}
-      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:block">
+      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-surface shadow-sm sm:block">
         <div className="grid grid-cols-4 gap-4 border-b border-gray-200 bg-gray-100 px-4 py-3">
           <div className="text-sm font-semibold text-gray-600">Funcionalidade</div>
           {orderedPlans.map((plan) => {

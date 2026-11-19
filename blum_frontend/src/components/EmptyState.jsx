@@ -44,7 +44,7 @@ const EmptyState = ({
   return (
     <div className="col-span-full flex w-full items-center justify-center py-16 sm:py-20">
       <div className="mx-auto max-w-sm text-center">
-        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-edge bg-surface text-ink-muted shadow-soft backdrop-blur-md">
+        <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-edge bg-surface text-ink-muted shadow-soft">
           {icon != null && typeof icon !== "string" ? (
             icon
           ) : (

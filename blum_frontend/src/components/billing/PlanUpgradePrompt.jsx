@@ -20,7 +20,7 @@ export default function PlanUpgradePrompt({ open, feature, requiredPlan, onClose
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -45,7 +45,7 @@ export default function PlanUpgradePrompt({ open, feature, requiredPlan, onClose
           <Link
             to="/subscription"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
           >
             Ver planos
           </Link>

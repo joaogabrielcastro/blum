@@ -69,7 +69,7 @@ export function useOfflineSync({ api, brands, isOnline, isLoggedIn, toast }) {
 
   // Com internet: atualiza catálogo local se estiver desatualizado (>24h).
   // Não incluir `syncing` nas deps — senão o cleanup cancela o finally e o botão
-  // fica preso em "A sincronizar…" para sempre.
+  // fica preso em "Sincronizando…" para sempre.
   useEffect(() => {
     if (!isLoggedIn || !isOnline || !brands?.length) return;
     if (autoRefreshAttemptedRef.current) return;

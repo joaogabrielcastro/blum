@@ -558,8 +558,8 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-slate-950/60 backdrop-blur-sm">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Gerar PDF" tabIndex={-1} className="mx-4 w-full max-w-md rounded-[1.5rem] border border-edge bg-surface p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex h-full w-full items-center justify-center overflow-y-auto bg-overlay/50">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Gerar PDF" tabIndex={-1} className="mx-4 w-full max-w-md rounded-2xl border border-edge bg-surface p-6 shadow-2xl">
         <h3 className="text-xl font-bold mb-4 text-center">
           Gerar PDF ({order?.documentType === "orcamento" ? "Orçamento" : "Pedido"})
         </h3>
@@ -613,7 +613,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
               type="button"
               onClick={handleDownloadPdf}
               disabled={!imageLoaded || busy}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {busy ? (
                 <>
@@ -638,7 +638,7 @@ const PdfGenerator = ({ order, clients, clientsList = [], brands, onClose }) => 
               type="button"
               onClick={handleSharePdf}
               disabled={!imageLoaded || busy}
-              className="w-full px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+              className="w-full px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition-colors disabled:opacity-50"
             >
               Enviar ao cliente (WhatsApp / e-mail)
             </button>

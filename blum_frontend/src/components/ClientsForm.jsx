@@ -260,7 +260,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
         toast.success("Cliente atualizado com sucesso.");
       } else {
         await apiService.createClient(payload);
-        toast.success("Cliente guardado com sucesso.");
+        toast.success("Cliente salvo com sucesso.");
       }
       onClientAdded();
     } catch (error) {
@@ -296,7 +296,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
 
       toast.error(
         error.message ||
-          `Não foi possível ${isEditing ? "atualizar" : "guardar"} o cliente.`,
+          `Não foi possível ${isEditing ? "atualizar" : "salvar"} o cliente.`,
       );
     } finally {
       setLoading(false);
@@ -310,7 +310,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
           className={
             isDrawer
               ? "w-full"
-              : "mx-auto w-full max-w-4xl rounded-2xl border border-edge bg-surface/80 p-4 shadow-soft backdrop-blur-md sm:p-6 md:p-8"
+              : "mx-auto w-full max-w-4xl rounded-2xl border border-edge bg-surface/80 p-4 shadow-soft sm:p-6 md:p-8"
           }
         >
           {!isDrawer ? (
@@ -524,7 +524,7 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
             <div
               className={`mt-2 flex justify-end gap-2 border-t border-edge pt-5 ${
                 isDrawer
-                  ? "sticky bottom-0 bg-surface/90 pb-1 backdrop-blur-md"
+                  ? "sticky bottom-0 bg-surface/90 pb-1"
                   : ""
               }`}
             >
@@ -540,10 +540,10 @@ const ClientsForm = ({ client, onClientAdded, onCancel, variant = "page" }) => {
                 disabled={loading || isSearching || isCepSearching}
               >
                 {loading
-                  ? "A guardar…"
+                  ? "Salvando…"
                   : isEditing
                     ? "Atualizar cliente"
-                    : "Guardar cliente"}
+                    : "Salvar cliente"}
               </PrimaryButton>
             </div>
           </form>

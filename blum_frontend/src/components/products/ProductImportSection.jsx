@@ -221,29 +221,34 @@ export default function ProductImportSection({
 
   if (parsedItems.length === 0) {
     return (
-      <div>
+      <div className="rounded-2xl border border-edge bg-surface p-4 shadow-soft sm:p-6">
         {successMessage ? (
           <div className="mb-4 whitespace-pre-line rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
             {successMessage}
           </div>
         ) : null}
 
-        <FormField
-          className="mb-4"
-          label="Modo de importação"
-          hint="Use «Sincronizar» para planilhas do ERP. Use «Somar» para entradas de compra."
-        >
-          <select
-            value={stockMode}
-            onChange={(e) => setStockMode(e.target.value)}
-            className={`${inputClassName()} md:max-w-md`}
+        <div className="mb-5 rounded-xl border border-brand/15 bg-brand-50/50 p-4">
+          <FormField
+            label="Como deseja atualizar o catálogo?"
+            hint={
+              stockMode === "replace"
+                ? "Atualiza preço e substitui o estoque atual pelas quantidades da planilha."
+                : "Soma as quantidades da planilha ao estoque que já existe."
+            }
           >
-            <option value="replace">
-              Sincronizar catálogo (substituir estoque)
-            </option>
-            <option value="add">Somar estoque (entrada)</option>
-          </select>
-        </FormField>
+            <select
+              value={stockMode}
+              onChange={(e) => setStockMode(e.target.value)}
+              className={`${inputClassName()} md:max-w-lg`}
+            >
+              <option value="replace">
+                Sincronizar catálogo — substituir estoque
+              </option>
+              <option value="add">Entrada de compra — somar estoque</option>
+            </select>
+          </FormField>
+        </div>
 
         <UploadSection
           onFileChange={(e) => {
@@ -261,6 +266,7 @@ export default function ProductImportSection({
           description="Envie CSV ou Excel (.xlsx) exportado do ERP."
           accept=".csv,.xlsx,.xls"
           fileType="planilha"
+          embedded
         />
 
         {onClose ? (
@@ -292,15 +298,15 @@ export default function ProductImportSection({
         </p>
         {stats ? (
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-            <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="rounded-lg bg-surface/70 px-3 py-2">
               <span className="font-semibold">{stats.autoCodeCount || 0}</span>{" "}
               código(s) gerado(s)
             </div>
-            <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="rounded-lg bg-surface/70 px-3 py-2">
               <span className="font-semibold">{stats.duplicateCodeCount || 0}</span>{" "}
               código(s) repetido(s)
             </div>
-            <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="rounded-lg bg-surface/70 px-3 py-2">
               <span className="font-semibold">{stats.zeroPriceCount || 0}</span>{" "}
               preço(s) zerado(s)
             </div>
@@ -348,7 +354,7 @@ export default function ProductImportSection({
                   key={`${row.normalizedCode}-${row.index}`}
                   type="button"
                   onClick={() => setFocusItemIndex(row.index)}
-                  className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100"
+                  className="rounded-lg border border-red-300 bg-surface px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100"
                 >
                   Ir para linha {row.index + 1} ({row.code})
                 </button>

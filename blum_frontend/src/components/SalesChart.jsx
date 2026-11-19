@@ -52,7 +52,7 @@ const SalesChart = ({
               {`Mês anterior: ${formatCurrency(dataPoint[compareKey] || 0)}`}
             </p>
           ) : null}
-          <p className="text-emerald-600 dark:text-emerald-400">
+          <p className="text-emerald-600">
             {`Vendas do Dia: ${formatCurrency(dataPoint["Vendas do Dia"] || 0)}`}
           </p>
         </div>
@@ -103,7 +103,7 @@ const SalesChart = ({
   // VERSÃO SIMPLIFICADA para Dashboard
   if (simplified) {
     return (
-      <div className="w-full h-96">
+      <div className="relative w-full h-96">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
@@ -162,7 +162,7 @@ const SalesChart = ({
 
   // VERSÃO COMPLETA para ReportsPage
   return (
-    <div className="w-full h-[600px]">
+    <div className="relative w-full h-[600px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}

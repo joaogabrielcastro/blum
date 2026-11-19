@@ -193,7 +193,7 @@ const ProductsPage = ({ userRole, subscription }) => {
 
   if (!selectedBrand) {
     return (
-      <div className="flex min-h-0 flex-col bg-transparent p-2 sm:p-4 md:p-6">
+      <div className="flex min-h-0 flex-col">
         {headerBlock}
         {error && (
           <ErrorMessage message={error} onClose={() => setError(null)} />
@@ -277,7 +277,7 @@ const ProductsPage = ({ userRole, subscription }) => {
   }
 
   return (
-    <div className="flex min-h-0 flex-col bg-transparent p-2 sm:p-4 md:p-6">
+    <div className="flex min-h-0 flex-col">
       {headerBlock}
 
       {error && <ErrorMessage message={error} onClose={() => setError(null)} />}
@@ -323,9 +323,9 @@ const ProductsPage = ({ userRole, subscription }) => {
         </div>
       ) : null}
 
-      <div className="relative min-h-[200px] flex-grow overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft backdrop-blur-md">
+      <div className="relative min-h-[200px] flex-grow overflow-hidden rounded-2xl border border-edge bg-surface/80 shadow-soft">
         {productsLoading && (
-          <div className="absolute inset-0 z-10 overflow-auto bg-surface/70 p-2 backdrop-blur-[2px]">
+          <div className="absolute inset-0 z-10 overflow-auto bg-surface/70 p-2">
             <ListPageSkeleton variant="table" rows={6} />
           </div>
         )}
@@ -334,7 +334,7 @@ const ProductsPage = ({ userRole, subscription }) => {
           <>
             <div className="hidden max-h-[calc(100vh-16rem)] overflow-auto md:block">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90 backdrop-blur-md">
+                <thead className="sticky top-0 z-10 border-b border-edge bg-surface/90">
                   <tr className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     {isAdmin ? (
                       <th className="w-10 px-3 py-3.5">

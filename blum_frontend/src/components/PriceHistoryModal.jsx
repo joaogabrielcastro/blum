@@ -46,21 +46,21 @@ const PriceHistoryModal = ({ product, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico de preços" tabIndex={-1} className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[1.5rem] border border-white/10 bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Histórico de preços" tabIndex={-1} className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl">
         {/* Cabeçalho */}
-        <div className="bg-gradient-to-br from-slate-950 via-blue-950 to-blue-700 p-6 text-white">
+        <div className="bg-slate-900 p-6 text-white">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold mb-2">Histórico de Preços</h2>
-              <p className="text-blue-100">
+              <p className="text-slate-300">
                 {product?.name} 
                 {product?.productcode && ` (Código: ${product.productcode})`}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-blue-100 hover:text-white transition-colors p-2 rounded-full hover:bg-blue-500"
+              className="text-slate-300 hover:text-white transition-colors p-2 rounded-full hover:bg-blue-500"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -135,7 +135,7 @@ const PriceHistoryModal = ({ product, onClose }) => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-surface divide-y divide-gray-200">
                     {priceHistory.map((record, index) => {
                       const previousPrice = priceHistory[index + 1]?.purchase_price;
                       const variation = previousPrice 
@@ -184,7 +184,7 @@ const PriceHistoryModal = ({ product, onClose }) => {
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 rounded-lg border border-edge bg-surface text-ink hover:bg-surface-muted transition-colors"
             >
               Fechar
             </button>

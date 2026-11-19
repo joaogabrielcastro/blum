@@ -1,4 +1,4 @@
-const { sql, pool } = require("../../config/database");
+const { sql, pool, beginTenantTransaction } = require("../../config/database");
 const { invalidateProductsCache } = require("../../config/cache");
 const { requireTenantId } = require("../../utils/tenantContext");
 const { parseSpreadsheetBuffer } = require("./productSpreadsheetParser");
@@ -113,7 +113,7 @@ async function finalizeImport({
   const results = { created: 0, updated: 0, errors: 0 };
 
   try {
-    await client.query("BEGIN");
+    await beginTenantTransaction(client);
 
     const payloadJson = JSON.stringify(normalized);
 

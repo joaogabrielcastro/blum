@@ -224,7 +224,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       const duplicated = await apiService.duplicateOrder(orderId);
       const formatted = formatOrderData(duplicated);
       await fetchData();
-      toast.success("Pedido duplicado. Revise e guarde.");
+      toast.success("Pedido duplicado. Revise e salve.");
       navigate(`/orders/${formatted.id}/edit`);
     } catch (error) {
       toast.error(error?.message || "Não foi possível duplicar o pedido.");
@@ -385,7 +385,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
 
   if (loading) {
     return (
-      <div className="w-full max-w-full p-3 sm:p-6 md:p-8">
+      <div>
         <ListPageSkeleton variant="list" />
       </div>
     );
@@ -435,7 +435,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
   );
 
   return (
-    <div className="p-3 sm:p-6 md:p-8">
+    <div>
       {offlineSyncBar}
       <ConfirmationModal
         show={!!(modalAction.orderId || modalAction.offlinePendingId)}
@@ -510,7 +510,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       />
 
       {paymentDialogOrder ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 p-0 sm:items-center sm:p-4">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-soft sm:rounded-2xl">
             <h3 className="text-lg font-semibold text-ink">
               {hasPaymentMethod(paymentDialogOrder.paymentMethod)
@@ -637,7 +637,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       )}
 
       <Surface padded={false} className="overflow-hidden">
-        <div className="p-3 pb-24 sm:p-5 sm:pb-5">
+        <div className="p-3 sm:p-5">
         {filteredOrdersByDay.length > 0 ? (
           <div className="space-y-8">
             {filteredOrdersByDayPaged.map(({ dateKey, label, orders: dayOrders }) => (
@@ -804,18 +804,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         </div>
       </Surface>
 
-      <button
-        type="button"
-        aria-label="Novo orçamento"
-        className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-2xl font-bold text-white shadow-soft hover:bg-brand-600 sm:hidden"
-        style={{
-          bottom: "max(1.25rem, env(safe-area-inset-bottom, 0px))",
-          left: "max(1.25rem, env(safe-area-inset-left, 0px))",
-        }}
-        onClick={() => navigate("/orders/new")}
-      >
-        +
-      </button>
     </div>
   );
 };

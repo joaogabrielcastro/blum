@@ -5,10 +5,11 @@ import {
   Route,
   Navigate,
   useNavigate,
+  useLocation,
 } from "react-router-dom";
 import Login from "./components/Login";
 import Sidebar from "./components/Sidebar";
-import Dashboard from "./Pages/Dashboard";
+import BottomNav from "./components/BottomNav";
 import SignupPage from "./Pages/SignupPage";
 import { verifyToken, logout as apiLogout } from "./services/apiService";
 import { useToast } from "./context/ToastContext";
@@ -17,6 +18,7 @@ import PlanUpgradePrompt from "./components/billing/PlanUpgradePrompt";
 import StarterUpgradeBanner from "./components/billing/StarterUpgradeBanner";
 import { PLAN_FEATURE_REQUIRED_EVENT } from "./utils/planFeatures";
 
+const Dashboard = lazy(() => import("./Pages/Dashboard"));
 const ProductsPage = lazy(() => import("./Pages/ProductsPage"));
 const ClientsPage = lazy(() => import("./Pages/ClientsPage"));
 const OrdersPage = lazy(() => import("./Pages/OrdersPage"));
@@ -43,7 +45,7 @@ const PAGE_PATH = {
 function PageLoader() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
-      <div className="h-10 w-10 animate-spin rounded-full border-2 border-edge border-t-brand" />
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-edge border-t-brand" />
     </div>
   );
 }
@@ -62,6 +64,9 @@ function AuthenticatedApp({
   onNavigate,
 }) {
   const { clientsMap, brands } = useAppData();
+  const location = useLocation();
+  const companyName = String(user?.tenantName || "").trim();
+  const isOrderForm = /^\/orders\/(new|[^/]+\/edit)/.test(location.pathname);
 
   return (
     <div className="app-shell min-h-screen bg-surface-page font-sans text-ink antialiased">
@@ -74,28 +79,29 @@ function AuthenticatedApp({
           isPlatformAdmin={isPlatformAdmin}
           username={username}
           displayName={user?.name || username}
+          companyName={companyName}
         />
 
         {isSidebarOpen && (
           <div
             role="presentation"
             onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 z-30 bg-zinc-900/40 md:hidden dark:bg-black/50"
+            className="fixed inset-0 z-30 bg-overlay/50 md:hidden"
           />
         )}
 
         <div className="flex w-full max-w-full flex-1 flex-col overflow-y-auto">
-          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-edge/80 bg-surface/90 px-3 py-2.5 shadow-[0_1px_12px_rgba(15,23,42,0.04)] backdrop-blur-xl md:hidden">
+          <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-edge bg-surface px-2 md:hidden">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-xl text-ink-muted hover:bg-surface-muted hover:text-ink"
+              className="inline-flex h-11 w-11 touch-manipulation items-center justify-center rounded-xl text-ink-muted hover:bg-surface-muted hover:text-ink"
               aria-label={isSidebarOpen ? "Fechar menu" : "Abrir menu"}
               aria-expanded={isSidebarOpen}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6"
+                className="h-5 w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -105,35 +111,52 @@ function AuthenticatedApp({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth="2"
-                  d="M4 6h16M4 12h16m-7 6h7"
+                  d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
             </button>
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-              <div>
-                <span className="block text-sm font-bold tracking-tight text-ink">Blum</span>
-                <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-ink-muted">Gestão comercial</span>
-              </div>
-              <span className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" : "bg-amber-500"}`} aria-label={isOnline ? "Online" : "Offline"} />
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-ink">
+                {companyName || "Blum"}
+              </span>
             </div>
+            <span
+              className={`mr-2 inline-flex items-center gap-1.5 text-xs font-medium ${isOnline ? "text-ink-muted" : "text-amber-700"}`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-amber-500"}`}
+                aria-hidden
+              />
+              {isOnline ? "Online" : "Offline"}
+            </span>
           </header>
 
           {!isOnline ? (
-            <div className="bg-amber-500 px-3 py-2.5 text-center text-sm font-semibold leading-snug text-white sm:text-base">
-              Sem internet — modo campo ativo. Use Orçamentos para criar vendas
-              offline; os dados serão enviados ao voltar online.
+            <div
+              role="status"
+              className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-medium leading-snug text-amber-900"
+            >
+              Sem internet — modo campo ativo. Você pode criar orçamentos
+              normalmente; eles serão enviados quando a conexão voltar.
             </div>
           ) : null}
 
           {subscription?.accessBlocked && userRole !== "admin" ? (
-            <div className="bg-red-600 px-3 py-2.5 text-center text-sm font-semibold text-white sm:text-base">
-              A assinatura da empresa está inativa. Contacte o administrador.
+            <div
+              role="alert"
+              className="border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm font-medium text-red-800"
+            >
+              A assinatura da empresa está inativa. Fale com o administrador.
             </div>
           ) : null}
 
           <StarterUpgradeBanner subscription={subscription} />
 
-          <main className="app-main page-enter max-w-full flex-1 p-3 pb-24 sm:p-4 sm:pb-6 md:p-5 lg:p-6">
+          <main
+            className={`app-main page-enter mx-auto w-full max-w-[1440px] flex-1 px-4 pt-4 sm:px-6 sm:pt-6 md:pb-8 lg:px-8 ${
+              isOrderForm ? "pb-8" : "pb-24"
+            }`}
+          >
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route
@@ -252,13 +275,9 @@ function AuthenticatedApp({
             </Suspense>
           </main>
 
-          <footer className="mt-auto border-t border-edge/70 bg-surface/70 px-6 py-4 backdrop-blur">
-            <div className="text-center text-sm text-ink-muted">
-              Blum © {new Date().getFullYear()}
-            </div>
-          </footer>
         </div>
       </div>
+      {isOrderForm ? null : <BottomNav />}
     </div>
   );
 }
@@ -299,7 +318,7 @@ function AppShell() {
     };
     setUser(userInfo);
     const displayName =
-      String(userData.name || userData.username || "").trim() || "utilizador";
+      String(userData.name || userData.username || "").trim() || "usuário";
     toast.success(`Bem-vindo, ${displayName}!`);
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect");

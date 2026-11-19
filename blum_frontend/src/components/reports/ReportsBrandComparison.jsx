@@ -5,7 +5,7 @@ const ReportsBrandComparison = ({
   totalSales,
   mediaPorRepresentada,
 }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
+  <div className="bg-surface p-6 rounded-2xl shadow-md border border-gray-200 mb-8">
     <h2 className="text-xl font-semibold text-gray-800 mb-2">
       Vendas por representada vs. total do período
     </h2>

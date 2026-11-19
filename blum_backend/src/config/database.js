@@ -93,6 +93,19 @@ async function execute(text, values = []) {
   }
 }
 
+/**
+ * Inicia uma transação num client obtido com `pool.connect()` já aplicando o
+ * contexto do pedido HTTP (tenant / bypass RLS). Sem isto, o RLS devolve zero
+ * linhas quando a API usa um utilizador de runtime que não é dono das tabelas.
+ */
+async function beginTenantTransaction(client) {
+  await client.query("BEGIN");
+  const ctx = getDbContext();
+  if (ctx) {
+    await applyDbContext(client, ctx);
+  }
+}
+
 function createFragment(text, values) {
   return {
     __isSqlFragment: true,
@@ -154,6 +167,7 @@ function sql(firstArg, ...rest) {
 module.exports = {
   pool,
   sql,
+  beginTenantTransaction,
   runWithDbContext,
   getDbContext,
 };
