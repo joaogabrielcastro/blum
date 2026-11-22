@@ -86,108 +86,104 @@ const ProductsPage = ({ userRole, subscription }) => {
     setSelectedProductIds,
   } = page;
 
-  const headerBlock = (
-    <PageHeader
-      title={selectedBrand ? "Catálogo" : "Produtos"}
-      description={
-        selectedBrand
-          ? `Representada: ${selectedBrand}`
-          : "Escolha uma representada para gerir o catálogo"
+  const proBadge = (allowed) => (allowed ? null : "Pro");
+
+  const catalogMenuItems = isAdmin
+    ? [
+        {
+          id: "price-batch",
+          label: "Reajuste de preços",
+          badge: proBadge(canPriceBatch),
+          onClick: () =>
+            canPriceBatch
+              ? setShowBulkAdjust(true)
+              : requestUpgrade("price-batch"),
+        },
+        {
+          id: "export-csv",
+          label: exportingFormat === "csv" ? "Exportando CSV…" : "Exportar CSV",
+          badge: proBadge(canExport),
+          disabled: exportingFormat != null,
+          onClick: () =>
+            canExport
+              ? handleExportProducts("csv")
+              : requestUpgrade("product-export"),
+        },
+        {
+          id: "export-xlsx",
+          label:
+            exportingFormat === "xlsx" ? "Exportando Excel…" : "Exportar Excel",
+          badge: proBadge(canExport),
+          disabled: exportingFormat != null,
+          onClick: () =>
+            canExport
+              ? handleExportProducts("xlsx")
+              : requestUpgrade("product-export"),
+        },
+        {
+          id: "new-brand",
+          label: "Nova representada",
+          onClick: () => setShowBrandForm(true),
+        },
+      ]
+    : [];
+
+  const importButton = isAdmin ? (
+    <SecondaryButton
+      type="button"
+      onClick={() =>
+        canImport ? setShowImport(true) : requestUpgrade("product-import")
       }
-      actions={
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-          {selectedBrand ? (
-            <SecondaryButton type="button" onClick={clearSelectedBrand}>
-              Trocar representada
-            </SecondaryButton>
-          ) : null}
-          {isAdmin ? (
-            <SecondaryButton
-              type="button"
-              onClick={() => setShowBrandForm(true)}
-            >
-              Nova representada
-            </SecondaryButton>
-          ) : null}
-          {isAdmin && selectedBrand ? (
-            <SecondaryButton
-              type="button"
-              onClick={() =>
-                canPriceBatch
-                  ? setShowBulkAdjust(true)
-                  : requestUpgrade("price-batch")
-              }
-              title={
-                canPriceBatch ? undefined : "Disponível no plano Profissional"
-              }
-            >
-              Reajuste
-              {!canPriceBatch ? " · Pro" : ""}
-            </SecondaryButton>
-          ) : null}
-          {isAdmin ? (
-            <SecondaryButton
-              type="button"
-              onClick={() =>
-                canImport
-                  ? setShowImport(true)
-                  : requestUpgrade("product-import")
-              }
-              title={
-                canImport ? undefined : "Disponível no plano Profissional"
-              }
-            >
-              Importar
-              {!canImport ? " · Pro" : ""}
-            </SecondaryButton>
-          ) : null}
-          {isAdmin && selectedBrand ? (
-            <>
-              <SecondaryButton
-                type="button"
-                onClick={() =>
-                  canExport
-                    ? handleExportProducts("csv")
-                    : requestUpgrade("product-export")
-                }
-                disabled={exportingFormat != null}
-                title={
-                  canExport ? undefined : "Disponível no plano Profissional"
-                }
-              >
-                {exportingFormat === "csv" ? "Exportando…" : "CSV"}
-                {!canExport ? " · Pro" : ""}
-              </SecondaryButton>
-              <SecondaryButton
-                type="button"
-                onClick={() =>
-                  canExport
-                    ? handleExportProducts("xlsx")
-                    : requestUpgrade("product-export")
-                }
-                disabled={exportingFormat != null}
-                title={
-                  canExport ? undefined : "Disponível no plano Profissional"
-                }
-              >
-                {exportingFormat === "xlsx" ? "Exportando…" : "Excel"}
-                {!canExport ? " · Pro" : ""}
-              </SecondaryButton>
-            </>
-          ) : null}
-          {isAdmin && selectedBrand ? (
-            <PrimaryButton
-              type="button"
-              onClick={() => {
-                resetForms();
-                setShowProductForm(true);
-              }}
-            >
-              Novo produto
-            </PrimaryButton>
-          ) : null}
+      title={canImport ? undefined : "Disponível no plano Profissional"}
+    >
+      Importar
+      {!canImport ? " · Pro" : ""}
+    </SecondaryButton>
+  ) : null;
+
+  const headerBlock = selectedBrand ? (
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <button
+          type="button"
+          onClick={clearSelectedBrand}
+          className="-ml-1 mb-1 inline-flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm font-medium text-ink-muted transition-colors hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m15 18-6-6 6-6" />
+          </svg>
+          Representadas
+        </button>
+        <h1 className="truncate text-xl font-semibold tracking-[-0.02em] text-ink sm:text-2xl">
+          {selectedBrand}
+        </h1>
+        <p className="mt-1 text-sm text-ink-muted">Catálogo da representada</p>
+      </div>
+      {isAdmin ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {importButton}
+          <KebabMenu
+            triggerLabel="Mais ações"
+            label="Mais ações do catálogo"
+            items={catalogMenuItems}
+          />
+          <PrimaryButton
+            type="button"
+            onClick={() => {
+              resetForms();
+              setShowProductForm(true);
+            }}
+          >
+            Novo produto
+          </PrimaryButton>
         </div>
-      }
+      ) : null}
+    </div>
+  ) : (
+    <PageHeader
+      title="Produtos"
+      description="Escolha uma representada para gerenciar o catálogo"
+      actions={importButton}
     />
   );
 

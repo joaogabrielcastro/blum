@@ -5,7 +5,12 @@ import { createPortal } from "react-dom";
  * Discrete ⋯ action menu for list rows.
  * items: [{ id, label, onClick, tone?: 'default'|'danger'|'muted', icon? }]
  */
-export default function KebabMenu({ items = [], align = "right", label = "Ações" }) {
+export default function KebabMenu({
+  items = [],
+  align = "right",
+  label = "Ações",
+  triggerLabel = null,
+}) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
@@ -17,7 +22,7 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
       const el = btnRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const menuW = 196;
+      const menuW = 220;
       const left =
         align === "left"
           ? rect.left
@@ -53,19 +58,33 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
       <button
         ref={btnRef}
         type="button"
-        aria-label={label}
+        aria-label={triggerLabel ? undefined : label}
+        aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-ink-muted transition-all duration-200 ease-in-out hover:border-edge hover:bg-surface-muted hover:text-ink active:scale-[0.98]"
+        className={
+          triggerLabel
+            ? "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-edge bg-surface px-3.5 text-sm font-medium text-ink transition-colors hover:bg-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+            : "inline-flex h-9 w-9 items-center justify-center rounded-xl border border-transparent text-ink-muted transition-colors hover:border-edge hover:bg-surface-muted hover:text-ink"
+        }
       >
-        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-          <circle cx="12" cy="5" r="1.6" />
-          <circle cx="12" cy="12" r="1.6" />
-          <circle cx="12" cy="19" r="1.6" />
-        </svg>
+        {triggerLabel ? (
+          <>
+            {triggerLabel}
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
+            </svg>
+          </>
+        ) : (
+          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
+            <circle cx="12" cy="5" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="12" cy="19" r="1.6" />
+          </svg>
+        )}
       </button>
       {open
         ? createPortal(
@@ -73,7 +92,7 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
               ref={menuRef}
               role="menu"
               style={{ top: coords.top, left: coords.left }}
-              className="fixed z-[80] w-[196px] overflow-hidden rounded-xl border border-edge bg-surface/95 p-1 shadow-glass animate-fade-in"
+              className="fixed z-[80] w-[220px] overflow-hidden rounded-xl border border-edge bg-surface-elevated p-1 shadow-pop animate-fade-in"
             >
               {items.map((item) => {
                 const tone =
@@ -96,7 +115,12 @@ export default function KebabMenu({ items = [], align = "right", label = "Açõe
                     }}
                   >
                     {item.icon}
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge ? (
+                      <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                        {item.badge}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

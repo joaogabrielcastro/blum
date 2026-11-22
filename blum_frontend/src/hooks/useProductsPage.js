@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import apiService from "../services/apiService";
 import { useToast } from "../context/ToastContext";
 import { useAppData } from "../context/AppDataProvider";
@@ -22,6 +23,9 @@ export function useProductsPage(userRole) {
   const [showProductForm, setShowProductForm] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState(null);
   const [selectedBrandId, setSelectedBrandId] = useState(null);
+  /** Representada aberta fica na URL: o "voltar" do navegador funciona. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlBrandId = searchParams.get("representada");
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [error, setError] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -210,6 +214,7 @@ export function useProductsPage(userRole) {
         setSelectedBrandId(null);
         setSearchTerm("");
         setCurrentPage(1);
+        if (urlBrandId) setSearchParams({}, { replace: true });
       } else {
         await fetchProducts();
       }
@@ -280,15 +285,36 @@ export function useProductsPage(userRole) {
     setSelectedBrandId(id != null ? String(id) : null);
     setSearchTerm("");
     setCurrentPage(1);
+    if (id != null) setSearchParams({ representada: String(id) });
   };
 
-  const clearSelectedBrand = () => {
+  const resetCatalogState = useCallback(() => {
     setSelectedBrand(null);
     setSelectedBrandId(null);
     setSearchTerm("");
     setCurrentPage(1);
     setProducts([]);
+  }, []);
+
+  const clearSelectedBrand = () => {
+    resetCatalogState();
+    if (urlBrandId) setSearchParams({});
   };
+
+  // URL → estado: voltar/avançar do navegador e links diretos.
+  useEffect(() => {
+    if (!urlBrandId) {
+      if (selectedBrandId) resetCatalogState();
+      return;
+    }
+    if (String(urlBrandId) === String(selectedBrandId)) return;
+    const brand = brands.find((b) => String(b.id) === String(urlBrandId));
+    if (!brand) return;
+    setSelectedBrand(brand.displayName || brand.name || "");
+    setSelectedBrandId(String(brand.id));
+    setSearchTerm("");
+    setCurrentPage(1);
+  }, [urlBrandId, brands]);
 
   const handleSearchChange = (term) => {
     setSearchTerm(term);
