@@ -14,6 +14,7 @@ import {
   orderCreatedAt,
   formatOrderDateLabel,
   prepareCumulativeSalesChartData,
+  orderDocumentType,
 } from "../utils/orderApiFields";
 import { useAppData } from "../context/AppDataProvider";
 
@@ -62,11 +63,12 @@ const Dashboard = ({ onNavigate, userId, userRole }) => {
 
         setRecentOrders(ordersList.slice(0, 5));
 
-        const finishedOrders = ordersList.filter(
-          (order) => order.status === "Entregue",
+        // Venda = pedido confirmado (orçamentos não entram no gráfico).
+        const confirmedOrders = ordersList.filter(
+          (order) => orderDocumentType(order) === "pedido",
         );
 
-        setSalesData(prepareCumulativeSalesChartData(finishedOrders));
+        setSalesData(prepareCumulativeSalesChartData(confirmedOrders));
       } catch (error) {
         console.error("Erro ao buscar dados do dashboard:", error);
       } finally {

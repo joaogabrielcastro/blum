@@ -41,7 +41,7 @@ const runE2e = process.env.RUN_E2E === "1";
     ).toBeVisible({ timeout: 15_000 });
 
     await expect(page.getByText("Período", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Total de Pedidos")).toBeVisible();
-    await expect(page.getByText("Comissões previstas")).toBeVisible();
+    await expect(page.getByText("Pedidos no período")).toBeVisible();
+    await expect(page.getByText("Valor total de vendas")).toBeVisible();
   });
 });

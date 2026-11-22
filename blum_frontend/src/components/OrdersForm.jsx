@@ -703,7 +703,7 @@ const OrdersForm = ({
             </p>
             <p className="mt-1 text-sm text-amber-900/90">
               {documentType === "pedido"
-                ? "O pedido pode ser salvo e faturado; ao finalizar, a baixa será automática e o saldo poderá ficar negativo."
+                ? "O pedido pode ser salvo; a baixa de estoque é automática e o saldo poderá ficar negativo."
                 : "Você pode salvar o orçamento; o aviso ficará registrado."}
             </p>
           </div>
@@ -858,7 +858,7 @@ const OrdersForm = ({
         }
         description={
           documentType === "pedido"
-            ? "Confirme para continuar. A entrega poderá ser finalizada e a baixa automática poderá deixar o saldo negativo."
+            ? "Confirme para continuar. A baixa automática de estoque poderá deixar o saldo negativo."
             : "O orçamento será salvo com aviso visível para o admin e para você."
         }
         lines={stockWarningLines}

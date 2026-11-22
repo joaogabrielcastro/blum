@@ -32,7 +32,7 @@ const ReportsCommissionsTable = ({
         <p className="text-gray-600 mt-2 max-w-3xl">
           Cada linha é um <strong>vendedor</strong> que lançou o pedido{" "}
           (<code className="text-sm bg-gray-100 px-1 rounded">user_ref</code>
-          ). Os valores somam apenas pedidos <strong>Entregue</strong> em{" "}
+          ). Os valores somam os pedidos confirmados em{" "}
           <strong>{periodLabel}</strong>. A comissão é a soma do campo{" "}
           <strong>total_commission</strong> de cada pedido.
         </p>

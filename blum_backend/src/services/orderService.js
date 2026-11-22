@@ -1211,7 +1211,7 @@ class OrderService {
         COUNT(id) AS "totalOrders",
         COALESCE(SUM(totalprice), 0) AS "totalSpent"
       FROM orders
-      WHERE clientid = ${clientId} AND status = 'Entregue'
+      WHERE clientid = ${clientId} AND document_type = 'pedido'
         AND tenant_id = ${tenantId}
         AND user_ref = ${authUser.userId}
     `;
@@ -1223,7 +1223,7 @@ class OrderService {
         COUNT(id) AS "totalOrders",
         COALESCE(SUM(totalprice), 0) AS "totalSpent"
       FROM orders
-      WHERE clientid = ${clientId} AND status = 'Entregue'
+      WHERE clientid = ${clientId} AND document_type = 'pedido'
         AND tenant_id = ${tenantId}
     `;
 

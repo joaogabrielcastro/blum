@@ -20,7 +20,6 @@ import { discardPendingOrder } from "../offline";
 import {
   hasPaymentMethod,
   needsPaymentRegistration,
-  finalizeDeliveryBlockReason,
   paymentOptionsForOrder,
 } from "../utils/paymentMethods";
 import Surface, {
@@ -115,20 +114,6 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
           );
           toast.success("Pedido excluído.");
         }
-      } else if (type === "finalize") {
-        await apiService.finalizeOrder(orderId);
-        setOrders(
-          orders.map((order) =>
-            String(order.id) === String(orderId)
-              ? {
-                  ...order,
-                  status: "Entregue",
-                  finishedAt: new Date().toISOString(),
-                }
-              : order,
-          ),
-        );
-        toast.success("Entrega finalizada.");
       }
     } catch (error) {
       const raw = (error?.message || "").trim();
@@ -146,11 +131,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       } else if (raw) {
         toast.error(raw);
       } else {
-        toast.error(
-          type === "delete"
-            ? "Falha ao excluir pedido. Tente novamente."
-            : "Falha ao finalizar pedido. Tente novamente.",
-        );
+        toast.error("Falha ao excluir pedido. Tente novamente.");
       }
       await fetchData();
     } finally {
@@ -169,7 +150,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       toast.success(
         confirmStockWarning
           ? "Pedido confirmado com aviso de ruptura de estoque."
-          : "Pedido confirmado. Defina o pagamento para finalizar a entrega.",
+          : "Pedido confirmado.",
       );
       const formatted = formatOrderData(converted);
       if (formatted?.id && !hasPaymentMethod(formatted.paymentMethod)) {
@@ -259,19 +240,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
     };
   }, [paymentDialogOrder, updatingPayment]);
 
-  const handleRequestFinalize = (order) => {
-    const reason = finalizeDeliveryBlockReason(order);
-    if (reason) {
-      toast.warning(reason);
-      if (!hasPaymentMethod(order.paymentMethod)) {
-        handleOpenPaymentDialog(order);
-      }
-      return;
-    }
-    setModalAction({ type: "finalize", orderId: order.id });
-  };
-
-  const handleConfirmPaymentMethod = async ({ finalizeAfter = false } = {}) => {
+  const handleConfirmPaymentMethod = async () => {
     if (!paymentDialogOrder?.id || !hasPaymentMethod(paymentDialogMethod)) {
       toast.warning("Selecione a forma de pagamento.");
       return;
@@ -281,14 +250,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       const orderId = paymentDialogOrder.id;
       await apiService.updateOrderPaymentMethod(orderId, paymentDialogMethod);
       setPaymentDialogOrder(null);
-      if (finalizeAfter) {
-        await apiService.finalizeOrder(orderId);
-        toast.success("Pagamento salvo e entrega finalizada.");
-      } else {
-        toast.success(
-          "Forma de pagamento atualizada. Agora você pode finalizar a entrega.",
-        );
-      }
+      toast.success("Forma de pagamento atualizada.");
       await fetchData();
     } catch (error) {
       toast.error(
@@ -324,47 +286,29 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       );
     }
 
-    const isDelivered = order.status === "Entregue";
     const isQuote = order.documentType === "orcamento";
 
     return (
       <div className="grid w-full grid-cols-2 items-stretch gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2">
-        {isDelivered ? (
-          <div className="col-span-2 flex sm:col-span-1 sm:contents">
-            <StatusBadge status="Entregue" />
-          </div>
+        {isQuote ? (
+          <SecondaryButton
+            type="button"
+            onClick={() => setConvertConfirmId(order.id)}
+            className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 sm:col-span-1"
+          >
+            Confirmar pedido
+          </SecondaryButton>
         ) : null}
-        {!isDelivered ? (
-          <>
-            {isQuote ? (
-              <SecondaryButton
-                type="button"
-                onClick={() => setConvertConfirmId(order.id)}
-                className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-indigo-200 !text-indigo-700 hover:!bg-indigo-50 sm:col-span-1"
-              >
-                Confirmar pedido
-              </SecondaryButton>
-            ) : (
-              <SecondaryButton
-                type="button"
-                onClick={() => handleRequestFinalize(order)}
-                className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-emerald-200 !text-emerald-700 hover:!bg-emerald-50 sm:col-span-1"
-              >
-                Finalizar entrega
-              </SecondaryButton>
-            )}
-            {!isQuote && needsPaymentRegistration(order.paymentMethod) ? (
-              <SecondaryButton
-                type="button"
-                onClick={() => handleOpenPaymentDialog(order)}
-                className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-amber-200 !text-amber-800 hover:!bg-amber-50 sm:col-span-1"
-              >
-                {hasPaymentMethod(order.paymentMethod)
-                  ? "Registrar pagamento"
-                  : "Definir pagamento"}
-              </SecondaryButton>
-            ) : null}
-          </>
+        {!isQuote && needsPaymentRegistration(order.paymentMethod) ? (
+          <SecondaryButton
+            type="button"
+            onClick={() => handleOpenPaymentDialog(order)}
+            className="col-span-2 !min-h-11 !px-3 !py-2 !text-sm touch-manipulation !border-amber-200 !text-amber-800 hover:!bg-amber-50 sm:col-span-1"
+          >
+            {hasPaymentMethod(order.paymentMethod)
+              ? "Registrar pagamento"
+              : "Definir pagamento"}
+          </SecondaryButton>
         ) : null}
         <SecondaryButton
           onClick={() => handleEditOrder(order.id)}
@@ -465,26 +409,16 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
           })
         }
         title={
-          modalAction.type === "delete"
-            ? modalAction.offlinePendingId
-              ? "Descartar orçamento offline"
-              : "Excluir pedido"
-            : "Finalizar entrega"
+          modalAction.offlinePendingId
+            ? "Descartar orçamento offline"
+            : "Excluir pedido"
         }
-        tone={modalAction.type === "delete" ? "danger" : "primary"}
-        confirmText={
-          modalAction.type === "delete"
-            ? modalAction.offlinePendingId
-              ? "Descartar"
-              : "Excluir"
-            : "Finalizar"
-        }
+        tone="danger"
+        confirmText={modalAction.offlinePendingId ? "Descartar" : "Excluir"}
         message={
-          modalAction.type === "delete"
-            ? modalAction.offlinePendingId
-              ? "Descartar este orçamento que ainda não foi enviado ao servidor?"
-              : "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
-            : "Confirmar finalização da entrega? O estoque já foi baixado na confirmação do pedido."
+          modalAction.offlinePendingId
+            ? "Descartar este orçamento que ainda não foi enviado ao servidor?"
+            : "Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita."
         }
       />
       <ConfirmationModal
@@ -492,7 +426,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
         title="Confirmar pedido"
         tone="primary"
         confirmText="Confirmar pedido"
-        message="Isso transforma o orçamento em pedido e baixa o estoque. Depois você define o pagamento e finaliza a entrega."
+        message="Isso transforma o orçamento em pedido e baixa o estoque."
         onConfirm={() =>
           convertConfirmId && handleConvertToPedido(convertConfirmId)
         }
@@ -511,7 +445,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
       <OrderStockWarningModal
         open={convertStockModal.open}
         title="Confirmar pedido com itens sem estoque"
-        description="O aviso de ruptura ficará registrado no pedido. Você ainda poderá finalizar a entrega depois."
+        description="O aviso de ruptura ficará registrado no pedido."
         lines={convertStockModal.lines}
         requireExplicitConfirm
         confirmLabel="Confirmar pedido com aviso"
@@ -540,7 +474,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                     ? "Este pedido tem desconto geral. Só PIX ou dinheiro são permitidos — ou zere o desconto ao editar."
                     : paymentDialogOrder.paymentMethod === "carteira"
                       ? "Como o cliente quitou o pedido em carteira?"
-                      : "Escolha a forma de pagamento para poder finalizar a entrega."}
+                      : "Escolha a forma de pagamento do pedido."}
                 </p>
                 <div className="mt-4">
                   <PaymentMethodPicker
@@ -559,7 +493,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                   >
                     Cancelar
                   </SecondaryButton>
-                  <SecondaryButton
+                  <PrimaryButton
                     type="button"
                     onClick={() => handleConfirmPaymentMethod()}
                     disabled={
@@ -567,38 +501,8 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                     }
                     className="!min-h-11 w-full sm:w-auto"
                   >
-                    {updatingPayment ? "Salvando…" : "Só salvar pagamento"}
-                  </SecondaryButton>
-                  {paymentDialogOrder.documentType !== "orcamento" &&
-                  paymentDialogOrder.status !== "Entregue" ? (
-                    <PrimaryButton
-                      type="button"
-                      onClick={() =>
-                        handleConfirmPaymentMethod({ finalizeAfter: true })
-                      }
-                      disabled={
-                        updatingPayment ||
-                        !hasPaymentMethod(paymentDialogMethod)
-                      }
-                      className="!min-h-11 w-full sm:w-auto"
-                    >
-                      {updatingPayment
-                        ? "Salvando…"
-                        : "Salvar e finalizar entrega"}
-                    </PrimaryButton>
-                  ) : (
-                    <PrimaryButton
-                      type="button"
-                      onClick={() => handleConfirmPaymentMethod()}
-                      disabled={
-                        updatingPayment ||
-                        !hasPaymentMethod(paymentDialogMethod)
-                      }
-                      className="!min-h-11 w-full sm:w-auto"
-                    >
-                      {updatingPayment ? "Salvando…" : "Salvar pagamento"}
-                    </PrimaryButton>
-                  )}
+                    {updatingPayment ? "Salvando…" : "Salvar pagamento"}
+                  </PrimaryButton>
                 </div>
               </div>
             </div>,
@@ -608,7 +512,7 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
 
       <PageHeader
         title="Pedidos"
-        description="Fluxo: orçamento → confirmar pedido → definir pagamento → finalizar entrega."
+        description="Fluxo: orçamento → confirmar pedido (baixa o estoque)."
         actions={
           <PrimaryButton
             className="hidden sm:inline-flex"
@@ -669,10 +573,11 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                 </h2>
                 <ul className="divide-y divide-edge">
                   {dayOrders.map((order) => {
-                    const openDays = formatOpenDays(
-                      order.createdAt,
-                      order.status,
-                    );
+                    // Só orçamentos ficam "em aberto": pedido confirmado é final.
+                    const openDays =
+                      order.documentType === "orcamento"
+                        ? formatOpenDays(order.createdAt, order.status)
+                        : null;
                     return (
                       <li
                         key={order.id}
@@ -708,13 +613,12 @@ const OrdersPage = ({ userId, userRole, brands, isOnline = true }) => {
                             ) : null}
                           </div>
                           {!order.isOfflinePending &&
-                          order.status !== "Entregue" ? (
+                          (order.documentType === "orcamento" ||
+                            !hasPaymentMethod(order.paymentMethod)) ? (
                             <p className="mt-1 text-xs text-ink-muted">
                               {order.documentType === "orcamento"
                                 ? "Próximo passo: Confirmar pedido (baixa estoque)."
-                                : !hasPaymentMethod(order.paymentMethod)
-                                  ? "Próximo passo: definir pagamento e finalizar entrega."
-                                  : "Próximo passo: Finalizar entrega."}
+                                : "Pagamento pendente: defina a forma de pagamento."}
                             </p>
                           ) : null}
                           <p className="mt-1 text-sm text-ink-muted">

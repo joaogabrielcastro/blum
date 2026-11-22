@@ -85,9 +85,6 @@ const ReportsPage = ({ userRole, userId, subscription }) => {
     chartData,
     totalSales,
     totalCommissions,
-    realizedSales,
-    realizedCommissions,
-    deliveredOrderCount,
     brandBars,
     mediaPorRepresentada,
     commissionsByRep,
@@ -324,9 +321,6 @@ const ReportsPage = ({ userRole, userId, subscription }) => {
           orderCount={ordersToDisplay.length}
           totalSales={totalSales}
           totalCommissions={totalCommissions}
-          realizedSales={realizedSales}
-          realizedCommissions={realizedCommissions}
-          deliveredOrderCount={deliveredOrderCount}
         />
         <ReportsSalesChartSection
           selectedYear={selectedYear}
