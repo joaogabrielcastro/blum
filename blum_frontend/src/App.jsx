@@ -90,7 +90,7 @@ function AuthenticatedApp({
           />
         )}
 
-        <div className="flex w-full max-w-full flex-1 flex-col overflow-y-auto">
+        <div className="flex w-full max-w-full flex-1 flex-col overflow-y-auto overscroll-none">
           <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-edge bg-surface px-2 md:hidden">
             <button
               type="button"
