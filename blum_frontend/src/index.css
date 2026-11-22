@@ -79,6 +79,10 @@
   }
 
   html {
+    /* App: sem zoom por toque duplo e sem ajuste automático de fonte. */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "cv11", "ss01";
@@ -87,6 +91,17 @@
   body {
     @apply m-0 bg-surface-page font-sans text-sm text-ink;
     min-width: 320px;
+    /* Sem "elástico" nem puxar-para-recarregar: a tela não parece solta. */
+    overscroll-behavior: none;
+  }
+
+  /* No celular, campos com 16px: abaixo disso o iPhone dá zoom ao focar. */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   * {

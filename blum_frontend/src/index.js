@@ -13,6 +13,14 @@ import './index.css';
 
 initFrontendSentry();
 
+// Comportamento de app: o Safari do iPhone ignora `user-scalable=no`, então o
+// gesto de pinça (evento exclusivo do iOS) é bloqueado aqui.
+['gesturestart', 'gesturechange'].forEach((type) => {
+  document.addEventListener(type, (event) => event.preventDefault(), {
+    passive: false,
+  });
+});
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
