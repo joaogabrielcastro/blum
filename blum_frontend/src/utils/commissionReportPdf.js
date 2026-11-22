@@ -136,7 +136,7 @@ export function buildAllRepresentativesCommissionPdf({
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    "Somente pedidos com status Entregue no período selecionado.",
+    "Pedidos confirmados no período selecionado.",
     14,
     pageHeight - 10,
   );

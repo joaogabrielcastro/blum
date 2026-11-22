@@ -5,6 +5,15 @@ import ErrorMessage from "../components/ErrorMessage";
 import StatusBadge from "../components/ui/StatusBadge";
 import apiService from "../services/apiService";
 import formatCurrency, { formatOrderData } from "../utils/format";
+import { orderDocumentType } from "../utils/orderApiFields";
+
+/** Sem etapa de entrega: o que importa é se é orçamento ou pedido. */
+const DocumentTypeBadge = ({ order }) =>
+  orderDocumentType(order) === "pedido" ? (
+    <StatusBadge label="Pedido" tone="success" />
+  ) : (
+    <StatusBadge label="Orçamento" tone="neutral" />
+  );
 
 const ClientHistoryPage = ({ clients }) => {
   const { clientId } = useParams();
@@ -181,7 +190,7 @@ const ClientHistoryPage = ({ clients }) => {
                       Valor Total
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Tipo
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Ações
@@ -210,7 +219,7 @@ const ClientHistoryPage = ({ clients }) => {
                           {formatCurrency(order.totalPrice)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <StatusBadge status={order.status} />
+                          <DocumentTypeBadge order={order} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button
@@ -303,8 +312,8 @@ const OrderDetailsModal = ({
                 {getSellerName(order)}
               </p>
               <p className="flex items-center gap-2">
-                <span className="font-medium">Status:</span>
-                <StatusBadge status={order.status} />
+                <span className="font-medium">Tipo:</span>
+                <DocumentTypeBadge order={order} />
               </p>
             </div>
           </div>

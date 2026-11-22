@@ -37,7 +37,7 @@ export default function BrandSalesComparison({
       <div className="flex flex-col items-center justify-center py-14 text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
         <p className="font-medium">Nenhuma venda por representada neste período.</p>
         <p className="text-sm mt-1">
-          Finalize pedidos com status Entregue para ver os valores aqui.
+          Confirme orçamentos como pedidos para ver os valores aqui.
         </p>
       </div>
     );
