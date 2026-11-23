@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+    <infNFe Id="NFe41261111222333000181550010000012341000012345" versao="4.00">
+      <ide>
+        <cUF>41</cUF>
+        <natOp>VENDA DE MERCADORIA</natOp>
+        <mod>55</mod>
+        <serie>1</serie>
+        <nNF>1234</nNF>
+        <dhEmi>2026-11-20T10:15:00-03:00</dhEmi>
+        <tpNF>1</tpNF>
+      </ide>
+      <emit>
+        <CNPJ>11222333000181</CNPJ>
+        <xNome>FORNECEDOR EXEMPLO LTDA</xNome>
+      </emit>
+      <dest>
+        <CNPJ>44555666000199</CNPJ>
+        <xNome>CLIENTE EXEMPLO LTDA</xNome>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>LED9QA</cProd>
+          <cEAN>7891234567895</cEAN>
+          <xProd>LAMPADA LED 9W BIVOLT</xProd>
+          <NCM>85395200</NCM>
+          <CFOP>6102</CFOP>
+          <uCom>CX</uCom>
+          <qCom>2.0000</qCom>
+          <vUnCom>96.0000000000</vUnCom>
+          <vProd>192.00</vProd>
+          <cEANTrib>7891234567895</cEANTrib>
+          <uTrib>CX</uTrib>
+          <qTrib>2.0000</qTrib>
+          <vUnTrib>96.0000000000</vUnTrib>
+          <vFrete>12.00</vFrete>
+          <vDesc>4.00</vDesc>
+          <indTot>1</indTot>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMS10>
+              <orig>0</orig>
+              <CST>10</CST>
+              <vICMS>23.04</vICMS>
+              <vICMSST>9.60</vICMSST>
+              <vFCPST>1.92</vFCPST>
+            </ICMS10>
+          </ICMS>
+          <IPI>
+            <cEnq>999</cEnq>
+            <IPITrib>
+              <CST>50</CST>
+              <vIPI>9.60</vIPI>
+            </IPITrib>
+          </IPI>
+        </imposto>
+      </det>
+      <det nItem="2">
+        <prod>
+          <cProd>000777</cProd>
+          <cEAN>SEM GTIN</cEAN>
+          <xProd>FITA ISOLANTE 20M</xProd>
+          <NCM>39191010</NCM>
+          <CFOP>6102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>10.0000</qCom>
+          <vUnCom>3.5000000000</vUnCom>
+          <vProd>35.00</vProd>
+          <cEANTrib>SEM GTIN</cEANTrib>
+          <uTrib>UN</uTrib>
+          <qTrib>10.0000</qTrib>
+          <vUnTrib>3.5000000000</vUnTrib>
+          <indTot>1</indTot>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMSSN102>
+              <orig>0</orig>
+              <CSOSN>102</CSOSN>
+            </ICMSSN102>
+          </ICMS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vProd>227.00</vProd>
+          <vFrete>12.00</vFrete>
+          <vDesc>4.00</vDesc>
+          <vIPI>9.60</vIPI>
+          <vST>9.60</vST>
+          <vFCPST>1.92</vFCPST>
+          <vNF>256.12</vNF>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+  <protNFe versao="4.00">
+    <infProt>
+      <chNFe>41261111222333000181550010000012341000012345</chNFe>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+</nfeProc>

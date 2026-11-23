@@ -36,11 +36,6 @@ function validateCnpjDigits(digits) {
   return rev === Number(digits[13]);
 }
 
-export function detectTaxIdType(digits) {
-  if (digits.length <= 11) return "cpf";
-  return "cnpj";
-}
-
 export function validateTaxIdClient(raw) {
   const digits = onlyTaxIdDigits(raw);
   if (!digits) {

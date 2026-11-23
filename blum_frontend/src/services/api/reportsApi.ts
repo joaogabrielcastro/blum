@@ -7,7 +7,21 @@ import type {
 } from "../../types/api";
 
 export const reportsApi = {
-  getSalesByRep: () => apiRequest(`${API_URL}/reports/sales-by-rep`),
+  getProfitReport: (filters: {
+    startDate?: string;
+    endDate?: string;
+    sellerId?: string;
+    brand?: string;
+  }) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, value);
+    }
+    return apiRequest(`${API_URL}/reports/profit?${params.toString()}`);
+  },
+
+  estimateMissingCosts: () =>
+    apiRequest(`${API_URL}/reports/profit/estimate-missing-costs`, { method: "POST" }),
 
   getReportStats: (filters: ReportStatsFilters) => {
     const queryString = new URLSearchParams(

@@ -8,6 +8,7 @@ import ReportsMonthlyHistoryTable from "../components/reports/ReportsMonthlyHist
 import ReportsBrandComparison from "../components/reports/ReportsBrandComparison";
 import ReportsOrdersTable from "../components/reports/ReportsOrdersTable";
 import ReportsCommissionsTable from "../components/reports/ReportsCommissionsTable";
+import ReportsProfit from "../components/reports/ReportsProfit";
 import Tabs, { TabPanel } from "../components/ui/Tabs";
 import Surface, { PageHeader } from "../components/ui/Surface";
 import ListPageSkeleton from "../components/ListPageSkeleton";
@@ -37,6 +38,7 @@ const TAB_SUMMARY = "resumo";
 const TAB_ORDERS = "pedidos";
 const TAB_COMMISSIONS = "comissoes";
 const TAB_BRANDS = "comparativos";
+const TAB_PROFIT = "lucro";
 
 const ReportsPage = ({ userRole, userId, subscription }) => {
   const toast = useToast();
@@ -270,6 +272,8 @@ const ReportsPage = ({ userRole, userId, subscription }) => {
       badge: commissionsByRep.length || undefined,
     },
     { id: TAB_BRANDS, label: "Comparativos" },
+    // Lucro usa custo: só para admin.
+    ...(userRole === "admin" ? [{ id: TAB_PROFIT, label: "Lucro" }] : []),
   ];
 
   if (loading) {
@@ -373,6 +377,26 @@ const ReportsPage = ({ userRole, userId, subscription }) => {
           canCommissionPdf={canCommissionPdf}
         />
       </TabPanel>
+
+      {userRole === "admin" ? (
+        <TabPanel id={TAB_PROFIT} activeId={activeTab}>
+          {activeTab === TAB_PROFIT ? (
+            <ReportsProfit
+              selectedYear={selectedYear}
+              selectedMonth={selectedMonth}
+              periodLabel={periodLabel}
+              sellerFilterKey={sellerFilterKey}
+              brandFilterKey={brandFilterKey}
+              filterLabel={[
+                sellerFilterKey ? selectedSellerLabel : null,
+                brandFilterKey ? selectedBrandLabel : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+          ) : null}
+        </TabPanel>
+      ) : null}
 
       <TabPanel id={TAB_BRANDS} activeId={activeTab}>
         {canBrandCompare ? (

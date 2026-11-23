@@ -13,7 +13,10 @@ const {
 
 exports.getAll = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const {
       brand,
       brandId,
@@ -86,7 +89,10 @@ exports.getAll = async (req, res) => {
 
 exports.lookupByCode = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const productcode = req.query.productcode ?? req.query.productCode;
     const { brand, brandId } = req.query;
 
@@ -124,7 +130,10 @@ exports.lookupByCode = async (req, res) => {
 
 exports.lookupByCodes = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const { brand, brandId } = req.body || {};
     const rawCodes = req.body?.codes ?? req.body?.productCodes ?? [];
 
@@ -171,7 +180,10 @@ exports.lookupByCodes = async (req, res) => {
 
 exports.search = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const { q, brandId, brand } = req.query;
     const allowedBrandNames =
       await brandAccessService.getRestrictedBrandNamesOrNull(
@@ -212,7 +224,10 @@ exports.search = async (req, res) => {
 
 exports.getById = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const { id } = req.params;
     const product = await productService.findById(id, req.user.tenantId);
     const allowedBrandNames =
@@ -238,10 +253,14 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const product = await productService.create({
       ...req.body,
       tenant_id: req.user.tenantId,
+      actor: { userId: req.user.userId, username: req.user.username },
     });
 
     await invalidateProductsCache(req.user.tenantId);
@@ -269,11 +288,15 @@ exports.delete = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const mapOptions = { camelOnly: req.apiVersion === "v2" };
+    const mapOptions = {
+      camelOnly: req.apiVersion === "v2",
+      includeCost: req.user?.role === "admin",
+    };
     const { id } = req.params;
     const product = await productService.update(id, {
       ...req.body,
       tenant_id: req.user.tenantId,
+      actor: { userId: req.user.userId, username: req.user.username },
     });
 
     await invalidateProductsCache(req.user.tenantId);
@@ -323,5 +346,20 @@ exports.bulkAdjustPrices = async (req, res) => {
   } catch (error) {
     console.error("Erro no reajuste de preços:", error);
     res.status(400).json({ error: error.message || "Erro no reajuste de preços" });
+  }
+};
+
+const { getProductInsights } = require("../services/product/productInsightsService");
+
+exports.getInsights = async (req, res) => {
+  try {
+    const insights = await getProductInsights(req.params.id, req.user.tenantId);
+    res.status(200).json(insights);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error("Erro ao carregar ficha do produto:", error);
+    res
+      .status(status)
+      .json({ error: status >= 500 ? "Erro ao carregar ficha do produto." : error.message });
   }
 };

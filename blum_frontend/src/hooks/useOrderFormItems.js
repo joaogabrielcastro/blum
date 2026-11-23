@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { useToast } from "../context/ToastContext";
+import { costFromProduct } from "../utils/productCost";
 import {
   allowsDecimalQuantityBrand,
   parseQuantityByBrand,
@@ -21,6 +22,7 @@ function lineToStaging(item, index) {
     productId: item.productId,
     productcode: item.productcode ?? "",
     availableStock: item.availableStock ?? null,
+    unitCost: item.unitCost ?? null,
   };
 }
 
@@ -38,6 +40,8 @@ function productToStaging(product, selectedBrandId) {
     productId: product.id,
     productcode: product.productcode ?? product.productCode ?? "",
     availableStock: product.stock,
+    // Só vem preenchido para admin (a API não envia custo ao vendedor).
+    unitCost: costFromProduct(product),
   };
 }
 
@@ -243,6 +247,7 @@ export function useOrderFormItems(
       productId: stagingItem.productId,
       productcode: stagingItem.productcode,
       availableStock: stagingItem.availableStock,
+      unitCost: stagingItem.unitCost ?? null,
     };
 
     if (stagingItem.mode === "edit" && stagingItem.editIndex != null) {

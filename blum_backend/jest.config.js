@@ -16,14 +16,10 @@ module.exports = {
     "src/middleware/tenantDbContextMiddleware.js",
     "src/mappers/**/*.js",
     "src/services/**/*.js",
-    "!src/services/purchase/pdfProcessService.js",
-    "!src/services/purchase/pdfTextExtractionService.js",
     "!src/services/orderService.js",
     "!src/services/productService.js",
     "!src/services/clientService.js",
     "!src/services/reportService.js",
-    "!src/services/purchase/csvImportService.js",
-    "!src/services/purchase/purchaseFinalizeImportService.js",
   ],
   coverageThreshold: {
     global: {

@@ -35,4 +35,17 @@ router.get(
   reportController.getCommissionByBrand
 );
 
+router.get(
+  "/profit",
+  authenticate,
+  authorize("admin"),
+  reportController.getProfitReport,
+);
+router.post(
+  "/profit/estimate-missing-costs",
+  authenticate,
+  authorize("admin"),
+  reportController.estimateMissingCosts,
+);
+
 module.exports = router;

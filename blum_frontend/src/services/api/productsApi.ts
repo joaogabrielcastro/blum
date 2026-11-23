@@ -1,5 +1,4 @@
 import { API_URL, apiRequest, apiUpload, apiDownloadBlob } from "./core";
-import type { ApiRequestError } from "./core";
 import type { ProductsExportOptions, ProductsListResponse } from "../../types/api";
 
 export const productsApi = {
@@ -68,30 +67,11 @@ export const productsApi = {
     );
   },
 
+  getProductInsights: (productId: string | number) =>
+    apiRequest(`${API_URL}/products/${productId}/insights`),
+
   getProductById: (productId: string | number) =>
     apiRequest(`${API_URL}/products/${productId}`),
-
-  lookupProductByCode: async (
-    productCode: string,
-    brand?: string,
-    brandId?: string | number | null,
-  ) => {
-    const code = String(productCode ?? "").trim();
-    if (!code) return null;
-    const params = new URLSearchParams();
-    params.append("productcode", code);
-    if (brand && brand !== "all") params.append("brand", brand);
-    if (brandId != null && brandId !== "")
-      params.append("brandId", String(brandId));
-    try {
-      return await apiRequest(
-        `${API_URL}/products/by-code?${params.toString()}`,
-      );
-    } catch (err) {
-      if ((err as ApiRequestError)?.status === 404) return null;
-      throw err;
-    }
-  },
 
   lookupProductsByCodes: async (
     productCodes: string[],

@@ -76,90 +76,76 @@ async function updateOrderCore(executor, payload) {
   return result.rows || result;
 }
 
-async function markOrderDelivered(executor, id, tenantIdInput) {
-  const tenantId = requireTenantId(tenantIdInput);
+/**
+ * Atualiza o saldo e, se `movement` vier, registra o movimento na mesma
+ * instrução (CTE): saldo e histórico nunca divergem.
+ * movement: { type, referenceType, referenceId, userId, reason }
+ */
+async function changeProductStock(executor, { productId, delta, tenantId, movement }) {
   const db = resolveExecutor(executor);
+  if (!movement) {
+    const result = await db.query(
+      `
+        UPDATE products
+        SET stock = stock + $1::integer
+        WHERE id = $2 AND tenant_id = $3
+        RETURNING id
+      `,
+      [delta, productId, tenantId],
+    );
+    return result.rows || result;
+  }
+  const userId = Number.parseInt(movement.userId, 10);
   const result = await db.query(
     `
-      UPDATE orders
-      SET status = 'Entregue', finishedat = COALESCE(finishedat, NOW())
-      WHERE id = $1
-        AND tenant_id = $2
-        AND (status IS DISTINCT FROM 'Entregue')
-      RETURNING id
+      WITH upd AS (
+        UPDATE products
+        SET stock = stock + $1::integer
+        WHERE id = $2 AND tenant_id = $3
+        RETURNING id, stock, tenant_id, cost_price
+      )
+      INSERT INTO stock_movements
+        (tenant_id, product_id, movement_type, quantity, balance_after,
+         unit_cost, reference_type, reference_id, reason, user_id)
+      SELECT tenant_id, id, $4, $1, stock, cost_price, $5, $6, $7, $8
+      FROM upd
+      RETURNING product_id AS id
     `,
-    [id, tenantId],
+    [
+      delta,
+      productId,
+      tenantId,
+      movement.type,
+      movement.referenceType || null,
+      movement.referenceId ?? null,
+      movement.reason || null,
+      Number.isInteger(userId) ? userId : null,
+    ],
   );
   return result.rows || result;
 }
 
-async function getOrderStatusById(executor, id, tenantIdInput) {
+async function decreaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput, movement }) {
   const tenantId = requireTenantId(tenantIdInput);
-  const db = resolveExecutor(executor);
-  const result = await db.query(
-    "SELECT id, status FROM orders WHERE id = $1 AND tenant_id = $2",
-    [id, tenantId],
-  );
-  const rows = result.rows || result;
-  return rows[0] || null;
-}
-
-async function getOrderLinesForStock(executor, id, tenantIdInput) {
-  const tenantId = requireTenantId(tenantIdInput);
-  const db = resolveExecutor(executor);
-  const result = await db.query(
-    `
-      SELECT product_id, quantity, brand
-      FROM order_items
-      WHERE order_id = $1 AND tenant_id = $2
-    `,
-    [id, tenantId],
-  );
-  return result.rows || result;
-}
-
-async function decreaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput }) {
-  const tenantId = requireTenantId(tenantIdInput);
-  const db = resolveExecutor(executor);
   const qInt = quantityToIntForStock(quantity);
   if (qInt == null) {
     return [];
   }
-  const result = await db.query(
-    `
-      UPDATE products
-      SET stock = stock - $1::integer
-      WHERE id = $2
-        AND tenant_id = $3
-      RETURNING id
-    `,
-    [qInt, productId, tenantId],
-  );
-  return result.rows || result;
+  return changeProductStock(executor, { productId, delta: -qInt, tenantId, movement });
 }
 
-async function increaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput }) {
+async function increaseProductStock(executor, { productId, quantity, tenantId: tenantIdInput, movement }) {
   const tenantId = requireTenantId(tenantIdInput);
-  const db = resolveExecutor(executor);
   const qInt = quantityToIntForStock(quantity);
   if (qInt == null) {
     return;
   }
-  await db.query(
-    `
-      UPDATE products
-      SET stock = stock + $1::integer
-      WHERE id = $2 AND tenant_id = $3
-    `,
-    [qInt, productId, tenantId],
-  );
+  await changeProductStock(executor, { productId, delta: qInt, tenantId, movement });
 }
 
 module.exports = {
   updateOrderCore,
-  markOrderDelivered,
-  getOrderStatusById,
-  getOrderLinesForStock,
   decreaseProductStock,
   increaseProductStock,
+  changeProductStock,
 };

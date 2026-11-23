@@ -19,18 +19,6 @@ export function needsPaymentRegistration(method) {
   return !hasPaymentMethod(method) || method === "carteira";
 }
 
-export function canFinalizeDelivery(order) {
-  if (!order) return false;
-  const doc = order.documentType ?? order.document_type;
-  const status = order.status;
-  if (doc === "orcamento") return false;
-  if (status === "Entregue") return false;
-  if (!hasPaymentMethod(order.paymentMethod ?? order.payment_method)) {
-    return false;
-  }
-  return true;
-}
-
 export function paymentOptionsForOrder(order) {
   const discount = parseFloat(order?.discount) || 0;
   const current = order?.paymentMethod ?? order?.payment_method;
@@ -43,17 +31,3 @@ export function paymentOptionsForOrder(order) {
   }
   return options;
 }
-
-export function finalizeDeliveryBlockReason(order) {
-  if (!order) return "Pedido inválido.";
-  const doc = order.documentType ?? order.document_type;
-  if (doc === "orcamento") {
-    return "Primeiro confirme o pedido (botão Confirmar pedido). Depois defina o pagamento e finalize a entrega.";
-  }
-  if (order.status === "Entregue") return "Este pedido já foi finalizado.";
-  if (!hasPaymentMethod(order.paymentMethod ?? order.payment_method)) {
-    return "Defina a forma de pagamento para poder finalizar a entrega.";
-  }
-  return null;
-}
-

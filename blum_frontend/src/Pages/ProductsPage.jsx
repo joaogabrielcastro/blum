@@ -1,3 +1,4 @@
+import { useState } from "react";
 import ProductRow from "../components/ProductRow";
 import ProductsForm from "../components/ProductsForm";
 import BrandForm from "../components/BrandForm";
@@ -9,6 +10,7 @@ import Pagination from "../components/Pagination";
 import BulkPriceAdjustModal from "../components/products/BulkPriceAdjustModal";
 import ProductImportSection from "../components/products/ProductImportSection";
 import DeleteBrandWithProductsDialog from "../components/products/DeleteBrandWithProductsDialog";
+import ProductSheet from "../components/products/ProductSheet";
 import ListPageSkeleton from "../components/ListPageSkeleton";
 import Drawer from "../components/ui/Drawer";
 import KebabMenu from "../components/ui/KebabMenu";
@@ -18,6 +20,8 @@ import {
   SecondaryButton,
 } from "../components/ui/Surface";
 import { useProductsPage } from "../hooks/useProductsPage";
+import formatCurrency from "../utils/format";
+import { costFromProduct, marginPercent } from "../utils/productCost";
 import { useToast } from "../context/ToastContext";
 import {
   canUseFeature,
@@ -25,6 +29,7 @@ import {
 } from "../utils/planFeatures";
 
 const ProductsPage = ({ userRole, subscription }) => {
+  const [sheetProductId, setSheetProductId] = useState(null);
   const toast = useToast();
   const page = useProductsPage(userRole);
   const canImport = canUseFeature(subscription, "product-import");
@@ -417,6 +422,11 @@ const ProductsPage = ({ userRole, subscription }) => {
                     <KebabMenu
                       items={[
                         {
+                          id: "sheet",
+                          label: "Ficha do produto",
+                          onClick: () => setSheetProductId(product.id),
+                        },
+                        {
                           id: "edit",
                           label: "Editar",
                           onClick: () => handleEditProduct(product),
@@ -441,9 +451,21 @@ const ProductsPage = ({ userRole, subscription }) => {
                     <div>
                       <p className="text-xs text-ink-muted">Preço</p>
                       <p className="text-sm font-semibold tabular-nums text-ink">
-                        R$ {parseFloat(product.price || 0).toFixed(2)}
+                        {formatCurrency(parseFloat(product.price || 0))}
                       </p>
                     </div>
+                    {isAdmin ? (
+                      <div>
+                        <p className="text-xs text-ink-muted">Custo · margem</p>
+                        <p className="text-sm tabular-nums text-ink">
+                          {costFromProduct(product) == null
+                            ? "Sem custo"
+                            : `${formatCurrency(costFromProduct(product))} · ${(
+                                marginPercent(product.price, costFromProduct(product)) ?? 0
+                              ).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+                        </p>
+                      </div>
+                    ) : null}
                     <div>
                       <p className="text-xs text-ink-muted">Estoque</p>
                       <p className="text-sm font-semibold tabular-nums text-ink">
@@ -523,6 +545,11 @@ const ProductsPage = ({ userRole, subscription }) => {
           />
         </Drawer>
       ) : null}
+
+      <ProductSheet
+        productId={sheetProductId}
+        onClose={() => setSheetProductId(null)}
+      />
 
       {isAdmin && showBulkAdjust && selectedBrand && canPriceBatch && (
         <BulkPriceAdjustModal

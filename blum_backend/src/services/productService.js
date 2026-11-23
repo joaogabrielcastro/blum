@@ -1,6 +1,13 @@
-const { sql } = require("../config/database");
+const { sql, pool, beginTenantTransaction } = require("../config/database");
+const { parseCostInput } = require("./product/productCost");
+const { changeProductStock } = require("../repositories/orderRepository");
 const productRepository = require("../repositories/productRepository");
 const { requireTenantId } = require("../utils/tenantContext");
+
+function toUserId(value) {
+  const n = Number.parseInt(value, 10);
+  return Number.isInteger(n) ? n : null;
+}
 
 /** Restrição opcional por representada (vendedor). Fragmento vazio = sem filtro extra. */
 function brandSql(names) {
@@ -498,8 +505,10 @@ class ProductService {
     }
 
     const brand_id = brand ? await resolveBrandId(brand, tenantId) : null;
+    const costRaw = productData.costPrice ?? productData.cost_price;
+    const cost = costRaw === undefined ? null : parseCostInput(costRaw);
 
-    return productRepository.insertProduct({
+    const created = await productRepository.insertProduct({
       name,
       productcode,
       price,
@@ -508,7 +517,19 @@ class ProductService {
       brand_id,
       minstock,
       tenant_id: tenantId,
+      cost_price: cost,
     });
+    const initialStock = parseInt(stock, 10) || 0;
+    if (created && initialStock !== 0) {
+      await sql(
+        `INSERT INTO stock_movements
+           (tenant_id, product_id, movement_type, quantity, balance_after, unit_cost,
+            reference_type, reason, user_id)
+         VALUES ($1, $2, 'cadastro', $3, $3, $4, 'manual', 'Estoque inicial', $5)`,
+        [tenantId, created.id, initialStock, cost, toUserId(productData.actor?.userId)],
+      );
+    }
+    return created;
   }
 
   /**
@@ -540,30 +561,84 @@ class ProductService {
     }
 
     const brand_id = brand ? await resolveBrandId(brand, tenantId) : null;
+    const costRaw = productData.costPrice ?? productData.cost_price;
+    const actor = productData.actor || {};
 
-    const result = await sql(
-      `UPDATE products
-       SET name = $1, productcode = $2, price = $3, stock = $4, brand = $5, minstock = $6, brand_id = $7
-       WHERE id = $8 AND tenant_id = $9
-       RETURNING *`,
-      [
-        name,
-        productcode,
-        price,
-        stock,
-        brand,
-        minstock || 0,
-        brand_id,
-        id,
-        tenantId,
-      ],
-    );
+    // Uma transação: dados do produto + histórico de preço/custo + movimento
+    // de estoque (ajuste manual) ficam sempre coerentes.
+    const client = await pool.connect();
+    try {
+      await beginTenantTransaction(client);
+      const currentRes = await client.query(
+        "SELECT * FROM products WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        [id, tenantId],
+      );
+      const current = currentRes.rows[0];
+      if (!current) throw new Error("Produto não encontrado");
 
-    if (result.length === 0) {
-      throw new Error("Produto não encontrado");
+      // Custo ausente no payload = mantém o atual (vendedor/telas antigas).
+      const nextCost =
+        costRaw === undefined ? current.cost_price : parseCostInput(costRaw);
+      const nextStock = parseInt(stock, 10);
+      const stockDelta = Number.isFinite(nextStock)
+        ? nextStock - Number(current.stock)
+        : 0;
+
+      const result = await client.query(
+        `UPDATE products
+         SET name = $1, productcode = $2, price = $3, brand = $4, minstock = $5,
+             brand_id = $6, cost_price = $7
+         WHERE id = $8 AND tenant_id = $9
+         RETURNING *`,
+        [name, productcode, price, brand, minstock || 0, brand_id, nextCost, id, tenantId],
+      );
+      let updated = result.rows[0];
+
+      if (stockDelta !== 0) {
+        await changeProductStock(client, {
+          productId: Number(id),
+          delta: stockDelta,
+          tenantId,
+          movement: {
+            type: "ajuste",
+            referenceType: "manual",
+            reason: "Ajuste manual no cadastro",
+            userId: actor.userId,
+          },
+        });
+        updated = { ...updated, stock: nextStock };
+      }
+
+      const oldPrice = Number(current.price);
+      const newPrice = Number(price);
+      if (Number.isFinite(newPrice) && newPrice !== oldPrice) {
+        await client.query(
+          `INSERT INTO price_history
+             (product_id, tenant_id, event_type, old_price, new_price, changed_by, changedat)
+           VALUES ($1, $2, 'venda', $3, $4, $5, NOW())`,
+          [id, tenantId, oldPrice, newPrice, actor.username || null],
+        );
+      }
+
+      const oldCost = current.cost_price == null ? null : Number(current.cost_price);
+      const newCost = nextCost == null ? null : Number(nextCost);
+      if (oldCost !== newCost) {
+        await client.query(
+          `INSERT INTO price_history
+             (product_id, tenant_id, event_type, old_cost, new_cost, changed_by, changedat)
+           VALUES ($1, $2, 'custo_manual', $3, $4, $5, NOW())`,
+          [id, tenantId, oldCost, newCost, actor.username || null],
+        );
+      }
+
+      await client.query("COMMIT");
+      return updated;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    return result[0];
   }
 
   /**
@@ -735,6 +810,7 @@ class ProductService {
         INSERT INTO price_history (
           product_id,
           tenant_id,
+          event_type,
           old_price,
           new_price,
           changed_by,
@@ -742,6 +818,7 @@ class ProductService {
         ) VALUES (
           ${item.id},
           ${tenantId},
+          'reajuste',
           ${item.oldPrice},
           ${item.newPrice},
           ${changedBy},

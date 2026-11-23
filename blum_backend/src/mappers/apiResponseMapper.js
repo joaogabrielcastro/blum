@@ -1,3 +1,5 @@
+const { marginPercent } = require("../services/product/productCost");
+
 function omitSubcodeFields(obj) {
   if (!obj || typeof obj !== "object") return obj;
   const clone = { ...obj };
@@ -17,8 +19,48 @@ function maybeStripLegacy(obj, legacyKeys, options = {}) {
   return clone;
 }
 
+const COST_FIELDS = [
+  "cost_price",
+  "costPrice",
+  "last_cost",
+  "lastCost",
+  "last_purchase_at",
+  "lastPurchaseAt",
+  "marginPercent",
+];
+
+function toNumberOrNull(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Custo e margem só saem para quem pode vê-los (admin). Para os demais
+ * perfis os campos são removidos da resposta.
+ */
+function applyCostVisibility(product, options = {}) {
+  const clone = { ...product };
+  const cost = toNumberOrNull(product.cost_price ?? product.costPrice);
+  const lastCost = toNumberOrNull(product.last_cost ?? product.lastCost);
+  const lastPurchaseAt = product.last_purchase_at ?? product.lastPurchaseAt ?? null;
+  for (const key of COST_FIELDS) delete clone[key];
+  if (!options.includeCost) return clone;
+  clone.costPrice = cost;
+  clone.lastCost = lastCost;
+  clone.lastPurchaseAt = lastPurchaseAt;
+  clone.marginPercent = marginPercent(product.price, cost);
+  if (!options.camelOnly) {
+    clone.cost_price = cost;
+    clone.last_cost = lastCost;
+    clone.last_purchase_at = lastPurchaseAt;
+  }
+  return clone;
+}
+
 function mapProductResponse(product, options = {}) {
   if (!product || typeof product !== "object") return product;
+  product = applyCostVisibility(product, options);
   const mapped = omitSubcodeFields({
     ...product,
     tenantId: product.tenantId ?? product.tenant_id ?? null,
@@ -74,6 +116,12 @@ function mapClientsPayload(clients, options = {}) {
 
 function mapOrderItemResponse(item, options = {}) {
   if (!item || typeof item !== "object") return item;
+  // Custo do item (snapshot da venda) só vai para admin.
+  const unitCost = toNumberOrNull(item.unit_cost ?? item.unitCost);
+  item = { ...item };
+  delete item.unit_cost;
+  delete item.unitCost;
+  if (options.includeCost) item.unitCost = unitCost;
   const mapped = omitSubcodeFields({
     ...item,
     tenantId: item.tenantId ?? item.tenant_id ?? null,

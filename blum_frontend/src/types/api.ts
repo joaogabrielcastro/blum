@@ -59,24 +59,6 @@ export interface ClientRecord {
   [key: string]: unknown;
 }
 
-export interface ClientStats {
-  totalOrders: number;
-  totalSpent: number;
-}
-
-export interface ClientOrderSummary {
-  id: number;
-  orderNumber: string;
-  orderDate: string | null;
-  seller: unknown;
-  status: string;
-  totalAmount: number;
-  discount: number;
-  paymentMethod: string;
-  notes: string;
-  items: unknown[];
-}
-
 export interface PaginationMeta {
   total: number;
   page: number;

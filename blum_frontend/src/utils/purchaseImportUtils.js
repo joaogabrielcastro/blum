@@ -7,26 +7,6 @@ export function normalizeProductCode(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-export function buildImportSuccessSummary(
-  result,
-  selectedBrand,
-  purchaseDate,
-  rowCount,
-) {
-  const updated = result?.results?.updated ?? 0;
-  const created = result?.results?.created ?? 0;
-  const brandLabel = result?.brandUsed || selectedBrand?.name || "—";
-  return (
-    `✅ ${result?.message || "Importação concluída."}\n\n` +
-    `Resumo da importação:\n` +
-    `• ${updated} produtos atualizados\n` +
-    `• ${created} novos produtos criados\n` +
-    `• Representada: ${brandLabel}\n` +
-    `• Data da compra: ${purchaseDate}\n` +
-    `• Linhas importadas: ${rowCount}`
-  );
-}
-
 export function getDuplicateProductCodesFromItems(items) {
   const codes = (items || [])
     .map((i) => normalizeProductCode(i.productCode))
@@ -117,41 +97,3 @@ export async function maybeMergeDuplicateProductCodes(rows, setRows) {
   return merged;
 }
 
-export function validatePurchaseImportRows(rows) {
-  const missingProductCodes = rows.filter(
-    (item) => !normalizeProductCode(item.productCode),
-  );
-  if (missingProductCodes.length > 0) {
-    return {
-      ok: false,
-      error: "Todos os itens devem ter um código de produto preenchido.",
-    };
-  }
-
-  const invalidItems = rows.filter(
-    (item) => !item.quantity || item.unitPrice == null || item.unitPrice <= 0,
-  );
-  if (invalidItems.length > 0) {
-    return {
-      ok: false,
-      error:
-        "Todos os itens devem ter quantidade e preço unitário válidos (maior que zero).",
-    };
-  }
-
-  return { ok: true };
-}
-
-export function buildFinalizePurchasePayload(brandId, purchaseDate, rows) {
-  return {
-    brandId,
-    purchaseDate,
-    items: rows.map((item) => ({
-      mappedProductId: item.mappedProductId || "",
-      productCode: item.productCode,
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-    })),
-  };
-}

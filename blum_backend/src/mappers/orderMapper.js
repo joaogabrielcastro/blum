@@ -32,6 +32,8 @@ function mapOrderItemsWithProducts(lines) {
     stockAtSave:
       row.stock_at_save != null ? parseInt(row.stock_at_save, 10) : null,
     stockShortfall: parseFloat(row.stock_shortfall) || 0,
+    // Removido da resposta para quem não é admin (apiResponseMapper).
+    unit_cost: row.unit_cost ?? null,
   }));
 }
 

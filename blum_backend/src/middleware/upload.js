@@ -83,18 +83,6 @@ function secureSingle(field, extensions, allowedTypes, message) {
   };
 }
 
-const uploadPdf = secureSingle(
-  "purchasePdf",
-  [".pdf"],
-  ["pdf"],
-  "Apenas arquivos PDF são permitidos",
-);
-const uploadCsv = secureSingle(
-  "productsCsv",
-  [".csv"],
-  ["csv"],
-  "Apenas arquivos CSV são permitidos",
-);
 const uploadSpreadsheet = secureSingle(
   "productsFile",
   [".csv", ".xlsx", ".xls"],
@@ -103,8 +91,6 @@ const uploadSpreadsheet = secureSingle(
 );
 
 module.exports = {
-  uploadPdf,
-  uploadCsv,
   uploadSpreadsheet,
   validateFileContent,
 };

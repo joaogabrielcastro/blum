@@ -1,363 +1,198 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import apiService from "../services/apiService";
-import LoadingSpinner from "../components/LoadingSpinner";
-import VerificationTable from "../components/common/VerificationTable";
-import UploadSection from "../components/common/UploadSection";
-import PurchaseTabs from "../components/purchases/PurchaseTabs";
-import PurchaseDateSection from "../components/purchases/PurchaseDateSection";
-import PurchaseActions from "../components/purchases/PurchaseActions";
-import PurchaseInlineNotice from "../components/purchases/PurchaseInlineNotice";
-import CsvImportSection from "../components/purchases/CsvImportSection";
-import ConfirmationModal from "../components/ConfirmationModal";
 import Surface, { PageHeader } from "../components/ui/Surface";
-import { usePurchaseLogic } from "../hooks/usePurchaseLogic";
-import {
-  buildVerificationCatalog,
-  buildImportSuccessSummary,
-  buildFinalizePurchasePayload,
-  getDuplicateProductCodesFromItems,
-  mergePurchaseItemsByProductCode,
-  validatePurchaseImportRows,
-} from "../utils/purchaseImportUtils";
+import Button from "../components/ui/Button";
+import InvoiceReview from "../components/purchases/InvoiceReview";
+import InvoiceList from "../components/purchases/InvoiceList";
+import { useAppData } from "../context/AppDataProvider";
+import { useToast } from "../context/ToastContext";
 import { canUseFeature } from "../utils/planFeatures";
+import { readXmlFiles } from "../utils/purchaseInvoice";
 
+/**
+ * Compras por XML de NF-e: envia um ou vários XMLs, confere nota a nota e
+ * confirma. Cada confirmação soma estoque e atualiza o custo dos produtos.
+ */
 const PurchasesPage = ({ subscription }) => {
-  const purchaseLogic = usePurchaseLogic();
-  const [activeTab, setActiveTab] = useState("pdf");
-  const [createConfirm, setCreateConfirm] = useState(null);
-  const [mergeConfirm, setMergeConfirm] = useState(null);
   const canImportPurchases = canUseFeature(subscription, "purchase-import");
+  const { brands } = useAppData();
+  const toast = useToast();
+  const inputRef = useRef(null);
 
-  const {
-    selectedFile,
-    setSelectedFile,
-    parsedItems,
-    setParsedItems,
-    isLoading,
-    setIsLoading,
-    error,
-    setError,
-    successMessage,
-    setSuccessMessage,
-    userProducts,
-    setUserProducts,
-    brands,
-    selectedBrandId,
-    setSelectedBrandId,
-    purchaseDate,
-    setPurchaseDate,
-  } = purchaseLogic;
+  const [queue, setQueue] = useState([]); // [{ name, xml }]
+  const [current, setCurrent] = useState(null); // { name, xml, preview }
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [invoices, setInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
+
+  const loadInvoices = useCallback(async () => {
+    try {
+      setInvoices(await apiService.getPurchaseInvoices());
+    } catch {
+      setInvoices([]);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setSuccessMessage(null);
-  }, [activeTab, setSuccessMessage]);
+    if (canImportPurchases) loadInvoices();
+  }, [canImportPurchases, loadInvoices]);
 
-  const pdfDuplicateProductCodes = useMemo(
-    () => getDuplicateProductCodesFromItems(parsedItems),
-    [parsedItems],
+  const openPreview = useCallback(
+    async (file, brandId) => {
+      setLoadingPreview(true);
+      try {
+        const preview = await apiService.previewPurchaseInvoice({
+          xml: file.xml,
+          brandId: brandId || undefined,
+        });
+        setCurrent({ ...file, preview });
+      } catch (err) {
+        toast.error(`${file.name}: ${err.message || "não foi possível ler o XML."}`);
+        setCurrent(null);
+      } finally {
+        setLoadingPreview(false);
+      }
+    },
+    [toast],
   );
 
-  const handleItemChange = (index, field, value) => {
-    setError(null);
-    setSuccessMessage(null);
-    setParsedItems((prev) => {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
-        ...(field === "mappedProductId" && { isNewProduct: !value }),
-      };
-      return updated;
-    });
+  // Próxima nota da fila quando não há nenhuma em conferência.
+  useEffect(() => {
+    if (current || loadingPreview || queue.length === 0) return;
+    const [next, ...rest] = queue;
+    setQueue(rest);
+    openPreview(next);
+  }, [current, loadingPreview, queue, openPreview]);
+
+  const addFiles = async (fileList) => {
+    const files = await readXmlFiles(fileList);
+    const readable = files.filter((f) => f.xml && !f.readError);
+    if (files.length === 0) {
+      toast.warning("Selecione arquivos .xml de NF-e.");
+      return;
+    }
+    if (readable.length < files.length) {
+      toast.error("Alguns arquivos não puderam ser lidos.");
+    }
+    setQueue((prev) => [...prev, ...readable]);
   };
 
-  const handlePdfUpload = async () => {
-    if (!selectedFile) {
-      setError("Selecione um arquivo PDF.");
-      return;
-    }
-    if (!selectedBrandId) {
-      setError("Selecione uma representada para os produtos.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-    setParsedItems([]);
-
+  const handleConfirm = async ({ brandId, items }) => {
+    setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append("purchasePdf", selectedFile);
-      const itemsFromAI = await apiService.processPurchasePdf(formData);
-
-      const selectedBrand = brands.find(
-        (b) => String(b.id) === String(selectedBrandId),
-      );
-
-      const { items: preMappedItems, catalogProducts } =
-        await buildVerificationCatalog(
-          apiService,
-          itemsFromAI,
-          selectedBrand?.name || "",
-          selectedBrandId,
-        );
-
-      setUserProducts(catalogProducts);
-      setParsedItems(preMappedItems);
-    } catch (err) {
-      console.error("Erro ao processar PDF:", err);
-      setError(
-        "Não foi possível processar o PDF. Verifique o arquivo e tente novamente.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const finalizePdfRows = async (rows) => {
-    const selectedBrand = brands.find(
-      (b) => String(b.id) === String(selectedBrandId),
-    );
-    const mergedRows = mergePurchaseItemsByProductCode(rows);
-    setParsedItems(mergedRows);
-    setIsLoading(true);
-    setCreateConfirm(null);
-
-    try {
-      const result = await apiService.finalizePurchaseFromPdf(
-        buildFinalizePurchasePayload(
-          selectedBrandId,
-          purchaseDate,
-          mergedRows,
-        ),
-      );
-      setSuccessMessage(
-        buildImportSuccessSummary(
-          result,
-          selectedBrand,
-          purchaseDate,
-          mergedRows.length,
-        ),
-      );
-      setParsedItems([]);
-      setSelectedFile(null);
-      setUserProducts([]);
-    } catch (err) {
-      console.error("Erro ao processar PDF:", err);
-      setError(
-        err.message ||
-          "Não foi possível finalizar a compra. Tente novamente.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const continueAfterRowsReady = async (rows) => {
-    const validation = validatePurchaseImportRows(rows);
-    if (!validation.ok) {
-      setError(validation.error);
-      return;
-    }
-
-    const selectedBrand = brands.find(
-      (b) => String(b.id) === String(selectedBrandId),
-    );
-    const newProductsCount = rows.filter((item) => item.isNewProduct).length;
-
-    if (newProductsCount > 0) {
-      setCreateConfirm({
-        rows,
-        newProductsCount,
-        existingCount: rows.length - newProductsCount,
-        brandName: selectedBrand?.name || "Não selecionada",
+      const invoice = await apiService.confirmPurchaseInvoice({
+        xml: current.xml,
+        brandId,
+        items,
       });
-      return;
+      toast.success(
+        `NF ${invoice.number} registrada: estoque e custo de ${invoice.itemsCount} item(ns) atualizados.`,
+      );
+      setCurrent(null);
+      loadInvoices();
+    } catch (err) {
+      toast.error(err.message || "Não foi possível registrar a nota.");
+    } finally {
+      setSaving(false);
     }
-
-    await finalizePdfRows(rows);
   };
 
-  const handlePdfConfirm = async () => {
-    setError(null);
-    setSuccessMessage(null);
-
-    if (!selectedBrandId) {
-      setError("Selecione uma representada para os produtos.");
-      return;
-    }
-
-    const rows = [...parsedItems];
-    const duplicateProductCodes = getDuplicateProductCodesFromItems(rows);
-    if (duplicateProductCodes.length > 0) {
-      setMergeConfirm({ rows, codes: duplicateProductCodes });
-      return;
-    }
-
-    await continueAfterRowsReady(rows);
-  };
-
-  const handleMergeConfirm = async () => {
-    if (!mergeConfirm?.rows) return;
-    const merged = mergePurchaseItemsByProductCode(mergeConfirm.rows);
-    setParsedItems(merged);
-    setMergeConfirm(null);
-    await continueAfterRowsReady(merged);
-  };
+  if (!canImportPurchases) {
+    return (
+      <div className="mx-auto max-w-7xl">
+        <PageHeader title="Compras" description="Entrada de notas fiscais de compra." />
+        <Surface>
+          <h2 className="text-lg font-semibold text-ink">Importação no plano Profissional</h2>
+          <p className="mt-2 max-w-xl text-sm text-ink-muted">
+            No Starter você continua com catálogo e orçamentos. A entrada de compras pelo
+            XML da nota está disponível a partir do Profissional.
+          </p>
+          <Link
+            to="/subscription"
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-brand-hover"
+          >
+            Ver planos e fazer upgrade
+          </Link>
+        </Surface>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div className="mx-auto max-w-7xl">
-        <PageHeader
-          title="Compras"
-          description="Importe notas em PDF ou CSV para atualizar estoque e custos."
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        title="Compras"
+        description="Envie o XML da NF-e de compra: o custo final (com frete e impostos) e o estoque são atualizados após a sua conferência."
+      />
+
+      {current ? (
+        <InvoiceReview
+          key={`${current.name}-${current.preview.brand?.id ?? "none"}`}
+          preview={current.preview}
+          fileName={current.name}
+          brands={brands}
+          busy={saving}
+          onBrandChange={(brandId) => openPreview(current, brandId)}
+          onConfirm={handleConfirm}
+          onSkip={() => setCurrent(null)}
         />
+      ) : (
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            addFiles(e.dataTransfer.files);
+          }}
+          className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
+            dragging ? "border-brand bg-brand-50" : "border-edge bg-surface"
+          }`}
+        >
+          <p className="text-base font-semibold text-ink">
+            {loadingPreview ? "Lendo a nota…" : "Arraste os XMLs das notas aqui"}
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">
+            Aceita vários arquivos de uma vez. Só NF-e (modelo 55).
+          </p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xml,text/xml,application/xml"
+            multiple
+            className="hidden"
+            aria-label="Selecionar XML da nota"
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+          <Button
+            variant="primary"
+            className="mt-4"
+            loading={loadingPreview}
+            onClick={() => inputRef.current?.click()}
+          >
+            Selecionar XML
+          </Button>
+        </div>
+      )}
 
-        {!canImportPurchases ? (
-          <Surface>
-            <h2 className="text-lg font-semibold text-ink">
-              Importação no plano Profissional
-            </h2>
-            <p className="mt-2 max-w-xl text-sm text-ink-muted">
-              No Starter você continua com catálogo e orçamentos. A importação
-              de compras por CSV/PDF está disponível a partir do Profissional.
-            </p>
-            <Link
-              to="/subscription"
-              className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-soft transition-all hover:bg-brand-600"
-            >
-              Ver planos e fazer upgrade
-            </Link>
-          </Surface>
-        ) : (
-          <>
-            <PurchaseTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      {queue.length > 0 ? (
+        <p className="text-sm text-ink-muted">
+          {queue.length} nota(s) na fila: {queue.map((f) => f.name).join(", ")}
+        </p>
+      ) : null}
 
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <div className="text-center">
-                  <LoadingSpinner message="Processando…" />
-                </div>
-              </div>
-            ) : activeTab === "csv" ? (
-              <CsvImportSection purchaseLogic={purchaseLogic} />
-            ) : parsedItems.length === 0 ? (
-              <>
-                <PurchaseInlineNotice
-                  variant="success"
-                  message={successMessage}
-                  onDismiss={() => setSuccessMessage(null)}
-                />
-                <UploadSection
-                  title="Importar PDF da nota"
-                  description="Envie o PDF da compra e selecione a representada correspondente."
-                  accept=".pdf,application/pdf"
-                  fileType="pdf"
-                  onFileChange={(e) => {
-                    setSuccessMessage(null);
-                    setSelectedFile(e.target.files[0]);
-                  }}
-                  selectedFile={selectedFile}
-                  onUpload={handlePdfUpload}
-                  isLoading={isLoading}
-                  error={error}
-                  brands={brands}
-                  selectedBrandId={selectedBrandId}
-                  onBrandChange={(e) => setSelectedBrandId(e.target.value)}
-                />
-              </>
-            ) : (
-              <>
-                <PurchaseInlineNotice
-                  message={error}
-                  onDismiss={() => setError(null)}
-                />
-                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                  <h3 className="text-base font-semibold text-emerald-900">
-                    PDF processado
-                  </h3>
-                  <p className="mt-1 text-sm text-emerald-800">
-                    {parsedItems.length} itens encontrados. Verifique e
-                    confirme os dados abaixo.
-                  </p>
-                  {pdfDuplicateProductCodes.length > 0 ? (
-                    <p className="mt-2 text-sm font-medium text-amber-900">
-                      Há códigos repetidos. Use «Unificar códigos duplicados»
-                      ou confirme — será perguntado se deseja agrupar.
-                    </p>
-                  ) : null}
-                </div>
-
-                <PurchaseDateSection
-                  date={purchaseDate}
-                  onDateChange={setPurchaseDate}
-                />
-
-                <VerificationTable
-                  items={parsedItems}
-                  onItemChange={handleItemChange}
-                  userProducts={userProducts}
-                />
-
-                <PurchaseActions
-                  onCancel={() => {
-                    setParsedItems([]);
-                    setSuccessMessage(null);
-                  }}
-                  onConfirm={handlePdfConfirm}
-                  isLoading={isLoading}
-                  confirmLabel="Confirmar e atualizar estoque"
-                  secondaryAction={
-                    pdfDuplicateProductCodes.length > 0
-                      ? {
-                          label: "Unificar códigos duplicados",
-                          onClick: () => {
-                            setError(null);
-                            setSuccessMessage(null);
-                            setParsedItems(
-                              mergePurchaseItemsByProductCode(parsedItems),
-                            );
-                          },
-                        }
-                      : undefined
-                  }
-                />
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      <ConfirmationModal
-        show={!!mergeConfirm}
-        title="Unificar códigos duplicados?"
-        tone="primary"
-        confirmText="Unificar e continuar"
-        message={
-          mergeConfirm
-            ? `Códigos repetidos: ${mergeConfirm.codes.join(", ")}. Vamos somar quantidades e usar média ponderada de preço. Cancelar interrompe a importação.`
-            : ""
-        }
-        onConfirm={handleMergeConfirm}
-        onCancel={() => setMergeConfirm(null)}
-      />
-      <ConfirmationModal
-        show={!!createConfirm}
-        title="Criar produtos novos?"
-        tone="primary"
-        confirmText="Continuar"
-        message={
-          createConfirm
-            ? `${createConfirm.newProductsCount} produto(s) não existem no catálogo e serão criados automaticamente. Existentes: ${createConfirm.existingCount}. Representada: ${createConfirm.brandName}. Data: ${purchaseDate}.`
-            : ""
-        }
-        onConfirm={() =>
-          createConfirm?.rows && finalizePdfRows(createConfirm.rows)
-        }
-        onCancel={() => setCreateConfirm(null)}
-      />
+      <InvoiceList invoices={invoices} loading={loadingInvoices} onChanged={loadInvoices} />
     </div>
   );
 };

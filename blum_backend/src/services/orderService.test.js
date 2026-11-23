@@ -42,25 +42,6 @@ describe("orderService", () => {
     expect(sql).not.toHaveBeenCalled();
   });
 
-  test("finalize apenas marca a entrega, sem baixar estoque novamente", async () => {
-    jest.spyOn(orderService, "findById").mockResolvedValueOnce({
-      id: 8,
-      document_type: "pedido",
-    });
-    const client = { query: jest.fn(), release: jest.fn() };
-    pool.connect.mockResolvedValueOnce(client);
-    const repository = require("../repositories/orderRepository");
-    jest.spyOn(repository, "markOrderDelivered").mockResolvedValueOnce([{ id: 8 }]);
-    jest.spyOn(repository, "decreaseProductStock");
-
-    await expect(orderService.finalize(8, 1)).resolves.toEqual({
-      message: "Pedido finalizado com sucesso",
-    });
-    expect(repository.decreaseProductStock).not.toHaveBeenCalled();
-    expect(client.query).toHaveBeenCalledWith("COMMIT");
-    expect(client.release).toHaveBeenCalled();
-  });
-
   test("converter orçamento em pedido baixa o estoque mesmo ficando negativo", async () => {
     jest.spyOn(orderService, "findById")
       .mockResolvedValueOnce({
