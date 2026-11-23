@@ -30,9 +30,6 @@ export const ordersApi = {
   deleteOrder: (orderId: string | number) =>
     apiRequest(`${API_URL}/orders/${orderId}`, { method: "DELETE" }),
 
-  finalizeOrder: (orderId: string | number) =>
-    apiRequest(`${API_URL}/orders/${orderId}/finalize`, { method: "PUT" }),
-
   updateOrderPaymentMethod: (orderId: string | number, payment_method: string) =>
     apiRequest(`${API_URL}/orders/${orderId}/payment-method`, {
       method: "PUT",

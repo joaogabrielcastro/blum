@@ -8,11 +8,6 @@ export function controlsStockByBrand(brand) {
   return !allowsDecimalQuantityBrand(brand);
 }
 
-export function parseStockShortfallValue(value) {
-  const n = parseFloat(String(value ?? "").replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
 export function computeItemStockShortfall(item) {
   if (!controlsStockByBrand(item?.brand)) return 0;
 
@@ -53,6 +48,3 @@ export function getStockWarningLines(items = []) {
     .filter((row) => row.shortfall > 0);
 }
 
-export function orderHasStockWarnings(items = []) {
-  return getStockWarningLines(items).length > 0;
-}

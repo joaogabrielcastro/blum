@@ -22,12 +22,6 @@ router.get(
   ordersController.getClientItemPriceHistory,
 );
 router.get("/seller/:userId", authenticate, ordersController.getOrdersBySeller);
-router.get(
-  "/stats/:clientId",
-  authenticate,
-  validateId,
-  ordersController.getClientStats
-);
 router.get("/:id", authenticate, validateId, ordersController.getById);
 router.post(
   "/",
@@ -41,12 +35,6 @@ router.put(
   authenticate,
   validateId,
   ordersController.convertToPedido
-);
-router.put(
-  "/:id/finalize",
-  authenticate,
-  validateId,
-  ordersController.finalize
 );
 router.put(
   "/:id/payment-method",

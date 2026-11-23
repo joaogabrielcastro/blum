@@ -94,6 +94,3 @@ export function GhostButton(props) {
   return <Button variant="ghost" {...props} />;
 }
 
-export function DangerButton(props) {
-  return <Button variant="danger" {...props} />;
-}

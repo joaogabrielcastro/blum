@@ -110,7 +110,3 @@ export function useAppData() {
   return ctx;
 }
 
-/** Para módulos fora do provider (ex.: offline sync). */
-export function useOptionalAppData() {
-  return useContext(AppDataContext);
-}

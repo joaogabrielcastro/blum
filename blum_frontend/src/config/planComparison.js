@@ -190,8 +190,3 @@ export const PLAN_COMPARISON_SECTIONS = [
   },
 ];
 
-export function isTruthyAvailability(value) {
-  if (value === true) return true;
-  if (value === false || value == null) return false;
-  return String(value).trim().length > 0;
-}

@@ -59,6 +59,13 @@ router.post(
 );
 
 // Rotas que requerem autenticação (qualquer usuário autenticado)
+router.get(
+  "/:id/insights",
+  authenticate,
+  authorize("admin"),
+  validateId,
+  productsController.getInsights,
+);
 router.get("/:id", authenticate, validateId, productsController.getById);
 
 // Rotas apenas para admin

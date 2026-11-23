@@ -23,6 +23,7 @@ import OrderFormMetaSection from "./orders/OrderFormMetaSection";
 import OrderFormProductSearch from "./orders/OrderFormProductSearch";
 import OrderFormProductStaging from "./orders/OrderFormProductStaging";
 import OrderFormTotals from "./orders/OrderFormTotals";
+import { computeOrderMargin } from "../utils/orderMargin";
 import OrderFormStepper from "./orders/OrderFormStepper";
 import OrderFormSummaryCard from "./orders/OrderFormSummaryCard";
 import OrderStockWarningModal from "./orders/OrderStockWarningModal";
@@ -796,6 +797,11 @@ const OrdersForm = ({
                     discount={discount}
                     discountAmount={discountAmount}
                     totalPrice={totalPrice}
+                    margin={
+                      userRole === "admin"
+                        ? computeOrderMargin(items, discount)
+                        : null
+                    }
                   />
                 </>
               ) : null}

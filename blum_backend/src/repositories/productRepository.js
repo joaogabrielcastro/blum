@@ -31,11 +31,12 @@ async function insertProduct({
   brand_id,
   minstock,
   tenant_id,
+  cost_price = null,
 }) {
   const tenantId = requireTenantId(tenant_id);
   const rows = await sql(
-    `INSERT INTO products (name, productcode, price, stock, brand, brand_id, minstock, tenant_id, createdat)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+    `INSERT INTO products (name, productcode, price, stock, brand, brand_id, minstock, tenant_id, createdat, cost_price)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
      RETURNING *`,
     [
       name,
@@ -46,6 +47,7 @@ async function insertProduct({
       brand_id ?? null,
       minstock || 0,
       tenantId,
+      cost_price,
     ],
   );
   return rows[0];

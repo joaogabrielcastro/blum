@@ -1,70 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const purchaseController = require("../controllers/purchaseController");
-const { uploadPdf, uploadCsv } = require("../middleware/upload");
+const invoiceController = require("../controllers/purchaseInvoiceController");
 const { authenticate, authorize } = require("../middleware/authMiddleware");
 const { requirePlanFeature } = require("../middleware/planFeatureMiddleware");
+const { validateId } = require("../middleware/validation");
 
-// Todas as rotas de compras são apenas para admin
+// Compras são exclusivas do admin (contêm custo).
 const adminOnly = [authenticate, authorize("admin")];
-const purchaseImport = [
-  ...adminOnly,
-  requirePlanFeature("purchase-import"),
-];
+const purchaseImport = [...adminOnly, requirePlanFeature("purchase-import")];
 
-// Rotas de processamento
+// Compras por XML de NF-e
+router.post("/invoices/preview", ...purchaseImport, invoiceController.preview);
+router.post("/invoices", ...purchaseImport, invoiceController.confirm);
+router.get("/invoices", ...adminOnly, invoiceController.list);
+router.get("/invoices/:id", ...adminOnly, validateId, invoiceController.getById);
 router.post(
-  "/process-pdf",
+  "/invoices/:id/reverse",
   ...purchaseImport,
-  uploadPdf,
-  purchaseController.processPdf
+  validateId,
+  invoiceController.reverse,
 );
-router.post(
-  "/process-csv",
-  ...purchaseImport,
-  uploadCsv,
-  purchaseController.processCsv
-);
-router.post(
-  "/finalize-pdf",
-  ...purchaseImport,
-  purchaseController.finalizePurchaseFromPdf
-);
-router.post(
-  "/finalize-csv",
-  ...purchaseImport,
-  purchaseController.finalizePurchaseFromCsv
-);
-router.post(
-  "/import-csv",
-  ...purchaseImport,
-  uploadCsv,
-  purchaseController.importCsv
-);
-
-// Rotas de consulta (admin ou vendedores com permissão)
-router.get(
-  "/price-history/:productId",
-  authenticate,
-  purchaseController.getPriceHistory
-);
-router.get(
-  "/last-price/:productId",
-  authenticate,
-  purchaseController.getLastPurchasePrice
-);
-
-if (
-  process.env.NODE_ENV !== "production" ||
-  process.env.ENABLE_PURCHASE_DEBUG === "true"
-) {
-  router.get("/test", ...adminOnly, purchaseController.testConnection);
-  router.post(
-    "/debug-pdf",
-    ...adminOnly,
-    uploadPdf,
-    purchaseController.debugPdf,
-  );
-}
 
 module.exports = router;

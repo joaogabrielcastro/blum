@@ -1,15 +1,3 @@
-/** Feature IDs alinhados ao backend (planFeatures) e planComparison.js */
-
-export const PRO_FEATURE_IDS = [
-  "product-import",
-  "product-export",
-  "purchase-import",
-  "price-batch",
-  "brand-comparison",
-  "excel-export",
-  "commission-pdf",
-];
-
 export const FEATURE_LABELS = {
   "product-import": "Importação de produtos (Excel/CSV)",
   "product-export": "Exportação do catálogo",

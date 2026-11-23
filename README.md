@@ -63,7 +63,7 @@ O **BLUM** é um sistema de gestão comercial desenvolvido para facilitar o gere
 - **Express.js** - Framework web
 - **Neon Database** - PostgreSQL serverless
 - **Multer** - Upload de arquivos
-- **pdf-parse** - Processamento de PDFs de compras
+- **fast-xml-parser** - Leitura do XML da NF-e de compra
 
 ### Frontend
 - **React 18** - Biblioteca JavaScript
@@ -398,11 +398,13 @@ DELETE /api/v2/brands/:name     # Deletar representada
 
 ### Compras (Purchase)
 ```
-POST   /api/v2/purchases/process-pdf     # Processar PDF
-POST   /api/v2/purchases/process-csv     # Processar CSV
-POST   /api/v2/purchases/finalize-pdf    # Finalizar importação PDF
-POST   /api/v2/purchases/finalize-csv    # Finalizar importação CSV
-GET    /api/v2/purchases/price-history/:id  # Histórico de preços
+POST   /api/v2/purchases/invoices/preview      # Ler XML da NF-e (conferência)
+POST   /api/v2/purchases/invoices              # Registrar a nota (estoque + custo)
+GET    /api/v2/purchases/invoices              # Notas importadas
+GET    /api/v2/purchases/invoices/:id          # Detalhe da nota
+POST   /api/v2/purchases/invoices/:id/reverse  # Estornar a nota
+GET    /api/v2/products/:id/insights           # Ficha do produto (admin)
+GET    /api/v2/reports/profit                  # Lucro bruto (admin)
 ```
 
 ### Relatórios

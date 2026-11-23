@@ -246,10 +246,11 @@ async function finalizeImport({
         if (prevPrice !== item.price) {
           await client.query(
             `
-            INSERT INTO price_history (product_id, tenant_id, purchase_price, quantity, purchase_date)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO price_history
+              (product_id, tenant_id, event_type, old_price, new_price, changed_by, changedat)
+            VALUES ($1, $2, 'venda', $3, $4, 'Importação de catálogo', $5)
             `,
-            [existing.id, tenantId, item.price, item.stock, purchaseDateIso],
+            [existing.id, tenantId, prevPrice, item.price, purchaseDateIso],
           );
         }
       }

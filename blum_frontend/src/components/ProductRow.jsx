@@ -1,6 +1,15 @@
 import { useState } from "react";
-import PriceHistoryModal from "./PriceHistoryModal";
+import ProductSheet from "./products/ProductSheet";
 import KebabMenu from "./ui/KebabMenu";
+import formatCurrency from "../utils/format";
+import { costFromProduct, marginPercent, marginTone } from "../utils/productCost";
+
+const MARGIN_TONE_CLASS = {
+  danger: "text-red-600",
+  warning: "text-amber-700",
+  success: "text-emerald-700",
+  muted: "text-ink-muted",
+};
 
 const ProductRow = ({
   product,
@@ -16,19 +25,23 @@ const ProductRow = ({
   selected = false,
   onToggleSelect,
 }) => {
-  const [showPriceHistory, setShowPriceHistory] = useState(false);
+  const [showSheet, setShowSheet] = useState(false);
   const lowStock = product.stock <= (product.minstock || 0);
-  const price =
+  const priceValue =
     product.price != null && !Number.isNaN(Number(product.price))
-      ? Number(product.price).toFixed(2)
-      : "0.00";
+      ? Number(product.price)
+      : 0;
+  // Custo e margem só chegam da API para admin.
+  const isAdmin = userRole === "admin";
+  const cost = isAdmin ? costFromProduct(product) : null;
+  const margin = marginPercent(priceValue, cost);
 
   const menuItems = [
     userRole === "admin"
       ? {
-          id: "history",
-          label: "Histórico de preços",
-          onClick: () => setShowPriceHistory(true),
+          id: "sheet",
+          label: "Ficha do produto",
+          onClick: () => setShowSheet(true),
         }
       : null,
     userRole === "admin"
@@ -64,7 +77,17 @@ const ProductRow = ({
         ) : null}
         <td className="px-4 py-3.5">
           <div className="flex min-w-0 flex-col">
-            <h3 className="font-semibold text-ink">{product.name}</h3>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={() => setShowSheet(true)}
+                className="text-left font-semibold text-ink hover:text-brand hover:underline"
+              >
+                {product.name}
+              </button>
+            ) : (
+              <h3 className="font-semibold text-ink">{product.name}</h3>
+            )}
             <span className="mt-1 w-fit rounded-md border border-edge bg-surface-muted px-2 py-0.5 font-mono text-xs text-ink-muted">
               {product.productcode || product.productCode || "—"}
             </span>
@@ -72,9 +95,27 @@ const ProductRow = ({
         </td>
         <td className="px-4 py-3.5 text-sm text-ink-muted">{product.brand}</td>
         <td className="px-4 py-3.5 text-right">
-          <span className="text-base font-semibold tabular-nums text-ink">
-            R$ {price}
-          </span>
+          <div className="flex flex-col items-end">
+            <span className="text-base font-semibold tabular-nums text-ink">
+              {formatCurrency(priceValue)}
+            </span>
+            {isAdmin ? (
+              <span className="mt-0.5 text-xs tabular-nums text-ink-muted">
+                {cost == null ? (
+                  "Sem custo"
+                ) : (
+                  <>
+                    Custo {formatCurrency(cost)} ·{" "}
+                    <span className={`font-medium ${MARGIN_TONE_CLASS[marginTone(margin)]}`}>
+                      {margin == null
+                        ? "—"
+                        : `${margin.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
+                    </span>
+                  </>
+                )}
+              </span>
+            ) : null}
+          </div>
         </td>
         <td className="px-4 py-3.5 text-right">
           <div className="flex flex-col items-end">
@@ -133,11 +174,8 @@ const ProductRow = ({
         </tr>
       ) : null}
 
-      {showPriceHistory ? (
-        <PriceHistoryModal
-          product={product}
-          onClose={() => setShowPriceHistory(false)}
-        />
+      {showSheet ? (
+        <ProductSheet productId={product.id} onClose={() => setShowSheet(false)} />
       ) : null}
     </>
   );

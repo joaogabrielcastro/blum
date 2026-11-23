@@ -135,36 +135,20 @@ async function main() {
           console.log("OK order-price-history");
         }
 
-        const purchaseHistoryRes = await fetch(
-          `${DEFAULT_BASE_URL}/v2/purchases/price-history/${productId}`,
+        const insightsRes = await fetch(
+          `${DEFAULT_BASE_URL}/v2/products/${productId}/insights`,
           { headers: authHeaders },
         );
-        const purchaseHistory = await parseJsonSafe(purchaseHistoryRes);
-        const purchaseHistorySnake = findLegacyKeysDeep(purchaseHistory);
-        if (purchaseHistorySnake.length > 0) {
+        const insights = await parseJsonSafe(insightsRes);
+        const insightsSnake = findLegacyKeysDeep(insights);
+        if (insightsSnake.length > 0) {
           failures.push(
-            `[purchase-price-history] encontrou chaves legadas: ${purchaseHistorySnake
+            `[product-insights] encontrou chaves legadas: ${insightsSnake
               .slice(0, 30)
               .join(", ")}`,
           );
         } else {
-          console.log("OK purchase-price-history");
-        }
-
-        const lastPriceRes = await fetch(
-          `${DEFAULT_BASE_URL}/v2/purchases/last-price/${productId}`,
-          { headers: authHeaders },
-        );
-        const lastPrice = await parseJsonSafe(lastPriceRes);
-        const lastPriceSnake = findLegacyKeysDeep(lastPrice);
-        if (lastPriceSnake.length > 0) {
-          failures.push(
-            `[last-purchase-price] encontrou chaves legadas: ${lastPriceSnake
-              .slice(0, 30)
-              .join(", ")}`,
-          );
-        } else {
-          console.log("OK last-purchase-price");
+          console.log("OK product-insights");
         }
       }
     }

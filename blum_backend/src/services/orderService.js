@@ -322,6 +322,25 @@ class OrderService {
       tenantId,
     );
 
+    // Custo atual de cada produto vira o custo do item (snapshot: o lucro do
+    // pedido não muda quando o custo do produto mudar depois).
+    const productIds = [
+      ...new Set(
+        calculatedItems
+          .map((it) => Number.parseInt(it.productId, 10))
+          .filter((id) => Number.isInteger(id) && id > 0),
+      ),
+    ];
+    const costRows = productIds.length
+      ? await client.query(
+          "SELECT id, cost_price FROM products WHERE tenant_id = $1 AND id = ANY($2::int[])",
+          [tenantId, productIds],
+        )
+      : { rows: [] };
+    const costById = new Map(
+      (costRows?.rows || []).map((r) => [Number(r.id), r.cost_price]),
+    );
+
     const values = [];
     const placeholders = [];
     let paramIndex = 1;
@@ -366,19 +385,21 @@ class OrderService {
         tenantId,
         Number.isFinite(stockAtSave) ? stockAtSave : null,
         stockShortfall,
+        costById.get(Number.parseInt(it.productId, 10)) ?? null,
       );
 
+      const COLUMNS = 15;
       placeholders.push(
-        `($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9}, $${paramIndex + 10}, $${paramIndex + 11}, $${paramIndex + 12}, $${paramIndex + 13})`,
+        `(${Array.from({ length: COLUMNS }, (_, k) => `$${paramIndex + k}`).join(", ")})`,
       );
-      paramIndex += 14;
+      paramIndex += COLUMNS;
     }
 
     const insertSql = `
       INSERT INTO order_items (
         order_id, product_id, product_name, brand, brand_id, quantity, unit_price,
         line_discount, commission_rate, commission_amount, line_total, tenant_id,
-        stock_at_save, stock_shortfall
+        stock_at_save, stock_shortfall, unit_cost
       ) VALUES ${placeholders.join(", ")}
     `;
 
@@ -705,6 +726,12 @@ class OrderService {
             productId,
             quantity,
             tenantId,
+            movement: {
+              type: "saida_pedido",
+              referenceType: "order",
+              referenceId: orderId,
+              userId: authUser?.userId,
+            },
           });
           if (updatedStock.length === 0) {
             const err = new Error(
@@ -854,6 +881,13 @@ class OrderService {
                 productId,
                 quantity: delta,
                 tenantId,
+                movement: {
+                  type: "saida_pedido",
+                  referenceType: "order",
+                  referenceId: Number(id),
+                  userId: authUser?.userId,
+                  reason: "Pedido editado",
+                },
               },
             );
             if (updatedStock.length === 0) {
@@ -869,6 +903,13 @@ class OrderService {
               productId,
               quantity: restoreQty,
               tenantId,
+              movement: {
+                type: "estorno_pedido",
+                referenceType: "order",
+                referenceId: Number(id),
+                userId: authUser?.userId,
+                reason: "Pedido editado",
+              },
             });
           }
         }
@@ -1082,6 +1123,13 @@ class OrderService {
           productId,
           quantity,
           tenantId,
+          movement: {
+            type: "saida_pedido",
+            referenceType: "order",
+            referenceId: Number(id),
+            userId: options.userId,
+            reason: "Orçamento confirmado",
+          },
         });
         if (updatedStock.length === 0) {
           const err = new Error(
@@ -1129,7 +1177,7 @@ class OrderService {
     return result[0];
   }
 
-  async delete(id, tenantId) {
+  async delete(id, tenantId, userId = null) {
     tenantId = requireTenantId(tenantId);
     const current = await this.findById(id, tenantId);
     const currentDoc = current.document_type ?? current.documentType ?? null;
@@ -1144,6 +1192,13 @@ class OrderService {
           productId,
           quantity,
           tenantId,
+          movement: {
+            type: "estorno_pedido",
+            referenceType: "order",
+            referenceId: Number(id),
+            userId,
+            reason: "Pedido excluído",
+          },
         });
       }
       const result = await client.query(
@@ -1158,76 +1213,6 @@ class OrderService {
     } finally {
       client.release();
     }
-  }
-
-  async finalize(id, tenantId) {
-    tenantId = requireTenantId(tenantId);
-    const current = await this.findById(id, tenantId);
-    const currentDoc =
-      current.document_type ?? current.documentType ?? null;
-    if (currentDoc !== "pedido") {
-      const err = new Error(
-        "Converta o orçamento em pedido antes de finalizar a entrega.",
-      );
-      err.statusCode = 400;
-      throw err;
-    }
-
-    const client = await pool.connect();
-    try {
-      await beginTenantTransaction(client);
-      const updated = await orderRepository.markOrderDelivered(client, id, tenantId);
-
-      if (updated.length === 0) {
-        const row = await orderRepository.getOrderStatusById(client, id, tenantId);
-        if (!row) {
-          throw new Error("Pedido não encontrado");
-        }
-        const err = new Error("Pedido já foi finalizado");
-        err.statusCode = 409;
-        throw err;
-      }
-
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
-
-    return { message: "Pedido finalizado com sucesso" };
-  }
-
-  async getClientStats(clientId, authUser = null) {
-    if (!clientId) {
-      throw new Error("O ID do cliente é obrigatório");
-    }
-
-    const tenantId = tenantIdFromAuth(authUser);
-    if (authUser && authUser.role === "salesperson") {
-      const result = await sql`
-        SELECT
-        COUNT(id) AS "totalOrders",
-        COALESCE(SUM(totalprice), 0) AS "totalSpent"
-      FROM orders
-      WHERE clientid = ${clientId} AND document_type = 'pedido'
-        AND tenant_id = ${tenantId}
-        AND user_ref = ${authUser.userId}
-    `;
-      return result[0] || { totalOrders: 0, totalSpent: 0 };
-    }
-
-    const result = await sql`
-      SELECT
-        COUNT(id) AS "totalOrders",
-        COALESCE(SUM(totalprice), 0) AS "totalSpent"
-      FROM orders
-      WHERE clientid = ${clientId} AND document_type = 'pedido'
-        AND tenant_id = ${tenantId}
-    `;
-
-    return result[0] || { totalOrders: 0, totalSpent: 0 };
   }
 }
 

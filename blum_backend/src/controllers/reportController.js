@@ -212,3 +212,38 @@ exports.upsertSalesTarget = async (req, res) => {
 };
 
 module.exports = exports;
+
+const {
+  getProfitReport,
+  estimateMissingCosts,
+} = require("../services/profitReportService");
+
+// GET /reports/profit — lucro bruto (admin; contém custo)
+exports.getProfitReport = async (req, res) => {
+  try {
+    const { startDate, endDate, limit, sellerId, brand } = req.query;
+    const report = await getProfitReport({
+      tenantId: req.user.tenantId,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      sellerId: sellerId || undefined,
+      brand: brand || undefined,
+      limit,
+    });
+    res.status(200).json(report);
+  } catch (error) {
+    console.error("Erro ao gerar relatório de lucro:", error);
+    res.status(500).json({ error: "Erro ao gerar relatório de lucro" });
+  }
+};
+
+// POST /reports/profit/estimate-missing-costs — custo atual nos itens sem custo
+exports.estimateMissingCosts = async (req, res) => {
+  try {
+    const result = await estimateMissingCosts({ tenantId: req.user.tenantId });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Erro ao estimar custos:", error);
+    res.status(500).json({ error: "Erro ao estimar custos" });
+  }
+};

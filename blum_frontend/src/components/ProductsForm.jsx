@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useToast } from "../context/ToastContext";
 import FormField, { inputClassName } from "./ui/FormField";
 import { PrimaryButton, SecondaryButton } from "./ui/Surface";
+import formatCurrency from "../utils/format";
+import { costFromProduct, marginPercent, parseDecimalInput } from "../utils/productCost";
 
 const ProductsForm = ({
   product,
@@ -14,6 +16,7 @@ const ProductsForm = ({
     name: "",
     productcode: "",
     price: "",
+    costPrice: "",
     brand: "",
     stock: "0",
     minstock: "0",
@@ -28,6 +31,7 @@ const ProductsForm = ({
         name: product.name || "",
         productcode: product.productcode || product.productCode || "",
         price: product.price?.toString() || "",
+        costPrice: costFromProduct(product)?.toString() ?? "",
         brand: product.brand || "",
         stock: product.stock?.toString() || "",
         minstock: product.minstock?.toString() || "0",
@@ -37,6 +41,7 @@ const ProductsForm = ({
         name: "",
         productcode: "",
         price: "",
+        costPrice: "",
         brand: defaultBrand || "",
         stock: "0",
         minstock: "0",
@@ -51,6 +56,9 @@ const ProductsForm = ({
       newErrors.productcode = "Código é obrigatório";
     if (!formData.price || parseFloat(formData.price) <= 0)
       newErrors.price = "Preço deve ser maior que zero";
+    const cost = parseDecimalInput(formData.costPrice);
+    if (Number.isNaN(cost) || (cost != null && cost < 0))
+      newErrors.costPrice = "Informe um custo válido ou deixe em branco";
     if (!formData.brand) newErrors.brand = "Representada é obrigatória";
     if (formData.stock === "" || !Number.isInteger(Number(formData.stock)))
       newErrors.stock = "Informe um saldo inteiro";
@@ -71,6 +79,8 @@ const ProductsForm = ({
         name: formData.name.trim(),
         productcode: formData.productcode.trim(),
         price: parseFloat(String(formData.price).replace(",", ".")) || 0,
+        // "" = sem custo informado (o backend grava NULL).
+        costPrice: String(formData.costPrice).trim() === "" ? "" : parseDecimalInput(formData.costPrice),
         brand: formData.brand,
         stock: parseInt(formData.stock, 10) || 0,
         minstock: parseInt(formData.minstock, 10) || 0,
@@ -124,6 +134,20 @@ const ProductsForm = ({
     return brand;
   };
 
+  const previewMargin = marginPercent(
+    parseDecimalInput(formData.price),
+    parseDecimalInput(formData.costPrice),
+  );
+  const lastCost = product?.lastCost ?? product?.last_cost;
+  const costHint = [
+    previewMargin == null
+      ? "Visível só para administradores."
+      : `Margem: ${previewMargin.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% · visível só para administradores.`,
+    lastCost != null ? `Última compra: ${formatCurrency(lastCost)}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <FormField label="Nome do produto" required error={errors.name}>
@@ -153,7 +177,7 @@ const ProductsForm = ({
         />
       </FormField>
 
-      <FormField label="Preço" required error={errors.price}>
+      <FormField label="Preço de venda" required error={errors.price}>
         <input
           type="number"
           step="0.01"
@@ -163,6 +187,23 @@ const ProductsForm = ({
           onChange={handleChange}
           className={inputClassName(Boolean(errors.price))}
           placeholder="0,00"
+        />
+      </FormField>
+
+      <FormField
+        label="Preço de custo"
+        error={errors.costPrice}
+        hint={costHint}
+      >
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          name="costPrice"
+          value={formData.costPrice}
+          onChange={handleChange}
+          className={inputClassName(Boolean(errors.costPrice))}
+          placeholder="Opcional — preenchido pelas compras"
         />
       </FormField>
 
