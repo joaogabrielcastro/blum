@@ -67,7 +67,13 @@ const Login = ({ onLogin }) => {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => usernameRef.current?.focus(), 100);
+    // Só foca se nada estiver focado: não "rouba" o foco de quem já começou
+    // a digitar (ex.: na senha), o que mandava o texto para o campo errado.
+    const t = setTimeout(() => {
+      const active = document.activeElement;
+      if (active && active !== document.body) return;
+      usernameRef.current?.focus();
+    }, 100);
     return () => clearTimeout(t);
   }, []);
 
