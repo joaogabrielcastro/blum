@@ -15,6 +15,12 @@ export const brandsApi = {
       body: JSON.stringify(brandData),
     }),
 
-  deleteBrand: (brandId: string | number) =>
-    apiRequest(`${API_URL}/brands/${brandId}`, { method: "DELETE" }),
+  deleteBrand: (
+    brandId: string | number,
+    options: { withProducts?: boolean } = {},
+  ) =>
+    apiRequest(
+      `${API_URL}/brands/${brandId}${options.withProducts ? "?withProducts=1" : ""}`,
+      { method: "DELETE" },
+    ),
 };

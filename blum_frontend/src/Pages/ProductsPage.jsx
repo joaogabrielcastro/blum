@@ -8,6 +8,7 @@ import EmptyState from "../components/EmptyState";
 import Pagination from "../components/Pagination";
 import BulkPriceAdjustModal from "../components/products/BulkPriceAdjustModal";
 import ProductImportSection from "../components/products/ProductImportSection";
+import DeleteBrandWithProductsDialog from "../components/products/DeleteBrandWithProductsDialog";
 import ListPageSkeleton from "../components/ListPageSkeleton";
 import Drawer from "../components/ui/Drawer";
 import KebabMenu from "../components/ui/KebabMenu";
@@ -76,6 +77,9 @@ const ProductsPage = ({ userRole, subscription }) => {
     handleDeleteProduct,
     handleEditBrand,
     handleDeleteBrand,
+    handleDeleteBrandWithProducts,
+    brandDeleteWithProducts,
+    cancelBrandDeleteWithProducts,
     confirmDeleteAction,
     resetForms,
     handleExportProducts,
@@ -215,6 +219,12 @@ const ProductsPage = ({ userRole, subscription }) => {
             return undefined;
           }}
           onCancelDelete={clearDeleteConfirm}
+        />
+
+        <DeleteBrandWithProductsDialog
+          brand={brandDeleteWithProducts}
+          onConfirm={handleDeleteBrandWithProducts}
+          onCancel={cancelBrandDeleteWithProducts}
         />
 
         <Drawer

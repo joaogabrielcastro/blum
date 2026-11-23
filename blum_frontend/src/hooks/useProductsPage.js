@@ -36,6 +36,7 @@ export function useProductsPage(userRole) {
   const [pagination, setPagination] = useState(EMPTY_PAGINATION);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedProductIds, setSelectedProductIds] = useState([]);
+  const [brandDeleteWithProducts, setBrandDeleteWithProducts] = useState(null);
   const [showBulkAdjust, setShowBulkAdjust] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exportingFormat, setExportingFormat] = useState(null);
@@ -200,33 +201,65 @@ export function useProductsPage(userRole) {
     }
   };
 
+  const afterBrandDeleted = async (brandId) => {
+    await invalidateBrands();
+    if (String(selectedBrandId) === String(brandId)) {
+      setSelectedBrand(null);
+      setSelectedBrandId(null);
+      setSearchTerm("");
+      setCurrentPage(1);
+      if (urlBrandId) setSearchParams({}, { replace: true });
+    } else {
+      await fetchProducts();
+    }
+  };
+
   const handleDeleteBrand = async (brandId) => {
+    const brandName = confirmDelete;
+    // Fecha a confirmação em qualquer desfecho (sem faixa + toast repetidos).
+    const closeConfirm = () => {
+      setConfirmDelete(null);
+      setDeleteType(null);
+      setDeleteId(null);
+    };
     try {
       setError(null);
       await apiService.deleteBrand(brandId);
-      setConfirmDelete(null);
-      setDeleteType(null);
-      setDeleteId(null);
-      await invalidateBrands();
-
-      if (String(selectedBrandId) === String(brandId)) {
-        setSelectedBrand(null);
-        setSelectedBrandId(null);
-        setSearchTerm("");
-        setCurrentPage(1);
-        if (urlBrandId) setSearchParams({}, { replace: true });
-      } else {
-        await fetchProducts();
-      }
+      closeConfirm();
+      await afterBrandDeleted(brandId);
       toast.success("Representada excluída.");
     } catch (err) {
-      // Fecha a confirmação e avisa uma vez só (sem faixa + toast repetidos).
-      const msg = err.message || "Erro ao excluir Representada.";
-      setConfirmDelete(null);
-      setDeleteType(null);
-      setDeleteId(null);
-      toast.error(msg);
+      closeConfirm();
+      if (err?.code === "BRAND_HAS_PRODUCTS" && err.productCount > 0) {
+        // Oferece excluir junto com o catálogo, com confirmação pelo nome.
+        setBrandDeleteWithProducts({
+          id: brandId,
+          name: brandName,
+          productCount: err.productCount,
+        });
+        return;
+      }
+      toast.error(err.message || "Erro ao excluir Representada.");
       console.error("Erro ao excluir Representada:", err);
+    }
+  };
+
+  const handleDeleteBrandWithProducts = async (brand) => {
+    try {
+      const result = await apiService.deleteBrand(brand.id, {
+        withProducts: true,
+      });
+      setBrandDeleteWithProducts(null);
+      await afterBrandDeleted(brand.id);
+      const n = Number(result?.deletedProducts) || 0;
+      toast.success(
+        `Representada excluída com ${n.toLocaleString("pt-BR")} ${
+          n === 1 ? "produto" : "produtos"
+        }.`,
+      );
+    } catch (err) {
+      toast.error(err.message || "Erro ao excluir Representada.");
+      console.error("Erro ao excluir Representada com produtos:", err);
     }
   };
 
@@ -234,6 +267,9 @@ export function useProductsPage(userRole) {
     setDeleteType(type);
     setDeleteId(id);
     setConfirmDelete(name);
+    // A representada usa modal (fecha por ação do usuário); só a confirmação
+    // inline de produto expira sozinha.
+    if (type === "brand") return;
 
     setTimeout(() => {
       setConfirmDelete(null);
@@ -362,6 +398,9 @@ export function useProductsPage(userRole) {
     handleDeleteProduct,
     handleEditBrand,
     handleDeleteBrand,
+    handleDeleteBrandWithProducts,
+    brandDeleteWithProducts,
+    cancelBrandDeleteWithProducts: () => setBrandDeleteWithProducts(null),
     confirmDeleteAction,
     resetForms,
     handleExportProducts,

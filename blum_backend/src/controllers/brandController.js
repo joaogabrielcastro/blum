@@ -1,4 +1,4 @@
-const { sql } = require("../config/database");
+const { sql, pool, beginTenantTransaction } = require("../config/database");
 const brandAccessService = require("../services/brandAccessService");
 const { assertCanAddBrand } = require("../services/planLimitsService");
 const { mapBrandsPayload } = require("../mappers/apiResponseMapper");
@@ -126,10 +126,50 @@ exports.deleteBrand = async (req, res) => {
     `;
 
     const productCount = parseInt(productsWithBrand[0].count, 10);
+    const withProducts = ["1", "true"].includes(
+      String(req.query.withProducts || "").toLowerCase(),
+    );
+
+    if (productCount > 0 && withProducts) {
+      // Tudo ou nada: produtos e representada na mesma transação.
+      // Itens de pedidos guardam nome/marca/preço; o vínculo vira NULL (FK).
+      const client = await pool.connect();
+      let deletedProducts = 0;
+      try {
+        await beginTenantTransaction(client);
+        const del = await client.query(
+          `DELETE FROM products
+           WHERE tenant_id = $1 AND (brand_id = $2 OR brand = $3)`,
+          [req.user.tenantId, brandId, brandName],
+        );
+        deletedProducts = del.rowCount;
+        const removed = await client.query(
+          `DELETE FROM brands WHERE id = $1 AND tenant_id = $2`,
+          [brandId, req.user.tenantId],
+        );
+        if (removed.rowCount === 0) {
+          throw Object.assign(new Error("Marca não encontrada."), {
+            statusCode: 404,
+          });
+        }
+        await client.query("COMMIT");
+      } catch (txError) {
+        await client.query("ROLLBACK");
+        throw txError;
+      } finally {
+        client.release();
+      }
+      return res.status(200).json({
+        message: "Representada e produtos excluídos.",
+        deletedProducts,
+      });
+    }
+
     if (productCount > 0) {
       const plural = productCount === 1 ? "produto" : "produtos";
       return res.status(400).json({
         error: `"${brandName}" ainda tem ${productCount} ${plural} no catálogo. Exclua esses produtos (ou mova para outra representada) e tente de novo. Pedidos já feitos não impedem a exclusão.`,
+        code: "BRAND_HAS_PRODUCTS",
         productCount,
       });
     }
@@ -148,6 +188,9 @@ exports.deleteBrand = async (req, res) => {
 
     res.status(200).json({ message: "Marca deletada com sucesso!" });
   } catch (error) {
+    if (error.statusCode === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error("Erro ao deletar marca:", error);
     res.status(500).json({
       error: "Erro ao deletar marca.",
