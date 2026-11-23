@@ -125,10 +125,12 @@ exports.deleteBrand = async (req, res) => {
         AND (brand_id = ${brandId} OR brand = ${brandName})
     `;
 
-    if (parseInt(productsWithBrand[0].count) > 0) {
+    const productCount = parseInt(productsWithBrand[0].count, 10);
+    if (productCount > 0) {
+      const plural = productCount === 1 ? "produto" : "produtos";
       return res.status(400).json({
-        error:
-          "Não é possível excluir a representada enquanto existirem produtos associados. Mova ou exclua esses produtos primeiro.",
+        error: `"${brandName}" ainda tem ${productCount} ${plural} no catálogo. Exclua esses produtos (ou mova para outra representada) e tente de novo. Pedidos já feitos não impedem a exclusão.`,
+        productCount,
       });
     }
 

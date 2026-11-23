@@ -208,9 +208,11 @@ const ProductsPage = ({ userRole, subscription }) => {
           confirmDelete={confirmDelete}
           deleteType={deleteType}
           onConfirmDelete={() => {
+            // Retorna a Promise: o modal fica "processando" e evita clique duplo.
             if (deleteType === "brand") {
-              handleDeleteBrand(deleteId);
+              return handleDeleteBrand(deleteId);
             }
+            return undefined;
           }}
           onCancelDelete={clearDeleteConfirm}
         />

@@ -220,8 +220,11 @@ export function useProductsPage(userRole) {
       }
       toast.success("Representada excluída.");
     } catch (err) {
+      // Fecha a confirmação e avisa uma vez só (sem faixa + toast repetidos).
       const msg = err.message || "Erro ao excluir Representada.";
-      setError(msg);
+      setConfirmDelete(null);
+      setDeleteType(null);
+      setDeleteId(null);
       toast.error(msg);
       console.error("Erro ao excluir Representada:", err);
     }

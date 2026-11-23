@@ -21,7 +21,11 @@ export function ToastProvider({ children }) {
     (message, variant = "info", duration = 4500) => {
       const id = ++idCounter;
       const text = String(message ?? "").trim() || "—";
-      setToasts((prev) => [...prev, { id, message: text, variant }]);
+      // Mesma mensagem já visível: substitui em vez de empilhar cópias.
+      setToasts((prev) => [
+        ...prev.filter((t) => !(t.message === text && t.variant === variant)),
+        { id, message: text, variant },
+      ]);
       if (duration > 0) {
         setTimeout(() => remove(id), duration);
       }
