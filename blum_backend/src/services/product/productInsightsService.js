@@ -27,8 +27,26 @@ async function getProductInsights(productId, tenantIdInput) {
   const p = productRows[0];
   if (!p) throw notFound();
 
+  // Cada seção é independente: se uma falhar (ex.: diferença de esquema em
+  // uma base antiga), a ficha abre com as demais e informa o que faltou.
+  const unavailable = [];
+  const section = (name, query) =>
+    Promise.resolve(query).catch((error) => {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          message: "product_insights_section_failed",
+          section: name,
+          productId: id,
+          detail: error.message,
+        }),
+      );
+      unavailable.push(name);
+      return [];
+    });
+
   const [salesSummary, costHistory, priceHistory, movements, clients] = await Promise.all([
-    sql`
+    section("vendas_resumo", sql`
       SELECT
         MAX(o.createdat) AS last_sale_at,
         COALESCE(SUM(oi.quantity) FILTER (WHERE o.createdat >= NOW() - INTERVAL '30 days'), 0) AS qty_30,
@@ -38,8 +56,8 @@ async function getProductInsights(productId, tenantIdInput) {
       JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
       WHERE oi.tenant_id = ${tenantId} AND oi.product_id = ${id}
         AND o.document_type = 'pedido'
-    `,
-    sql`
+    `),
+    section("custo", sql`
       SELECT ph.id, ph.event_type, ph.purchase_price, ph.quantity, ph.old_cost, ph.new_cost,
              COALESCE(ph.created_at, ph.changedat, ph.purchase_date) AS at,
              ph.purchase_date,
@@ -49,22 +67,22 @@ async function getProductInsights(productId, tenantIdInput) {
       LEFT JOIN purchase_invoices pi
         ON pi.id = ph.purchase_invoice_id AND pi.tenant_id = ph.tenant_id
       WHERE ph.tenant_id = ${tenantId}
-        AND COALESCE(ph.product_id, ph.productid) = ${id}
+        AND ph.product_id = ${id}
         AND COALESCE(ph.event_type, 'custo') IN ('custo', 'custo_manual')
       ORDER BY ph.id DESC
       LIMIT 100
-    `,
-    sql`
+    `),
+    section("preco_venda", sql`
       SELECT id, event_type, old_price, new_price, changed_by,
              COALESCE(changedat, created_at) AS at, purchase_invoice_id
       FROM price_history
       WHERE tenant_id = ${tenantId}
-        AND COALESCE(product_id, productid) = ${id}
+        AND product_id = ${id}
         AND event_type IN ('venda', 'reajuste')
       ORDER BY id DESC
       LIMIT 100
-    `,
-    sql`
+    `),
+    section("estoque", sql`
       SELECT m.id, m.movement_type, m.quantity, m.balance_after, m.unit_cost,
              m.reference_type, m.reference_id, m.reason, m.created_at,
              u.name AS user_name, u.username AS user_username,
@@ -79,8 +97,8 @@ async function getProductInsights(productId, tenantIdInput) {
       WHERE m.tenant_id = ${tenantId} AND m.product_id = ${id}
       ORDER BY m.created_at DESC, m.id DESC
       LIMIT 100
-    `,
-    sql`
+    `),
+    section("vendas", sql`
       SELECT c.id AS client_id, c.companyname AS client_name,
              SUM(oi.quantity) AS quantity,
              SUM(oi.line_total) AS total,
@@ -94,7 +112,7 @@ async function getProductInsights(productId, tenantIdInput) {
       GROUP BY c.id, c.companyname
       ORDER BY MAX(o.createdat) DESC
       LIMIT 20
-    `,
+    `),
   ]);
 
   const s = salesSummary[0] || {};
@@ -102,6 +120,7 @@ async function getProductInsights(productId, tenantIdInput) {
   const cost = num(p.cost_price);
 
   return {
+    unavailable,
     product: {
       id: p.id,
       name: p.name,
