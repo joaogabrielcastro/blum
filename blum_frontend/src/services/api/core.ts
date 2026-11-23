@@ -21,6 +21,7 @@ export interface ApiRequestError extends Error {
   details?: unknown;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
+  productCount?: number;
   requestId?: string | null;
 }
 
@@ -180,6 +181,7 @@ async function parseErrorResponse(response: Response): Promise<never> {
   customError.requiredPlan = error.requiredPlan;
   customError.subscription = error.subscription;
   customError.stockWarnings = error.stockWarnings;
+  customError.productCount = error.productCount;
   throw attachMeta(customError);
 }
 

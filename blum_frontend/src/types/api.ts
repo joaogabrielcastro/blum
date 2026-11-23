@@ -47,6 +47,7 @@ export interface ApiErrorBody {
   requiredPlan?: string;
   subscription?: SubscriptionSummary;
   stockWarnings?: unknown[];
+  productCount?: number;
   requestId?: string;
 }
 

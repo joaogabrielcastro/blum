@@ -106,4 +106,11 @@ describe("Login", () => {
     ).toBeTruthy();
     expect(mockPersistAuthSession).not.toHaveBeenCalled();
   });
+  it("não tira o foco de quem já começou a digitar", async () => {
+    renderLogin();
+    const password = screen.getByLabelText(/^senha/i);
+    password.focus();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(document.activeElement).toBe(password);
+  });
 });

@@ -187,7 +187,7 @@ const RepresentadaPicker = ({
       <ConfirmationModal
         show={isAdmin && Boolean(confirmDelete) && deleteType === "brand"}
         title="Excluir representada?"
-        message={`Deseja excluir “${confirmDelete || ""}”? A exclusão só será permitida quando não houver produtos vinculados. Os pedidos históricos serão preservados.`}
+        message={`Deseja excluir “${confirmDelete || ""}”? Se houver produtos no catálogo, você poderá escolher excluí-los junto. Os pedidos históricos serão preservados.`}
         confirmText="Excluir representada"
         onConfirm={onConfirmDelete}
         onCancel={onCancelDelete}
