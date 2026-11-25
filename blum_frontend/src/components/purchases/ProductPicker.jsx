@@ -79,6 +79,7 @@ export default function ProductPicker({ brandId, initialQuery = "", onPick, onCa
                   <span className="block truncate font-medium text-ink">{p.name}</span>
                   <span className="font-mono text-xs text-ink-muted">
                     {p.productCode || p.productcode} · estoque {p.stock}
+                    {p.brand ? ` · ${p.brand}` : ""}
                   </span>
                 </span>
                 <span className="shrink-0 tabular-nums text-ink-muted">

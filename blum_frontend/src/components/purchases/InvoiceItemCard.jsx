@@ -27,6 +27,14 @@ function marginClass(m) {
 export default function InvoiceItemCard({ item, decision, brandId, onChange }) {
   const [picking, setPicking] = useState(false);
   const { product, createProduct } = decision;
+  // Mesmo catálogo pode existir em duas representadas (mesmo código e nome).
+  const productBrandId = product?.brandId ?? product?.brand_id ?? null;
+  const otherBrand =
+    Boolean(product) &&
+    brandId !== "" &&
+    brandId != null &&
+    productBrandId != null &&
+    String(productBrandId) !== String(brandId);
   const line = computeInvoiceLine(item, product, decision.factor);
 
   const costParts = [
@@ -102,6 +110,16 @@ export default function InvoiceItemCard({ item, decision, brandId, onChange }) {
             >
               Trocar produto
             </button>
+            {otherBrand ? (
+              <p
+                role="alert"
+                className="w-full rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-900"
+              >
+                Produto de outra representada: {product.brand || "sem representada"}.
+                O estoque e o custo vão para esse cadastro. Use “Trocar produto” se o
+                correto for o da representada da nota.
+              </p>
+            ) : null}
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">

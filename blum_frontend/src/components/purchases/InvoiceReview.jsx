@@ -43,6 +43,11 @@ export default function InvoiceReview({
       }).length,
     [preview.items, decisions],
   );
+  const otherBrandCount = preview.items.filter((item) => {
+    const p = decisions[item.itemNumber].product;
+    const pid = p?.brandId ?? p?.brand_id;
+    return p && brandId !== "" && pid != null && String(pid) !== String(brandId);
+  }).length;
   const invalidFactor = preview.items.some(
     (item) => parseFactor(decisions[item.itemNumber].factor) == null,
   );
@@ -157,8 +162,11 @@ export default function InvoiceReview({
       </div>
 
       <div className="sticky bottom-20 z-10 flex flex-col gap-3 rounded-2xl border border-edge bg-surface-elevated p-4 shadow-pop sm:bottom-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className={`text-sm ${blockReason ? "text-amber-700" : "text-ink-muted"}`}>
+        <p className={`text-sm ${blockReason || otherBrandCount ? "text-amber-700" : "text-ink-muted"}`}>
           {blockReason ||
+            (otherBrandCount
+              ? `${otherBrandCount} item(ns) vinculado(s) a produto de outra representada — confira antes de confirmar.`
+              : null) ||
             "Ao confirmar: soma o estoque, atualiza o custo médio e registra a nota. Preços só mudam nos itens marcados."}
         </p>
         <div className="flex gap-2">

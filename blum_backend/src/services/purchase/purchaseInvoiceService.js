@@ -44,11 +44,25 @@ async function findActiveInvoiceByKey(tenantId, accessKey) {
   return rows[0] || null;
 }
 
-/** Casa cada item da nota com um produto: vínculo salvo → EAN → código. */
+/**
+ * Casa cada item da nota com um produto: vínculo salvo → EAN → código.
+ *
+ * A representada da nota tem prioridade: vínculo salvo e EAN valem para a
+ * empresa inteira, e um mesmo catálogo pode existir em duas representadas
+ * (mesmo código e nome). Se o candidato for de outra representada e a da
+ * nota tiver o produto (mesmo código ou EAN), usa o da nota. Sem alternativa,
+ * mantém o candidato e marca `otherBrand` para a tela avisar.
+ */
 async function matchItems({ tenantId, nfe, brand }) {
   const cnpj = nfe.emitter.cnpj || "";
   const codes = nfe.items.map((i) => i.supplierCode).filter(Boolean);
   const eans = nfe.items.map((i) => i.ean).filter(Boolean);
+  const brandId = brand ? Number(brand.id) : null;
+  const brandName = brand ? String(brand.name) : null;
+  const inBrand = (row) =>
+    brand != null &&
+    (Number(row.brand_id) === brandId ||
+      (row.brand_id == null && String(row.brand || "") === brandName));
 
   const links = codes.length && cnpj
     ? await sql`
@@ -60,42 +74,62 @@ async function matchItems({ tenantId, nfe, brand }) {
     : [];
   const byLink = new Map(links.map((l) => [l.supplier_code, l]));
 
+  // EAN: prefere o produto da representada da nota quando houver mais de um.
   const byEanRows = eans.length
     ? await sql`
-        SELECT id, ean FROM products
+        SELECT id, ean, brand_id, brand FROM products
         WHERE tenant_id = ${tenantId} AND ean = ANY(${eans})
+        ORDER BY id
       `
     : [];
-  const byEan = new Map(byEanRows.map((r) => [r.ean, r.id]));
+  const byEan = new Map();
+  const byEanInBrand = new Map();
+  for (const r of byEanRows) {
+    if (!byEan.has(r.ean)) byEan.set(r.ean, r.id);
+    if (inBrand(r) && !byEanInBrand.has(r.ean)) byEanInBrand.set(r.ean, r.id);
+  }
 
+  // Código: só dentro da representada da nota (código não é único na empresa).
   const byCodeRows = codes.length && brand
     ? await sql`
-        SELECT id, productcode FROM products
+        SELECT id, productcode, brand_id FROM products
         WHERE tenant_id = ${tenantId} AND productcode = ANY(${codes})
           AND (brand_id = ${brand.id} OR brand = ${brand.name})
+        ORDER BY (brand_id = ${brand.id}) DESC, id
       `
     : [];
-  const byCode = new Map(byCodeRows.map((r) => [String(r.productcode), r.id]));
+  const byCode = new Map();
+  for (const r of byCodeRows) {
+    const key = String(r.productcode);
+    if (!byCode.has(key)) byCode.set(key, r.id);
+  }
 
-  const matches = nfe.items.map((item) => {
+  const raw = nfe.items.map((item) => {
     const link = byLink.get(item.supplierCode);
+    const factor = link ? Number(link.conversion_factor) || 1 : 1;
+    const inBrandAlt =
+      (item.ean && byEanInBrand.get(item.ean)) || byCode.get(item.supplierCode) || null;
     if (link) {
       return {
         productId: link.product_id,
         matchedBy: "vinculo",
-        conversionFactor: Number(link.conversion_factor) || 1,
+        conversionFactor: factor,
+        inBrandAlt,
       };
     }
     if (item.ean && byEan.has(item.ean)) {
-      return { productId: byEan.get(item.ean), matchedBy: "ean", conversionFactor: 1 };
+      const eanId = byEanInBrand.get(item.ean) ?? byEan.get(item.ean);
+      return { productId: eanId, matchedBy: "ean", conversionFactor: 1, inBrandAlt };
     }
     if (byCode.has(item.supplierCode)) {
-      return { productId: byCode.get(item.supplierCode), matchedBy: "codigo", conversionFactor: 1 };
+      return { productId: byCode.get(item.supplierCode), matchedBy: "codigo", conversionFactor: 1, inBrandAlt: null };
     }
-    return { productId: null, matchedBy: null, conversionFactor: 1 };
+    return { productId: null, matchedBy: null, conversionFactor: 1, inBrandAlt: null };
   });
 
-  const ids = [...new Set(matches.map((m) => m.productId).filter(Boolean))];
+  const ids = [
+    ...new Set(raw.flatMap((m) => [m.productId, m.inBrandAlt]).filter(Boolean)),
+  ];
   const products = ids.length
     ? await sql`
         SELECT id, name, productcode, brand, brand_id, stock, price, cost_price, last_cost
@@ -103,10 +137,25 @@ async function matchItems({ tenantId, nfe, brand }) {
       `
     : [];
   const productsById = new Map(products.map((p) => [Number(p.id), p]));
-  return matches.map((m) => ({
-    ...m,
-    product: m.productId ? productsById.get(Number(m.productId)) || null : null,
-  }));
+
+  return raw.map((m) => {
+    let product = m.productId ? productsById.get(Number(m.productId)) || null : null;
+    let matchedBy = m.matchedBy;
+    if (product && brand && !inBrand(product) && m.inBrandAlt) {
+      const alt = productsById.get(Number(m.inBrandAlt));
+      if (alt) {
+        product = alt;
+        matchedBy = "codigo";
+      }
+    }
+    return {
+      productId: product ? product.id : null,
+      matchedBy,
+      conversionFactor: m.conversionFactor,
+      product,
+      otherBrand: Boolean(product && brand && !inBrand(product)),
+    };
+  });
 }
 
 function describeProduct(product) {
@@ -116,6 +165,7 @@ function describeProduct(product) {
     name: product.name,
     productCode: product.productcode,
     brand: product.brand,
+    brandId: product.brand_id ?? null,
     stock: Number(product.stock),
     price: num(product.price),
     costPrice: num(product.cost_price),
@@ -209,6 +259,7 @@ async function preview({ xml, tenantId, brandId }) {
       return {
         ...item,
         matchedBy: match.matchedBy,
+        otherBrand: match.otherBrand,
         product: describeProduct(match.product),
         ...computeLine(item, match.product, match.conversionFactor),
       };
@@ -593,6 +644,7 @@ async function reverseInvoice({ id, tenantId, user }) {
 }
 
 module.exports = {
+  matchItems,
   preview,
   confirm,
   listInvoices,
